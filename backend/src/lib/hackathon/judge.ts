@@ -21,8 +21,11 @@ export interface JudgeRow {
 }
 
 /** The judge row of this hackathon for `email` (any status), or null. */
-export async function findJudgeByEmail(hackathonId: string, email: string): Promise<JudgeRow | null> {
-  const rows = await prisma.$queryRaw<Array<{ id: string; name: string | null; user_id: string | null; status: string }>>`
+// `client` lets the score write re-run these checks inside its transaction.
+type Db = Pick<typeof prisma, '$queryRaw' | 'hackathonJudgeTrack'>;
+
+export async function findJudgeByEmail(hackathonId: string, email: string, client: Db = prisma): Promise<JudgeRow | null> {
+  const rows = await client.$queryRaw<Array<{ id: string; name: string | null; user_id: string | null; status: string }>>`
     SELECT id, name, user_id, status
       FROM hackathon_judges
      WHERE hackathon_id = ${hackathonId}::uuid AND lower(email) = lower(${email.trim()})
@@ -37,8 +40,8 @@ export async function linkJudgeUser(judge: JudgeRow, userId: string): Promise<vo
   await prisma.hackathonJudge.updateMany({ where: { id: judge.id, userId: null }, data: { userId } });
 }
 
-export async function judgeTrackIds(judgeId: string): Promise<string[]> {
-  const rows = await prisma.hackathonJudgeTrack.findMany({ where: { judgeId }, select: { trackId: true } });
+export async function judgeTrackIds(judgeId: string, client: Db = prisma): Promise<string[]> {
+  const rows = await client.hackathonJudgeTrack.findMany({ where: { judgeId }, select: { trackId: true } });
   return rows.map((r) => r.trackId);
 }
 

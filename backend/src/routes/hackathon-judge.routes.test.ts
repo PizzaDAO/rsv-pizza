@@ -53,6 +53,7 @@ const OTHER_PARTY = '99999999-9999-4999-8999-999999999999';
 const OTHER_HID = '88888888-8888-4888-8888-888888888888';
 const T1 = '33333333-3333-4333-8333-333333333333';
 const T2 = '33333333-3333-4333-8333-444444444444';
+const T3 = '33333333-3333-4333-8333-555555555555'; // no projects
 const sid = (n: number) => `55555555-5555-4555-8555-${String(n).padStart(12, '0')}`;
 const S_A = sid(1); // submitted, T1, team alice
 const S_B = sid(2); // submitted, T2, team bob + carol (carol is also a judge -> conflict)
@@ -65,6 +66,7 @@ const CT = '66666666-6666-4666-8666-000000000002'; // Tech w1 max 10
 
 type Row = Record<string, any>;
 let db: Record<string, Row[]>;
+let inTx = false;
 let seq = 0;
 const nextTime = () => new Date(Date.UTC(2027, 0, 1) + ++seq * 1000);
 
@@ -88,8 +90,12 @@ function matches(row: Row, where: Row | undefined): boolean {
   for (const [k, cond] of Object.entries(where)) {
     if (cond === undefined) continue;
     if (k === 'tracks' && cond?.some) {
-      const ids: string[] = cond.some.trackId.in;
-      if (!db.hackathonSubmissionTrack.some((t) => t.submissionId === row.id && ids.includes(t.trackId))) return false;
+      const tc = cond.some.trackId;
+      const ids: string[] = typeof tc === 'string' ? [tc] : tc.in;
+      const rel = row.email !== undefined
+        ? db.hackathonJudgeTrack.filter((t) => t.judgeId === row.id)
+        : db.hackathonSubmissionTrack.filter((t) => t.submissionId === row.id);
+      if (!rel.some((t) => ids.includes(t.trackId))) return false;
       continue;
     }
     const v = row[k];
@@ -115,6 +121,9 @@ function withInclude(table: string, row: Row): Row {
         guest: db.guest.find((g) => g.id === m.guestId) ?? null,
       })),
     };
+  }
+  if (table === 'hackathonJudge') {
+    out.tracks = db.hackathonJudgeTrack.filter((t) => t.judgeId === row.id).map((t) => ({ trackId: t.trackId }));
   }
   if (table === 'hackathon') {
     out.tracks = db.hackathonTrack.filter((t) => t.hackathonId === row.id);
@@ -169,6 +178,22 @@ function fakeModel(table: string) {
       return { ...row };
     }),
     aggregate: vi.fn(async () => ({ _max: { sortOrder: null } })),
+    delete: vi.fn(async ({ where }: Row) => {
+      const i = rows().findIndex((x) => matches(x, where));
+      if (i < 0) throw Object.assign(new Error('not found'), { code: 'P2025' });
+      const [r] = rows().splice(i, 1);
+      if (table === 'hackathonTrack') db.hackathonJudgeTrack = db.hackathonJudgeTrack.filter((t) => t.trackId !== r.id);
+      return r;
+    }),
+    deleteMany: vi.fn(async ({ where }: Row) => {
+      const before = rows().length;
+      db[table] = rows().filter((x) => !matches(x, where));
+      return { count: before - db[table].length };
+    }),
+    createMany: vi.fn(async ({ data }: Row) => {
+      for (const d of data) rows().push({ ...d });
+      return { count: data.length };
+    }),
   };
 }
 
@@ -197,6 +222,7 @@ function seed() {
     hackathonTrack: [
       { id: T1, hackathonId: HID, name: 'DeFi', description: null, sponsorName: null, sortOrder: 0 },
       { id: T2, hackathonId: HID, name: 'Consumer', description: null, sponsorName: null, sortOrder: 1 },
+      { id: T3, hackathonId: HID, name: 'Infra', description: null, sponsorName: null, sortOrder: 2 },
     ],
     hackathonCriterion: [
       { id: CI, hackathonId: HID, name: 'Impact', description: null, weight: 3, maxScore: 5, sortOrder: 0 },
@@ -207,9 +233,17 @@ function seed() {
       { id: 'j-t1', hackathonId: HID, email: 'scoped@example.com', name: 'Scoped', userId: null, status: 'active' },
       { id: 'j-rm', hackathonId: HID, email: 'removed@example.com', name: 'Gone', userId: 'u-r', status: 'removed' },
       { id: 'j-carol', hackathonId: HID, email: 'carol@example.com', name: 'Carol', userId: null, status: 'active' },
+      { id: 'j-t3', hackathonId: HID, email: 't3@example.com', name: 'Tia Three', userId: null, status: 'active' },
+      { id: 'j-multi', hackathonId: HID, email: 'multi@example.com', name: 'Multi', userId: null, status: 'active' },
       { id: 'j-other', hackathonId: OTHER_HID, email: 'other@example.com', name: 'Other', userId: null, status: 'active' },
     ],
-    hackathonJudgeTrack: [{ judgeId: 'j-t1', trackId: T1, hackathonId: HID }],
+    hackathonJudgeTrack: [
+      { judgeId: 'j-t1', trackId: T1, hackathonId: HID },
+      { judgeId: 'j-t3', trackId: T3, hackathonId: HID },
+      { judgeId: 'j-multi', trackId: T1, hackathonId: HID },
+      { judgeId: 'j-multi', trackId: T3, hackathonId: HID },
+    ],
+    hackathonPrize: [],
     user: Object.values(USERS).map((u) => ({ id: u.id, email: u.email, name: u.name, profilePictureUrl: null })),
     guest: [{ id: 'g-carol', partyId: PARTY, email: 'Carol@Example.com', name: 'Carol (rsvp)' }],
     hackathonTeam: [
@@ -247,35 +281,67 @@ function seed() {
 
 const setHackathon = (over: Row) => Object.assign(db.hackathon[0], over);
 
+/** Simulates a concurrent write that commits between the route's pre-checks and its transaction. */
+function raceIntoNextTransaction(before: () => void) {
+  const real = mockPrisma.$transaction;
+  mockPrisma.$transaction = vi.fn(async (fn: any, opts?: any) => {
+    mockPrisma.$transaction = real;
+    before();
+    return real(fn, opts);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   seed();
-  for (const t of ['hackathon', 'hackathonTrack', 'hackathonCriterion', 'hackathonJudge', 'hackathonJudgeTrack', 'hackathonSubmission', 'hackathonScore', 'hackathonTeam', 'party', 'guest']) {
+  for (const t of ['hackathon', 'hackathonTrack', 'hackathonCriterion', 'hackathonJudge', 'hackathonJudgeTrack', 'hackathonSubmission', 'hackathonScore', 'hackathonTeam', 'party', 'guest', 'hackathonPrize', 'hackathonSubmissionTrack']) {
     mockPrisma[t] = fakeModel(t);
   }
   db.party = [{ id: PARTY, eventType: null, eventTags: [], date: null, region: null, city: null, password: null }];
-  mockPrisma.$transaction = vi.fn(async (arg: any) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)));
+  mockPrisma.$transaction = vi.fn(async (arg: any) => {
+    if (typeof arg !== 'function') return Promise.all(arg);
+    inTx = true;
+    try { return await arg(mockPrisma); } finally { inTx = false; }
+  });
   mockPrisma.$queryRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
     const sql = strings.join('?');
+    if (sql.includes('FROM hackathons') && sql.includes('FOR UPDATE')) {
+      const [id] = vals;
+      return db.hackathon.filter((h) => h.id === id).map((h) => ({ id: h.id }));
+    }
+    if (sql.includes('FROM hackathon_judges') && sql.includes('FOR SHARE')) {
+      const [id, hackathonId] = vals;
+      return db.hackathonJudge.filter((j) => j.id === id && j.hackathonId === hackathonId).map((j) => ({ status: j.status }));
+    }
+    if (sql.includes('FROM hackathon_submissions') && sql.includes('FOR SHARE')) {
+      const [id, hackathonId] = vals;
+      return db.hackathonSubmission.filter((x) => x.id === id && x.hackathonId === hackathonId).map((x) => ({ status: x.status }));
+    }
     if (sql.includes('FROM hackathon_judges')) {
       const [hackathonId, email] = vals;
       return db.hackathonJudge
         .filter((j) => j.hackathonId === hackathonId && j.email.toLowerCase() === String(email).toLowerCase())
         .map((j) => ({ id: j.id, name: j.name, user_id: j.userId, status: j.status }));
     }
-    if (sql.includes('FOR SHARE')) {
+    if (sql.includes('FROM hackathons') && sql.includes('FOR SHARE')) {
       const [id] = vals;
       return db.hackathon.filter((h) => h.id === id).map((h) => ({ judging_status: h.judgingStatus }));
     }
     throw new Error('unexpected raw query: ' + sql);
   });
-  mockPrisma.$executeRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
+  mockPrisma.$executeRaw = vi.fn(async (q: any, ...rest: any[]) => {
+    // Prisma.sql object (retotal) or a tagged template.
+    const strings: readonly string[] = q?.strings ?? q;
+    const vals: any[] = q?.values ?? rest;
     const sql = strings.join('?');
-    if (sql.includes('UPDATE hackathon_scores SET total')) {
-      const [total, id] = vals;
-      const s = db.hackathonScore.find((x) => x.id === id);
-      if (s) s.total = total;
-      return s ? 1 : 0;
+    if (sql.includes('UPDATE hackathon_scores AS s SET total')) {
+      if (!inTx) throw new Error('retotal must run inside the criterion transaction');
+      const pairs = vals.slice(0, -1);
+      for (let i = 0; i < pairs.length; i += 2) {
+        const sc = db.hackathonScore.find((x) => x.id === pairs[i]);
+        if (sc) sc.total = pairs[i + 1];
+      }
+      return pairs.length / 2;
     }
     throw new Error('unexpected raw SQL: ' + sql);
   });
@@ -458,10 +524,7 @@ describe('score writes', () => {
   });
 
   it('closed between the first check and the write -> 409 (re-checked under FOR SHARE)', async () => {
-    mockPrisma.$transaction = vi.fn(async (fn: any) => {
-      setHackathon({ judgingStatus: 'closed' });
-      return fn(mockPrisma);
-    });
+    raceIntoNextTransaction(() => setHackathon({ judgingStatus: 'closed' }));
     const res = await score('judge', S_A);
     expect(res.status).toBe(409);
     expect(db.hackathonScore).toHaveLength(0);
@@ -583,5 +646,113 @@ describe('privacy', () => {
     const s = JSON.stringify(d.body);
     expect(d.body.submission.myScore).toBeNull();
     for (const leak of ['scoped-secret', 'scoped@example.com', 'j-t1']) expect(s).not.toContain(leak);
+  });
+});
+
+// ------------------------------------------------------------------ review fixes (races, progress, track scope)
+
+describe('score write re-checks everything under the transaction locks', () => {
+  it('judge removed between the pre-check and the write -> 403, nothing stored', async () => {
+    raceIntoNextTransaction(() => { db.hackathonJudge.find((j) => j.id === 'j-all')!.status = 'removed'; });
+    const res = await score('judge', S_A);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('JUDGE_REMOVED');
+    expect(db.hackathonScore).toHaveLength(0);
+  });
+
+  it('project disqualified between the pre-check and the write -> 404, nothing stored', async () => {
+    raceIntoNextTransaction(() => { db.hackathonSubmission.find((x) => x.id === S_A)!.status = 'disqualified'; });
+    expect((await score('judge', S_A)).status).toBe(404);
+    expect(db.hackathonScore).toHaveLength(0);
+  });
+
+  it("judge's tracks changed between the pre-check and the write -> 404", async () => {
+    raceIntoNextTransaction(() => { db.hackathonJudgeTrack.find((t) => t.judgeId === 'j-t1')!.trackId = T2; });
+    expect((await score('scoped', S_A)).status).toBe(404);
+    expect(db.hackathonScore).toHaveLength(0);
+  });
+
+  it('criterion added between the pre-check and the write -> validated against the new rubric (400, no incomplete score)', async () => {
+    raceIntoNextTransaction(() => {
+      db.hackathonCriterion.push({ id: '66666666-6666-4666-8666-000000000003', hackathonId: HID, name: 'Design', description: null, weight: 1, maxScore: 5, sortOrder: 2 });
+    });
+    const res = await score('judge', S_A);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/missing: Design/);
+    expect(db.hackathonScore).toHaveLength(0);
+  });
+
+  it('max score lowered between the pre-check and the write -> validated against the new max', async () => {
+    raceIntoNextTransaction(() => { db.hackathonCriterion.find((c) => c.id === CT)!.maxScore = 5; });
+    expect((await score('judge', S_A)).status).toBe(400); // tech 7 > new max 5
+    expect(db.hackathonScore).toHaveLength(0);
+  });
+});
+
+describe('rubric writes re-check "has anyone scored" under the hackathon row lock', () => {
+  const firstScore = () => db.hackathonScore.push({ id: 'race', hackathonId: HID, judgeId: 'j-all', submissionId: S_A, criterionScores: goodScores, total: 77.5, privateComment: null, teamFeedback: null, updatedAt: nextTime() });
+
+  it('add criterion racing the first score -> 409, no criterion added', async () => {
+    raceIntoNextTransaction(firstScore);
+    const res = await api().post(`${hbase}/criteria`).set('Authorization', auth('host')).send({ name: 'Design' });
+    expect(res.status).toBe(409);
+    expect(db.hackathonCriterion).toHaveLength(2);
+    expect(mockPrisma.$queryRaw.mock.calls.some((c: any[]) => c[0].join('?').includes('FOR UPDATE'))).toBe(true);
+  });
+
+  it('max-score change racing the first score -> 409, unchanged', async () => {
+    raceIntoNextTransaction(firstScore);
+    expect((await api().patch(`${hbase}/criteria/${CT}`).set('Authorization', auth('host')).send({ maxScore: 5 })).status).toBe(409);
+    expect(db.hackathonCriterion.find((c) => c.id === CT)!.maxScore).toBe(10);
+  });
+
+  it('delete racing the first score -> 409', async () => {
+    raceIntoNextTransaction(firstScore);
+    expect((await api().delete(`${hbase}/criteria/${CT}`).set('Authorization', auth('host'))).status).toBe(409);
+    expect(db.hackathonCriterion).toHaveLength(2);
+  });
+
+  it('weight change and re-total happen in ONE transaction', async () => {
+    await score('judge', S_A);
+    mockPrisma.$transaction.mockClear();
+    const w = await api().patch(`${hbase}/criteria/${CI}`).set('Authorization', auth('host')).send({ weight: 1 });
+    expect(w.status).toBe(200);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1); // the fake throws if the UPDATE runs outside it
+    // (0.8 + 0.7) / 2 = 0.75
+    expect(db.hackathonScore[0].total).toBe(75);
+  });
+});
+
+describe('judge progress counts only the current assignment', () => {
+  it("scores outside a judge's current tracks don't count toward 'scored'", async () => {
+    await score('scoped', S_A); // j-t1 judges T1 = [S_A]
+    db.hackathonJudgeTrack.find((t) => t.judgeId === 'j-t1')!.trackId = T2; // now T2 = [S_B, S_C]
+    const b = (await api().get(`${hbase}/leaderboard`).set('Authorization', auth('host'))).body;
+    const j = b.judges.find((x: Row) => x.id === 'j-t1');
+    expect([j.assigned, j.scored]).toEqual([2, 0]);
+    // The score itself still counts on the leaderboard (the judge is active).
+    expect(b.overall.find((r: Row) => r.submissionId === S_A).scoreCount).toBe(1);
+  });
+});
+
+describe("deleting a judge's only track never widens them to all tracks", () => {
+  it('409 TRACK_HAS_JUDGES naming the judge; a multi-track judge alone does not block', async () => {
+    const res = await api().delete(`${hbase}/tracks/${T3}`).set('Authorization', auth('host'));
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('TRACK_HAS_JUDGES');
+    expect(res.body.error.message).toMatch(/Tia Three/);
+    expect(res.body.error.message).not.toMatch(/Multi/);
+    expect(db.hackathonTrack.some((t) => t.id === T3)).toBe(true);
+
+    // Re-scope Tia to T1; now only j-multi (T1 + T3) uses T3, which just narrows: allowed.
+    db.hackathonJudgeTrack.find((t) => t.judgeId === 'j-t3')!.trackId = T1;
+    const ok = await api().delete(`${hbase}/tracks/${T3}`).set('Authorization', auth('host'));
+    expect(ok.status).toBe(200);
+    expect(db.hackathonJudgeTrack.filter((t) => t.judgeId === 'j-multi').map((t) => t.trackId)).toEqual([T1]);
+  });
+
+  it('a removed judge scoped only to the track does not block', async () => {
+    db.hackathonJudge.find((j) => j.id === 'j-t3')!.status = 'removed';
+    expect((await api().delete(`${hbase}/tracks/${T3}`).set('Authorization', auth('host'))).status).toBe(200);
   });
 });

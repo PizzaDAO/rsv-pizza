@@ -72,7 +72,8 @@ export function JudgeScoring({ submission, criteria, tracks, judgingStatus, savi
   saving: boolean;
   error: string | null;
   onDismissError: () => void;
-  onSave: (body: ScoreInput) => Promise<boolean>;
+  /** Called with this panel's own submission id, so a save can't land on another project. */
+  onSave: (submissionId: string, body: ScoreInput) => Promise<boolean>;
   onBack: () => void;
   onNext: (() => void) | null;
 }) {
@@ -98,7 +99,7 @@ export function JudgeScoring({ submission, criteria, tracks, judgingStatus, savi
   const links = submission.links ? LINKS.filter(([k]) => !!submission.links![k]) : [];
 
   const save = async () => {
-    const ok = await onSave({ scores, privateComment: privateComment.trim() || null, teamFeedback: teamFeedback.trim() || null });
+    const ok = await onSave(submission.id, { scores, privateComment: privateComment.trim() || null, teamFeedback: teamFeedback.trim() || null });
     if (ok) setSavedAt(new Date().toISOString());
   };
 

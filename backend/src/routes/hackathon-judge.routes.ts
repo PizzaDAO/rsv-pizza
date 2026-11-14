@@ -186,18 +186,39 @@ router.put('/:partyId/submissions/:submissionId/score', requireAuth, judgeScoreL
     const ctx = await loadJudgeCtx(req);
     const sub = await loadScopedSubmission(ctx, req.params.submissionId);
     assertOpen(ctx.h.judgingStatus);
-    const input = parseScoreInput((req.body ?? {}) as Record<string, unknown>, ctx.criteria);
-    const data = {
-      criterionScores: input.criterionScores,
-      total: input.total,
-      privateComment: input.privateComment,
-      teamFeedback: input.teamFeedback,
-    };
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    // Fail fast on a malformed body before taking any lock (re-validated under the lock below).
+    parseScoreInput(body, ctx.criteria);
     await prisma.$transaction(async (tx: any) => {
-      // FOR SHARE: a concurrent "close judging" (UPDATE hackathons) waits for this write, and a
-      // write that starts after the close sees 'closed' here.
-      const rows = await tx.$queryRaw`SELECT judging_status FROM hackathons WHERE id = ${ctx.h.id}::uuid FOR SHARE`;
-      assertOpen(Array.isArray(rows) && rows[0] ? rows[0].judging_status : 'closed');
+      // Everything the write depends on is re-checked here under row locks, so it can't race:
+      //   - hackathons FOR SHARE: "close judging" and rubric edits (which take FOR UPDATE on
+      //     the same row, hackathon.routes.ts lockHackathon) wait for this write, and a write
+      //     that starts after them sees the new status / rubric;
+      //   - the judge row FOR SHARE: a concurrent removal waits; a removed judge can't write;
+      //   - the submission row FOR SHARE: a concurrent disqualify / withdraw waits; a project
+      //     that is no longer `submitted` (or left the judge's tracks) is a 404.
+      const hk = await tx.$queryRaw`SELECT judging_status FROM hackathons WHERE id = ${ctx.h.id}::uuid FOR SHARE`;
+      assertOpen(Array.isArray(hk) && hk[0] ? hk[0].judging_status : 'closed');
+      const jr = await tx.$queryRaw`SELECT status FROM hackathon_judges WHERE id = ${ctx.judge.id}::uuid AND hackathon_id = ${ctx.h.id}::uuid FOR SHARE`;
+      if (!Array.isArray(jr) || jr[0]?.status !== 'active') throw new AppError("You're no longer a judge for this hackathon.", 403, 'JUDGE_REMOVED');
+      const sr = await tx.$queryRaw`SELECT status FROM hackathon_submissions WHERE id = ${sub.id}::uuid AND hackathon_id = ${ctx.h.id}::uuid FOR SHARE`;
+      if (!Array.isArray(sr) || sr[0]?.status !== 'submitted') throw notFound('Project not found');
+      const inScope = await tx.hackathonSubmission.findFirst({
+        where: { id: sub.id, ...judgeScopeWhere(ctx.h.id, await judgeTrackIds(ctx.judge.id, tx)) },
+        select: { id: true },
+      });
+      if (!inScope) throw notFound('Project not found');
+      const criteria = await tx.hackathonCriterion.findMany({
+        where: { hackathonId: ctx.h.id },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      });
+      const input = parseScoreInput(body, criteria);
+      const data = {
+        criterionScores: input.criterionScores,
+        total: input.total,
+        privateComment: input.privateComment,
+        teamFeedback: input.teamFeedback,
+      };
       await tx.hackathonScore.upsert({
         where: { judgeId_submissionId: { judgeId: ctx.judge.id, submissionId: sub.id } },
         create: { ...data, hackathonId: ctx.h.id, judgeId: ctx.judge.id, submissionId: sub.id },

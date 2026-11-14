@@ -22,6 +22,7 @@
  *   - hackathon: DELETE = soft disable (disabled_at); ?hard=true only while no submission exists
  */
 import { Router, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { rateLimit } from 'express-rate-limit';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
@@ -176,6 +177,15 @@ router.put('/:partyId/hackathon', ...guard, async (req: AuthRequest, res: Respon
 
 // ---------------------------------------------------------------- tracks
 
+/** Active judges whose only scoped track is `trackId` (names or emails, for the 409 message). */
+async function judgesScopedOnlyTo(hackathonId: string, trackId: string): Promise<string[]> {
+  const judges = await prisma.hackathonJudge.findMany({
+    where: { hackathonId, status: 'active', tracks: { some: { trackId } } },
+    select: { name: true, email: true, tracks: { select: { trackId: true } } },
+  });
+  return judges.filter((j) => j.tracks.length === 1).map((j) => j.name || j.email);
+}
+
 router.post('/:partyId/hackathon/tracks', ...guard, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
@@ -220,6 +230,15 @@ router.delete('/:partyId/hackathon/tracks/:trackId', ...guard, async (req: AuthR
     }
     if (entries > 0) {
       throw conflict(`${entries} project(s) entered this track, so it can't be deleted.`, 'TRACK_HAS_SUBMISSIONS');
+    }
+    // A judge scoped to only this track would silently widen to ALL tracks once its
+    // hackathon_judge_tracks row cascades away (no rows = all tracks). Make the host decide.
+    const onlyTrackJudges = await judgesScopedOnlyTo(h.id, id);
+    if (onlyTrackJudges.length) {
+      throw conflict(
+        `${onlyTrackJudges.join(', ')} only judge${onlyTrackJudges.length === 1 ? 's' : ''} this track. Change their tracks in Judging first.`,
+        'TRACK_HAS_JUDGES',
+      );
     }
     await prisma.hackathonTrack.delete({ where: { id } })
       .catch((e) => mapFk(e, 'This track has prizes or projects. Remove them first.', 'TRACK_IN_USE'));
@@ -280,34 +299,50 @@ router.delete('/:partyId/hackathon/prizes/:prizeId', ...guard, async (req: AuthR
 
 // ---------------------------------------------------------------- rubric criteria
 
-/** Recompute hackathon_scores.total from criterion_scores with the current weights. */
-async function retotalScores(hackathonId: string) {
-  const [criteria, scores] = await Promise.all([
-    prisma.hackathonCriterion.findMany({ where: { hackathonId }, select: { id: true, weight: true, maxScore: true } }),
-    prisma.hackathonScore.findMany({ where: { hackathonId }, select: { id: true, criterionScores: true, total: true } }),
-  ]);
-  const changed = scores
+/**
+ * Rubric writes vs score writes. A rubric change that depends on "has anyone scored yet?" takes
+ * FOR UPDATE on the hackathon row; the judge score write takes FOR SHARE on the same row and
+ * re-reads the rubric under it (hackathon-judge.routes.ts). So a first score and a criterion
+ * add / max-score change / delete are serialized: whichever commits second sees the other.
+ */
+async function lockHackathon(tx: any, hackathonId: string) {
+  await tx.$queryRaw`SELECT id FROM hackathons WHERE id = ${hackathonId}::uuid FOR UPDATE`;
+}
+
+/**
+ * Recompute hackathon_scores.total from criterion_scores with the current weights, inside the
+ * caller's transaction. One UPDATE ... FROM (VALUES ...) per 500 rows; raw so updated_at (the
+ * judge's "scored at") isn't bumped by a host weight edit.
+ */
+async function retotalScores(tx: any, hackathonId: string) {
+  const criteria = await tx.hackathonCriterion.findMany({ where: { hackathonId }, select: { id: true, weight: true, maxScore: true } });
+  const scores = await tx.hackathonScore.findMany({ where: { hackathonId }, select: { id: true, criterionScores: true, total: true } });
+  const changed = (scores as Array<{ id: string; criterionScores: unknown; total: unknown }>)
     .map((s) => ({ id: s.id, total: computeTotal(readCriterionScores(s.criterionScores), criteria), old: Number(String(s.total)) }))
     .filter((s): s is { id: string; total: number; old: number } => s.total !== null && s.total !== s.old);
-  for (let i = 0; i < changed.length; i += 25) {
-    // Raw so updated_at (the judge's "scored at") isn't bumped by a host weight edit.
-    await Promise.all(changed.slice(i, i + 25).map((s) =>
-      prisma.$executeRaw`UPDATE hackathon_scores SET total = ${s.total} WHERE id = ${s.id}::uuid AND hackathon_id = ${hackathonId}::uuid`));
+  for (let i = 0; i < changed.length; i += 500) {
+    const rows = Prisma.join(changed.slice(i, i + 500).map((c) => Prisma.sql`(${c.id}::uuid, ${c.total}::numeric)`));
+    await tx.$executeRaw(Prisma.sql`UPDATE hackathon_scores AS s SET total = v.total FROM (VALUES ${rows}) AS v(id, total) WHERE s.id = v.id AND s.hackathon_id = ${hackathonId}::uuid`);
   }
 }
+
+const hasScores = async (tx: any, hackathonId: string) => (await tx.hackathonScore.count({ where: { hackathonId } })) > 0;
 
 router.post('/:partyId/hackathon/criteria', ...guard, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
     const h = await getHackathon(partyId);
     const data = parseCriterion(req.body ?? {}, false);
-    // Adding a criterion after scoring started would leave every existing score incomplete.
-    if ((await prisma.hackathonScore.count({ where: { hackathonId: h.id } })) > 0) {
-      throw conflict('Judges have started scoring, so criteria can no longer be added. You can still change weights.', 'RUBRIC_LOCKED');
-    }
     await assertCap('hackathonCriterion', h.id, LIMITS.criteria, 'criteria');
     if (data.sortOrder === undefined) data.sortOrder = await nextSort('hackathonCriterion', h.id);
-    await prisma.hackathonCriterion.create({ data: { ...(data as any), hackathonId: h.id } });
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      // Adding a criterion after scoring started would leave every existing score incomplete.
+      if (await hasScores(tx, h.id)) {
+        throw conflict('Judges have started scoring, so criteria can no longer be added. You can still change weights.', 'RUBRIC_LOCKED');
+      }
+      await tx.hackathonCriterion.create({ data: { ...(data as any), hackathonId: h.id } });
+    });
     return respond(res, partyId, 201);
   } catch (error) {
     next(error);
@@ -320,19 +355,20 @@ router.patch('/:partyId/hackathon/criteria/:criterionId', ...guard, async (req: 
     const id = childId(req.params.criterionId);
     const h = await getHackathon(partyId);
     const data = parseCriterion(req.body ?? {}, true);
-    const current = await prisma.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, weight: true, maxScore: true } });
-    if (!current) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
-    const scoreCount = await prisma.hackathonScore.count({ where: { hackathonId: h.id } });
-    // Rubric rules once scoring started (lib/hackathon/scoring.ts): max score is locked (existing
-    // scores were given on the old scale); weight changes are fine and re-total every score.
-    if (scoreCount > 0 && data.maxScore !== undefined && data.maxScore !== current.maxScore) {
-      throw conflict('Judges have started scoring, so the max score can no longer change. You can still change the weight.', 'RUBRIC_LOCKED');
-    }
-    const weightChanged = data.weight !== undefined && data.weight !== current.weight;
-    await prisma.hackathonCriterion.updateMany({ where: { id, hackathonId: h.id }, data });
-    // The stored total is a cache: the leaderboard and judge views always recompute from
-    // criterion_scores with the current weights, so this re-total is for exports / later reads.
-    if (scoreCount > 0 && weightChanged) await retotalScores(h.id);
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      const current = await tx.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, weight: true, maxScore: true } });
+      if (!current) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
+      const scored = await hasScores(tx, h.id);
+      // Rubric rules once scoring started (lib/hackathon/scoring.ts): max score is locked
+      // (existing scores were given on the old scale); weight changes re-total every score in
+      // this same transaction, so stored totals never disagree with the weights.
+      if (scored && data.maxScore !== undefined && data.maxScore !== current.maxScore) {
+        throw conflict('Judges have started scoring, so the max score can no longer change. You can still change the weight.', 'RUBRIC_LOCKED');
+      }
+      await tx.hackathonCriterion.updateMany({ where: { id, hackathonId: h.id }, data });
+      if (scored && data.weight !== undefined && data.weight !== current.weight) await retotalScores(tx, h.id);
+    }, { timeout: 20_000 });
     return respond(res, partyId);
   } catch (error) {
     next(error);
@@ -344,11 +380,13 @@ router.delete('/:partyId/hackathon/criteria/:criterionId', ...guard, async (req:
     const { partyId } = req.params;
     const id = childId(req.params.criterionId);
     const h = await getHackathon(partyId);
-    const c = await prisma.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true } });
-    if (!c) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
-    const scores = await prisma.hackathonScore.count({ where: { hackathonId: h.id } });
-    if (scores > 0) throw conflict('Judges have started scoring, so rubric criteria can no longer be deleted.', 'RUBRIC_LOCKED');
-    await prisma.hackathonCriterion.delete({ where: { id } });
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      const c = await tx.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true } });
+      if (!c) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
+      if (await hasScores(tx, h.id)) throw conflict('Judges have started scoring, so rubric criteria can no longer be deleted.', 'RUBRIC_LOCKED');
+      await tx.hackathonCriterion.delete({ where: { id } });
+    });
     return respond(res, partyId);
   } catch (error) {
     next(error);
@@ -632,7 +670,10 @@ router.get('/:partyId/hackathon/leaderboard', ...readGuard, async (req: AuthRequ
       const tracks: string[] = (j.tracks ?? []).map((t: Record<string, any>) => t.trackId);
       const assigned = subs.filter((s) =>
         (!tracks.length || s.tracks.some((t) => tracks.includes(t.trackId))) && !isConflicted(s as any, j.email));
-      const mine = scores.filter((x) => x.judgeId === j.id && subIds.has(x.submissionId));
+      // Only scores on projects in the judge's CURRENT assignment (a track change or a new
+      // conflict must not make "scored" exceed "assigned").
+      const assignedIds = new Set(assigned.map((s) => s.id));
+      const mine = scores.filter((x) => x.judgeId === j.id && assignedIds.has(x.submissionId));
       const last = mine.reduce<Date | null>((acc, x) => (!acc || x.updatedAt > acc ? x.updatedAt : acc), null);
       return {
         id: j.id,

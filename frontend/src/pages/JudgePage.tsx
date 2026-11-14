@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Gavel, Loader2, LogIn, CheckCircle2, Circle, EyeOff, Hash } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -86,8 +86,16 @@ export function JudgePage() {
     return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
   }, [partyId, user, loadQueue]);
 
+  // The selected project id, readable from async callbacks (a save that resolves after the
+  // judge moved on must not overwrite the new project's panel).
+  const selectedRef = useRef<string | null>(null);
+  selectedRef.current = selectedId;
+
   useEffect(() => {
-    if (!partyId || !selectedId) { setDetail(null); return; }
+    // Drop the previous project's detail first: its scores must never sit on screen (with
+    // Save enabled) under a different selected project while the new one loads.
+    setDetail(null);
+    if (!partyId || !selectedId) return;
     let cancelled = false;
     setDetailLoading(true);
     setError(null);
@@ -105,13 +113,14 @@ export function JudgePage() {
 
   const nextUnscored = useMemo(() => shown.find((s) => !s.scored && s.id !== selectedId) ?? null, [shown, selectedId]);
 
-  const save = useCallback(async (body: ScoreInput): Promise<boolean> => {
-    if (!partyId || !selectedId) return false;
+  /** Saves to the project the form was rendered for (never to whatever is selected now). */
+  const save = useCallback(async (submissionId: string, body: ScoreInput): Promise<boolean> => {
+    if (!partyId || submissionId !== selectedRef.current) return false;
     setSaving(true);
     setError(null);
     try {
-      const res = await hackathonJudgeApi.score(partyId, selectedId, body);
-      setDetail(res);
+      const res = await hackathonJudgeApi.score(partyId, submissionId, body);
+      if (res.submission.id === selectedRef.current) setDetail(res);
       void loadQueue(true);
       return true;
     } catch (e: any) {
@@ -121,7 +130,7 @@ export function JudgePage() {
     } finally {
       setSaving(false);
     }
-  }, [partyId, selectedId, loadQueue]);
+  }, [partyId, loadQueue]);
 
   const select = (id: string | null) => {
     setSelectedId(id);
@@ -179,6 +188,8 @@ export function JudgePage() {
     );
   }
 
+  // Only ever render the detail of the project that is selected right now.
+  const current = detail && selectedId && detail.submission.id === selectedId ? detail : null;
   const pct = data.progress.total ? Math.round((100 * data.progress.scored) / data.progress.total) : 0;
   const trackName = (id: string) => data.tracks.find((t) => t.id === id)?.name;
 
@@ -271,11 +282,12 @@ export function JudgePage() {
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 items-start">
         {queuePanel}
         <div className={selectedId ? '' : 'hidden lg:block'}>
-          {selectedId && detailLoading && !detail ? (
-            <div className="card p-6 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" /></div>
-          ) : detail && selectedId ? (
+          {selectedId && !current ? (
+            <div className="card p-6 flex justify-center" data-testid="judge-detail-loading">{detailLoading && <Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" />}</div>
+          ) : current ? (
             <JudgeScoring
-              submission={detail.submission}
+              key={current.submission.id}
+              submission={current.submission}
               criteria={data.criteria}
               tracks={data.tracks}
               judgingStatus={data.judgingStatus}

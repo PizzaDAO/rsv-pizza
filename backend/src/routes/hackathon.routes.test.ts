@@ -22,6 +22,7 @@ const model = () => ({
   createMany: vi.fn(),
   count: vi.fn(),
   aggregate: vi.fn(),
+  findMany: vi.fn(async () => []),
 });
 const mockPrisma = vi.hoisted(() => ({}) as Record<string, any>);
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
