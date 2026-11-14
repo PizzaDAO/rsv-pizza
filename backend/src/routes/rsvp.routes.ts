@@ -218,7 +218,8 @@ router.get('/:inviteCode/guest/:email', optionalAuth, async (req: AuthRequest, r
     const { inviteCode, email } = req.params;
 
     const callerEmail = req.userEmail?.trim().toLowerCase();
-    if (!callerEmail || callerEmail !== email.trim().toLowerCase()) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!callerEmail || callerEmail !== normalizedEmail) {
       return res.status(404).json({ error: 'Guest not found' });
     }
 
@@ -257,7 +258,7 @@ router.get('/:inviteCode/guest/:email', optionalAuth, async (req: AuthRequest, r
     const guest = await prisma.guest.findFirst({
       where: {
         partyId: party.id,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
       },
       select: {
         id: true,

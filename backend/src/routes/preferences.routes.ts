@@ -86,19 +86,28 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response, next: NextF
 
     // Older rows were saved with the email as typed on the RSVP form (mixed case),
     // so match case-insensitively and take the most recently updated row.
+    // PostgREST also treats `*` in an ilike pattern as `%`, so the ILIKE is only a
+    // pre-filter: rows are re-checked for an exact (normalized) email match below.
     const { data, error } = await supabaseAdmin
       .from('user_preferences')
-      .select('dietary_restrictions, liked_toppings, disliked_toppings, liked_beverages, disliked_beverages')
+      .select('email, dietary_restrictions, liked_toppings, disliked_toppings, liked_beverages, disliked_beverages')
       .ilike('email', escapeLike(email))
       .order('updated_at', { ascending: false, nullsFirst: false })
-      .limit(1);
+      .limit(20);
 
     if (error) {
       console.error('Error loading user preferences:', error);
       return res.status(500).json({ error: 'Failed to load preferences' });
     }
 
-    res.json({ preferences: data?.[0] ?? null });
+    const own = (data ?? []).find(
+      (row: { email?: unknown }) => typeof row.email === 'string' && row.email.trim().toLowerCase() === email
+    );
+    if (!own) {
+      return res.json({ preferences: null });
+    }
+    const { email: _rowEmail, ...preferences } = own;
+    res.json({ preferences });
   } catch (error) {
     next(error);
   }

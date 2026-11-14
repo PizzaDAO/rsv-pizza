@@ -136,7 +136,7 @@ describe('GET /api/preferences', () => {
 
   it("returns the caller's own preferences, keyed on the JWT email", async () => {
     const prefs = { dietary_restrictions: ['vegan'], liked_toppings: [], disliked_toppings: [], liked_beverages: [], disliked_beverages: [] };
-    sb.setResult({ data: [prefs], error: null });
+    sb.setResult({ data: [{ email: 'Alice@Example.com', ...prefs }], error: null });
     const res = await request(app())
       .get('/api/preferences?email=Alice%40Example.com')
       .set(auth('alice@example.com'));
@@ -151,6 +151,28 @@ describe('GET /api/preferences', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ preferences: null });
     expect(sb.calls).toContainEqual(['ilike', ['email', 'alice@example.com']]);
+  });
+
+  it("never returns another email's row even if the ILIKE pre-filter matches it", async () => {
+    // e.g. a JWT email of `*@example.com`: PostgREST treats `*` like `%`.
+    const prefs = { dietary_restrictions: ['vegan'], liked_toppings: [], disliked_toppings: [], liked_beverages: [], disliked_beverages: [] };
+    sb.setResult({ data: [{ email: 'victim@example.com', ...prefs }], error: null });
+    const res = await request(app()).get('/api/preferences').set(auth('*@example.com'));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ preferences: null });
+  });
+
+  it('picks the exact-email row when the pre-filter also matched others', async () => {
+    const mine = { dietary_restrictions: ['halal'], liked_toppings: [], disliked_toppings: [], liked_beverages: [], disliked_beverages: [] };
+    sb.setResult({
+      data: [
+        { email: 'other@example.com', ...mine, dietary_restrictions: ['vegan'] },
+        { email: ' Alice@example.com ', ...mine },
+      ],
+      error: null,
+    });
+    const res = await request(app()).get('/api/preferences').set(auth('alice@example.com'));
+    expect(res.body).toEqual({ preferences: mine });
   });
 
   it('escapes LIKE wildcards so an email cannot match other rows', async () => {
