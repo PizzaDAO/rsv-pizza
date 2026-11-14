@@ -73,3 +73,10 @@ Run all of these from the repo root on Node 20, in the worktree.
 
 ## Rollback
 The change is limited to three files. Revert the PR (`git revert <merge sha>`), which restores `^5.4.2`, the old lockfile and the dependabot ignore, then redeploy (GitHub Pages runs again on merge to master, and the Vercel projects rebuild). For an urgent fix, promote the previous Vercel deployment for each brand project first.
+
+## As shipped (PR #1297)
+
+- vite `^6.4.6` (6.4.6), not `^6.4.4`.
+- The frontend's vitest no longer keeps a nested vite 8.3.8: it dedupes to 6.4.6 (vitest 4 supports `^6 || ^7 || ^8`). The backend's vitest stays on 8.3.8.
+- Lockfile: plain `npm install vite@^6.4.6 -w frontend` left a stale root vite 5 and broke CI; the lock was corrected so vite 6 is hoisted. The review confirmed it is canonical (`npm install --package-lock-only` gives no diff).
+- Bundle: total JS +6.0%, one extra chunk. Accepted. vite 6 resolves the CJS-only `@safe-global/safe-apps-provider`'s `require()` to the CJS Safe SDK, which pulls a second (CJS) copy of viem into the provider's lazy chunk (~658 kB, 185 kB gzip). It only loads inside a Safe{Wallet} iframe; the initial load is +0.2%. If it matters later, alias the SDK to its ESM build or drop the Safe connector.
