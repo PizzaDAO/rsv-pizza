@@ -1,5 +1,27 @@
-import { metaMask, coinbaseWallet } from 'wagmi/connectors';
+import { injected, metaMask, coinbaseWallet } from 'wagmi/connectors';
 import { isMobile } from './handoff';
+
+/** Synchronously ask for EIP-6963 announcements; returns how many wallets answered. */
+export function countEip6963Wallets(win: Window | undefined = typeof window !== 'undefined' ? window : undefined): number {
+  if (!win) return 0;
+  const seen = new Set<string>();
+  const onAnnounce = (e: Event) => {
+    seen.add((e as CustomEvent).detail?.info?.uuid ?? String(seen.size));
+  };
+  win.addEventListener('eip6963:announceProvider', onAnnounce);
+  win.dispatchEvent(new Event('eip6963:requestProvider'));
+  win.removeEventListener('eip6963:announceProvider', onAnnounce);
+  return seen.size;
+}
+
+/**
+ * Generic injected() only as a fallback for older in-app browsers that inject window.ethereum
+ * but never announce via EIP-6963. When any EIP-6963 wallet exists it is omitted, so entries
+ * are not duplicated.
+ */
+export function needsLegacyInjected(win: (Window & { ethereum?: unknown }) | undefined = typeof window !== 'undefined' ? window : undefined): boolean {
+  return !!win && !!win.ethereum && countEip6963Wallets(win) === 0;
+}
 
 /**
  * Connector list that needs no WalletConnect / Reown project ID.
@@ -13,6 +35,7 @@ import { isMobile } from './handoff';
  * - coinbaseWallet: Coinbase Wallet SDK incl. Smart Wallet passkeys.
  */
 export const walletConnectors = (app: { name: string; url: string; icon: string }) => [
+  ...(needsLegacyInjected() ? [injected({ shimDisconnect: true })] : []),
   ...(isMobile()
     ? []
     : [metaMask({ dappMetadata: { name: app.name, url: app.url, iconUrl: app.icon }, enableAnalytics: false })]),

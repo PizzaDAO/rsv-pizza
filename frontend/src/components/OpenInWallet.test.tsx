@@ -29,6 +29,8 @@ describe('OpenInWallet', () => {
 
     link.addEventListener('click', (e) => e.preventDefault());
     await userEvent.click(link);
-    await waitFor(() => expect(getUrl).toHaveBeenCalledTimes(2));
+    // The tapped link stays rendered right after the tap; a fresh URL arrives later.
+    expect(screen.getByRole('link', { name: 'MetaMask' })).toBe(link);
+    await waitFor(() => expect(getUrl).toHaveBeenCalledTimes(2), { timeout: 2000 });
   });
 });

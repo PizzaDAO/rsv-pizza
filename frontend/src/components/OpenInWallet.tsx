@@ -97,9 +97,9 @@ export function OpenInWallet({ getHandoffUrl = defaultGetHandoffUrl, className =
         if (document.visibilityState === 'visible') window.location.href = fallback;
       }, 1500);
     }
-    // The token in this URL is now spent; mint a fresh one for the next tap.
-    setUrl(null);
-    window.setTimeout(mint, 0);
+    // The token in this URL is now spent. Keep the tapped link rendered (removing it mid-tap can
+    // make iOS/Android drop the navigation) and swap in a fresh URL a moment later.
+    window.setTimeout(mint, 500);
   };
 
   const handleCopy = async () => {

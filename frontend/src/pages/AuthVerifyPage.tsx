@@ -14,7 +14,7 @@ export function AuthVerifyPage() {
   const location = useLocation();
   const { setUser, signOut } = useAuth();
   const { t } = useTranslation('auth');
-  const [status, setStatus] = useState<'idle' | 'confirm' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'already' | 'confirm' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
@@ -49,7 +49,10 @@ export function AuthVerifyPage() {
     let alreadySignedIn = false;
     try { alreadySignedIn = !!localStorage.getItem('authToken'); } catch { /* storage blocked */ }
     if (alreadySignedIn) {
-      navigate(nextPath() || '/', { replace: true });
+      let storedEmail: string | null = null;
+      try { storedEmail = JSON.parse(localStorage.getItem('user') || 'null')?.email ?? null; } catch { /* ignore */ }
+      setConfirmEmail(storedEmail);
+      setStatus('already');
       return;
     }
 
@@ -266,6 +269,19 @@ export function AuthVerifyPage() {
                 {t('verifyPage.requestNew')}
               </button>
             </p>
+          </>
+        )}
+
+        {status === 'already' && (
+          <>
+            <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
+              <Check className="w-8 h-8 text-[#39d98a]" />
+            </div>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.alreadySignedIn', { defaultValue: 'Already signed in' })}</h1>
+            {confirmEmail && <p className="text-theme-text-secondary mb-6 break-all">{confirmEmail}</p>}
+            <button onClick={() => navigate(nextPath() || '/', { replace: true })} className="btn-primary">
+              {t('verifyPage.continue')}
+            </button>
           </>
         )}
 

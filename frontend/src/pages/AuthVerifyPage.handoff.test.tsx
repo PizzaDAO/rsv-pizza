@@ -63,7 +63,10 @@ describe('AuthVerifyPage token hand-off (login CSRF protection)', () => {
 
   it('skips the token entirely when this browser is already signed in', async () => {
     localStorage.setItem('authToken', 'existing');
+    localStorage.setItem('user', JSON.stringify({ email: 'me@example.org' }));
     renderAt('/auth/verify?token=tok&next=%2Fe%2Fparty');
+    expect(await screen.findByText('me@example.org')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     expect((await screen.findByTestId('where')).textContent).toBe('/e/party');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(localStorage.getItem('authToken')).toBe('existing');
