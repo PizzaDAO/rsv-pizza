@@ -7,6 +7,7 @@ import { triggerWebhook } from '../../services/webhook.service.js';
 import { setDeleteContext } from '../../helpers/auditContext.js';
 import { canUserAccessTab } from '../../helpers/partyAccess.js';
 import { siteForParty } from '../../lib/siteBrand.js';
+import { signGuestToken } from '../../lib/guestToken.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -34,13 +35,17 @@ export function buildInviteEmail(
     timezone: string | null;
     eventImageUrl?: string | null;
   },
-  guest: { name: string; email: string },
+  guest: { name: string; email: string; id?: string | null },
   customMessage?: string,
   baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
 ): { subject: string; html: string } {
-  const eventUrl = party.customUrl
+  // invite-verify: when the invite is for a real guest row, the RSVP link carries that
+  // guest's capability token (?t=), so the invitee can complete their RSVP without logging
+  // in, and nobody else who merely knows their address can. The link points only at our own
+  // site; the email has no QR or other third-party URL that would see it.
+  const eventUrl = (party.customUrl
     ? `${baseUrl}/${party.customUrl}`
-    : `${baseUrl}/${party.inviteCode}`;
+    : `${baseUrl}/${party.inviteCode}`) + (guest.id ? `?t=${signGuestToken(guest.id)}` : '');
 
   const dateText = party.date
     ? new Date(party.date).toLocaleDateString('en-US', {
@@ -599,7 +604,7 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
         timezone: party.timezone,
         eventImageUrl: party.eventImageUrl,
       },
-      { name: guest.name, email: guest.email },
+      { name: guest.name, email: guest.email, id: guest.id },
       undefined,
       site.url
     );
@@ -711,6 +716,9 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
 
           const name = (g.name || '').trim() || normalizedEmail.split('@')[0];
 
+          // invite-verify: the created row's id, so the invite link can carry its guest
+          // token. A testOnly send creates no row, so its link has no token.
+          let invitedGuestId: string | null = null;
           if (!testOnly) {
             if (existingEmails.has(normalizedEmail)) {
               results.skipped.push({ email: displayEmail, reason: 'already invited' });
@@ -732,6 +740,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                 },
               });
               results.createdGuestIds.push(newGuest.id);
+              invitedGuestId = newGuest.id;
             } catch (err: any) {
               results.failed.push({
                 email: displayEmail,
@@ -755,7 +764,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                   timezone: party.timezone,
                   eventImageUrl: party.eventImageUrl,
                 },
-                { name, email: normalizedEmail },
+                { name, email: normalizedEmail, id: invitedGuestId },
                 customMessage,
                 site.url
               );

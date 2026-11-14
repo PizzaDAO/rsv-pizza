@@ -15,6 +15,7 @@ import { useConfetti } from '../hooks/useConfetti';
 import { useTranslation } from 'react-i18next';
 import { RSVPFlowContent } from '../components/RSVPFlowContent';
 import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
+import { captureInviteToken } from '../lib/inviteToken';
 
 /** Map DbParty (snake_case) to a partial PublicEvent for RSVPFlowContent */
 function dbPartyToPublicEvent(party: DbParty, inviteCode: string): PublicEvent {
@@ -65,6 +66,8 @@ export function RSVPPage() {
   const { user } = useAuth();
   const { t } = useTranslation('rsvp');
   const { t: tCommon } = useTranslation('common');
+  // invite-verify: keep a host invite link's ?t= token for the RSVP submit, strip it from the URL.
+  useEffect(() => { captureInviteToken(); }, []);
 
   // Page-level loading state
   const [loading, setLoading] = useState(true);

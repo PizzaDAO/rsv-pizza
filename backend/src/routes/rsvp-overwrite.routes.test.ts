@@ -238,9 +238,20 @@ describe('POST /api/rsvp/:inviteCode/guest: duplicate email', () => {
     expect(mockPrisma.guest.update).not.toHaveBeenCalled();
   });
 
-  it('logged out on a host invite (INVITED, never RSVPd): completes it like a new RSVP', async () => {
+  it('logged out on a host invite (INVITED) WITHOUT its token: decoy, nothing written (invite-verify)', async () => {
     setup({ existing: { status: 'INVITED', submittedVia: 'invite', ethereumAddress: null as any } });
     const res = await request(app()).post('/api/rsvp/abc123/guest').send(BODY);
+    expect(res.status).toBe(201);
+    expect(res.body.guest.id).not.toBe(EXISTING_ID);
+    expect(verifyGuestToken(EXISTING_ID, res.body.guestToken)).toBe(false);
+    expect(mockPrisma.guest.update).not.toHaveBeenCalled();
+  });
+
+  it('logged out on a host invite (INVITED) with its invite-link token: completes it like a new RSVP', async () => {
+    setup({ existing: { status: 'INVITED', submittedVia: 'invite', ethereumAddress: null as any } });
+    const res = await request(app())
+      .post('/api/rsvp/abc123/guest')
+      .send({ ...BODY, guestToken: signGuestToken(EXISTING_ID) });
     expect(res.status).toBe(201);
     expect(res.body.updated).toBeUndefined();
     expect(res.body.guest).toEqual({ id: EXISTING_ID, name: 'Mallory', status: 'CONFIRMED', waitlistPosition: null });

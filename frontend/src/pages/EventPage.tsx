@@ -42,6 +42,7 @@ import { GuestScorecard } from '../components/scorecard';
 import { uploadPhoto } from '../lib/api';
 import { uploadEventPhoto } from '../lib/supabase';
 import { BRAND, brandUrl } from '../config/brand';
+import { captureInviteToken } from '../lib/inviteToken';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -79,6 +80,9 @@ export function EventPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, i18n } = useTranslation('event');
+  // invite-verify: a host invite link carries the invitee's token as ?t=; keep it for the
+  // RSVP submit and take it out of the address bar.
+  useEffect(() => { captureInviteToken(); }, []);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

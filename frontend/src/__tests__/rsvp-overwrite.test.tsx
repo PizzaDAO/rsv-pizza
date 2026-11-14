@@ -121,10 +121,10 @@ describe('RSVP success screen', () => {
   const renderIt = (f: any) =>
     render(<RSVPFlowContent event={event} form={f} eventName="Pizza Night" closeButtonLabel="Close" onClose={() => {}} twitterHandles={[]} />);
 
-  it('logged out: neutral title + note that an earlier RSVP is unchanged', () => {
+  it('logged out: a success screen now always means a real save (invite-verify), so no decoy note', () => {
     renderIt(form());
-    expect(screen.getByText("You're on the list!")).toBeInTheDocument();
-    expect(screen.getByText(/Already RSVP'd with this email\? Your original RSVP stays as it was/)).toBeInTheDocument();
+    expect(screen.getByText('See you at Pizza Night!')).toBeInTheDocument();
+    expect(screen.queryByText(/Already RSVP'd with this email/)).not.toBeInTheDocument();
     expect(screen.queryByText(/already on the guest list for/)).not.toBeInTheDocument();
   });
 

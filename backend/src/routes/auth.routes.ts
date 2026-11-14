@@ -1,68 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { rateLimit } from 'express-rate-limit';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
-import { siteForOrigin, type SiteBrand } from '../lib/siteBrand.js';
+import { siteForOrigin } from '../lib/siteBrand.js';
+import { issueLoginCode, recordFailedCodeAttempt } from '../lib/loginCode.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
-
-// Helper function to send magic link email
-async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string, site: SiteBrand) {
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sign In to ${site.name}</title>
-      </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to ${site.name}</h1>
-          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
-        </div>
-
-        <div style="background: #f9f9f9; padding: 30px 20px; border-radius: 12px; text-align: center; margin: 30px 0;">
-          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666; font-weight: 600;">YOUR SIGN-IN CODE</p>
-          <div style="font-size: 48px; font-weight: 700; letter-spacing: 8px; color: #ff393a; margin: 10px 0;">${code}</div>
-          <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
-        </div>
-
-        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
-          <p style="margin-top: 20px;">
-            If you didn't request this email, you can safely ignore it.
-          </p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
-      to: [email],
-      subject: `${site.name} Code ${code}`,
-      html: emailHtml,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Resend API error: ${error}`);
-  }
-
-  return response.json();
-}
 
 // POST /api/auth/magic-link - Request magic link
 router.post('/magic-link', async (req: Request, res: Response, next: NextFunction) => {
@@ -89,56 +36,11 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     // Find or create user
     let user = await prisma.user.findUnique({ where: { email: normalized } });
 
-    // Generate secure token
-    const token = randomBytes(32).toString('hex');
-
-    // Generate unique 6-digit code
-    let code = '';
-    let codeExists = true;
-    while (codeExists) {
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-      const existing = await prisma.magicLink.findUnique({ where: { code } });
-      codeExists = !!existing;
-    }
-
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    // Create magic link record
-    await prisma.magicLink.create({
-      data: {
-        token,
-        code,
-        email: normalized,
-        expiresAt,
-        userId: user?.id,
-      },
-    });
-
-    // Send magic link email
     // Exact-match the request Origin against registered series site_urls; else today's FRONTEND_URL.
     const site = await siteForOrigin(req.get('origin'), process.env.FRONTEND_URL || 'http://localhost:5176');
-    const frontendUrl = site.url;
-    const magicLinkUrl = `${frontendUrl}/auth/verify?token=${token}`;
-
-    // Log for development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('\n========================================');
-      console.log('Magic Link (dev mode):');
-      console.log(magicLinkUrl);
-      console.log('========================================\n');
-    }
-
-    // Send email via Resend
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (resendApiKey) {
-      try {
-        // mushroom-48468: use normalized lowercase for `to:` field
-        await sendMagicLinkEmail(normalized, magicLinkUrl, code, resendApiKey, site);
-      } catch (emailError) {
-        console.error('Failed to send magic link email:', emailError);
-        // Don't fail the request if email fails
-      }
-    }
+    // invite-verify: code creation + the sign-in email live in lib/loginCode.ts so the RSVP
+    // form's inline code step sends exactly this email (no new email type).
+    const { magicLinkUrl } = await issueLoginCode(normalized, site, user?.id);
 
     // Check if user is new (no name set)
     const isNewUser = !user || !user.name;
@@ -345,6 +247,23 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
       where: { code },
       include: { user: true },
     });
+
+    // invite-verify: callers that know which email the code was sent to (the RSVP form's
+    // inline code step) pass `email`. The code must then belong to that email; a code that
+    // exists for some OTHER email gets the same INVALID_CODE as a code that doesn't exist.
+    // Wrong guesses count against that email's live codes and lock them after
+    // MAX_CODE_ATTEMPTS (existing attempts/locked_at columns), so a code sent to a known
+    // email can't be brute-forced. Callers that send only `code` behave exactly as before.
+    if (req.body?.email !== undefined) {
+      const boundEmail = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : null;
+      if (!boundEmail) {
+        throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
+      }
+      if (!magicLink || normalizeEmail(magicLink.email) !== boundEmail) {
+        await recordFailedCodeAttempt(boundEmail);
+        throw new AppError('Invalid code', 401, 'INVALID_CODE');
+      }
+    }
 
     if (!magicLink) {
       throw new AppError('Invalid code', 401, 'INVALID_CODE');

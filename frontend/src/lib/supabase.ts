@@ -16,6 +16,7 @@ import {
 } from './api';
 import type { OneSheetConfig } from './api';
 import { uuid } from './utils';
+import { getInviteToken } from './inviteToken';
 import { sanitizeCoHosts } from './sanitizeCoHosts';
 import type { HostGoals } from '../types';
 import { renderPdfPageOneToPng } from './pdfUtils';
@@ -1716,6 +1717,53 @@ export async function updatePartyShowToppingsOnRsvp(partyId: string, value: bool
 // Guest operations
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
+/**
+ * invite-verify: thrown by addGuestToParty when the backend answers 202
+ * `verificationRequired`: the email is already on the event (RSVP'd or invited) and this
+ * browser can't prove it's theirs. Nothing was saved. The RSVP form shows an inline code
+ * step (a sign-in code was emailed to `email`); once the code logs them in, the same
+ * submission is retried as the owner.
+ */
+export class RsvpVerificationRequiredError extends Error {
+  readonly email: string;
+  constructor(email: string) {
+    super(`We sent a code to ${email}.`);
+    this.name = 'RsvpVerificationRequiredError';
+    this.email = email;
+  }
+}
+
+/**
+ * invite-verify: complete the inline code step. Verifies the 6-digit sign-in code for
+ * `email` (POST /api/auth/verify-code, bound to that email) and stores the session exactly
+ * like the normal login does. Returns the signed-in user.
+ */
+export async function verifyRsvpEmailCode(
+  email: string,
+  code: string,
+  name?: string,
+): Promise<{ id: string; email: string; name?: string | null }> {
+  const response = await fetch(`${API_URL}/api/auth/verify-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, email, ...(name ? { name } : {}) }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.accessToken) {
+    const errCode = data?.error?.code;
+    if (errCode === 'CODE_EXPIRED' || errCode === 'CODE_USED') {
+      throw new Error('That code has expired. Tap "Send a new code" to get another.');
+    }
+    if (errCode === 'CODE_LOCKED' || response.status === 429) {
+      throw new Error('Too many wrong codes. Tap "Send a new code" to get another.');
+    }
+    throw new Error("That code didn't work. Check it and try again.");
+  }
+  localStorage.setItem('authToken', data.accessToken);
+  localStorage.setItem('user', JSON.stringify(data.user));
+  return data.user;
+}
+
 export async function addGuestToParty(
   partyId: string,
   name: string,
@@ -1756,6 +1804,7 @@ export async function addGuestToParty(
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const authToken = localStorage.getItem('authToken');
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const inviteToken = getInviteToken();
     const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest`, {
       method: 'POST',
       headers,
@@ -1781,8 +1830,22 @@ export async function addGuestToParty(
         ethconfOptIn: ethconfOptIn || false,
         optinAbVariant: optinAbVariant ?? null,
         visitorSessionId: visitorSessionId ?? null,
+        // invite-verify: this client can show the inline sign-in code step (202), and
+        // carries the invite link's token (if this tab came from one) so an invitee can
+        // complete their invite without logging in.
+        codeStep: true,
+        ...(inviteToken ? { guestToken: inviteToken } : {}),
       }),
     });
+
+    // invite-verify: the email is already on this event and we can't prove it's ours.
+    // Nothing was saved; the caller shows the inline code step and retries once logged in.
+    if (response.status === 202) {
+      const data = await response.json().catch(() => null);
+      if (data?.verificationRequired) {
+        throw new RsvpVerificationRequiredError(typeof data.email === 'string' ? data.email : (email || ''));
+      }
+    }
 
     // rsvp-overwrite-fix: the stored login didn't verify (expired). Don't let the RSVP fall
     // back to anonymous behind the user's back (an owner edit would be a silent no-op while

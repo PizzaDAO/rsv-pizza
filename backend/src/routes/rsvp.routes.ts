@@ -7,7 +7,21 @@ import { siteForParty } from '../lib/siteBrand.js';
 import { verifySecret } from '../lib/secretHash.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
-import { signGuestToken, verifyGuestToken, guestTokenFromRequest } from '../lib/guestToken.js';
+import { signGuestToken, verifyGuestToken, guestTokenFromRequest, callerOwnsGuest } from '../lib/guestToken.js';
+import { issueLoginCode, takeRsvpCodeSend } from '../lib/loginCode.js';
+
+/**
+ * invite-verify: the RSVP endpoint's answer when the submitted email is already on the
+ * party and the caller can't prove it's theirs. The same body for every kind of existing row.
+ */
+export function verificationRequiredResponse(email: string) {
+  return {
+    success: false,
+    verificationRequired: true,
+    email,
+    message: `We sent a sign-in code to ${email}. Enter it to finish your RSVP.`,
+  };
+}
 
 const router = Router();
 
@@ -300,6 +314,8 @@ router.get('/:inviteCode/guest/:email', optionalAuth, async (req: AuthRequest, r
 // email). Anyone else submitting a taken email gets a response identical to a new RSVP and
 // nothing is written. Every success carries `guestToken`, the per-guest capability that
 // guest-scoped endpoints (raffle, quiz, discount, NFT) now require instead of a bare id.
+// invite-verify: the owner can also prove it with the row's guest token (invite links), and
+// clients sending `codeStep: true` get a 202 inline sign-in code step instead of the decoy.
 router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
@@ -578,12 +594,12 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       });
 
       if (existingGuest) {
-        // rsvp-overwrite-fix: only the owner of the email (verified JWT) may change an
-        // existing RSVP. This used to be open to anyone who typed the address, and the
-        // 200 `updated` reply plus the returned guest id made it an RSVP oracle and a
-        // capability leak.
-        const callerEmail = req.userEmail?.trim().toLowerCase();
-        const isOwner = !!callerEmail && callerEmail === normalizedEmail;
+        // rsvp-overwrite-fix: only the owner may change an existing RSVP (this used to be
+        // open to anyone who typed the address). invite-verify: the owner is the caller
+        // logged in as this email (verified JWT) OR holding this row's capability token.
+        // Invite emails carry the token on their RSVP link (?t=) and the RSVP form sends it
+        // back as `guestToken`, so an invitee needs no login to complete their invite.
+        const isOwner = callerOwnsGuest(req, existingGuest);
 
         if (isOwner) {
           // mushroom-31723: if the host has rejected this guest (approved=false),
@@ -610,6 +626,12 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
           // Trigger webhook for guest update (using party owner's webhooks)
           await triggerWebhook('guest.updated', { guest: updatedGuest, partyId: party.id }, party.userId!);
 
+          // A host invite (INVITED, never RSVP'd) completed by its invitee is their first
+          // RSVP: answer like a new RSVP (status, waitlist position, message).
+          if (existingGuest.status === 'INVITED') {
+            return res.status(201).json(newRsvpResponse(updatedGuest.id));
+          }
+
           return res.status(200).json({
             success: true,
             updated: true,
@@ -622,25 +644,37 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
           });
         }
 
-        // Not the owner. A host invite (status INVITED) holds no RSVP yet, only the
-        // address the host typed, so completing it is the same as a brand-new RSVP with
-        // that email (which anyone can always make). It keeps invite links working for
-        // logged-out invitees, and it answers exactly like a new RSVP.
-        if (existingGuest.status === 'INVITED' && existingGuest.approved !== false) {
-          const completed = await prisma.guest.update({
-            where: { id: existingGuest.id },
-            data: updateData(existingGuest),
-          });
-          await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
-          return res.status(201).json(newRsvpResponse(completed.id));
+        // Not the owner, whatever the row's status (RSVP'd, host invite, waitlisted,
+        // rejected): nothing is written. (A host invite used to be completable by anyone
+        // who knew the address, who then got the invitee's guest token.)
+        //
+        // invite-verify: clients that support the inline code step (`codeStep: true`, sent
+        // by the RSVP form) get 202 `verificationRequired`, and the address gets the normal
+        // sign-in code email (no new email type). Entering the code logs them in
+        // (POST /api/auth/verify-code with the email) and the form re-submits as the owner.
+        // The 202 body is identical for every kind of existing row, so it never says WHICH
+        // kind the email has. It does say "this email is on the party" (a new email gets an
+        // instant 201); see the PR notes for why that is accepted: the same fact already
+        // leaks through the public guest count, and every probe now emails the address
+        // owner. Sends are rate-limited per email+IP and per email; a limited request gets
+        // the same 202 and no email (an earlier code stays valid for 15 minutes).
+        if (req.body?.codeStep === true) {
+          try {
+            if (await takeRsvpCodeSend(normalizedEmail, req.ip)) {
+              const codeUser = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
+              const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
+              await issueLoginCode(normalizedEmail, site, codeUser?.id);
+            }
+          } catch (codeErr) {
+            console.error('RSVP code step: failed to issue sign-in code:', codeErr);
+          }
+          return res.status(202).json(verificationRequiredResponse(normalizedEmail));
         }
 
-        // A real RSVP already exists for this email and the caller can't prove it's
-        // theirs: change NOTHING and answer exactly like a new RSVP would. The guest id
-        // is a fresh random UUID (its token is valid-looking but matches no guest, so it
-        // grants nothing); no field of the existing guest is read into the response.
-        // TODO(rsvp-overwrite-fix): optionally email the address a "manage your RSVP"
-        // link here. Not enabled: that would be a new send and needs Snax's OK.
+        // Older clients without the code step: change NOTHING and answer exactly like a new
+        // RSVP would. The guest id is a fresh random UUID (its token is valid-looking but
+        // matches no guest, so it grants nothing); no field of the existing guest is read
+        // into the response.
         return res.status(201).json(newRsvpResponse(randomUUID()));
       }
     }

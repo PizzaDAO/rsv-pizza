@@ -7,8 +7,11 @@
  * discount, NFT bookkeeping, resend-confirmation) now require one of:
  *   - a JWT whose email is the guest's email (the guest, logged in), or
  *   - this token, which is only ever handed to the RSVPer in the RSVP response, to the
- *     owner via GET /api/parties/:id/my-guest. It is deliberately NOT put in emailed links:
- *     the email QR image is rendered by a third-party QR service, which would see it.
+ *     owner via GET /api/parties/:id/my-guest, and (invite-verify) to a host-invited guest
+ *     on the "RSVP Now" link of their invite email (?t=, our own site only; the invite
+ *     email has no QR). It is deliberately NOT put in the confirmation/approval emails'
+ *     QR links: the QR image is rendered by a third-party QR service, which would see it.
+ *     A valid token also lets its holder complete or update that guest's RSVP.
  *
  * Stateless: HMAC-SHA256 over the guest id with a domain-separated key derived from
  * JWT_SECRET, so no DB column or migration is needed. Rotating JWT_SECRET invalidates every

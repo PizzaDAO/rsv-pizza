@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
+import {
+  addGuestToParty,
+  getUserPreferences,
+  saveUserPreferences,
+  ExistingGuestData,
+  verifyRsvpEmailCode,
+} from '../lib/supabase';
+import type { RsvpVerificationRequiredError } from '../lib/supabase';
+
+/** invite-verify: addGuestToParty's "enter the emailed code" signal (checked by name, not instanceof). */
+function isVerificationRequired(err: unknown): err is RsvpVerificationRequiredError {
+  return err instanceof Error && err.name === 'RsvpVerificationRequiredError' && typeof (err as { email?: unknown }).email === 'string';
+}
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
@@ -164,6 +176,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
   const [guestId, setGuestId] = useState<string | null>(null);
   const [guestToken, setGuestToken] = useState<string | null>(null);
+  // invite-verify: set when the backend asked for the inline email code (the email is
+  // already on this event and this browser can't prove it's theirs). Nothing was saved yet.
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   // Pizzeria state
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
@@ -275,6 +292,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setWaitlistPosition(null);
     setGuestId(null);
     setGuestToken(null);
+    setVerificationEmail(null);
+    setVerifyingCode(false);
+    setCodeError(null);
     setStep(1);
     setError(null);
     setSwcOptIn(false);
@@ -481,9 +501,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setStep(2);
   }, [name, email, eventData.customUrl, eventData.inviteCode]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const submitRsvp = useCallback(async () => {
     const inviteCode = eventData.customUrl || eventData.inviteCode;
     if (!inviteCode) {
       setError('Invalid invite code');
@@ -570,7 +588,13 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         setError('Failed to submit. Please try again.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit. Please try again.');
+      if (isVerificationRequired(err)) {
+        // invite-verify: show the inline code step; the answers stay in the form.
+        setVerificationEmail(err.email || email.trim().toLowerCase());
+        setCodeError(null);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to submit. Please try again.');
+      }
     }
 
     setSubmitting(false);
@@ -580,6 +604,56 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn, optinAbVariant,
     saveToProfile, isEditing, onSuccess, user?.email,
   ]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitRsvp();
+  }, [submitRsvp]);
+
+  /**
+   * invite-verify: the inline code step. Verifies the emailed sign-in code (which logs this
+   * browser in as that email, like the normal login) and re-submits the same answers as the
+   * logged-in owner. `onSignedIn` lets the caller update the auth context. Returns true when
+   * the code was accepted.
+   */
+  const verifyCode = useCallback(async (
+    code: string,
+    onSignedIn?: (user: { id: string; email: string; name?: string | null }) => void,
+  ): Promise<boolean> => {
+    if (!verificationEmail) return false;
+    const trimmed = code.replace(/\s+/g, '');
+    if (!/^\d{6}$/.test(trimmed)) {
+      setCodeError('Enter the 6-digit code from the email.');
+      return false;
+    }
+    setVerifyingCode(true);
+    setCodeError(null);
+    try {
+      const signedIn = await verifyRsvpEmailCode(verificationEmail, trimmed, name.trim() || undefined);
+      onSignedIn?.(signedIn);
+    } catch (err) {
+      setCodeError(err instanceof Error ? err.message : "That code didn't work. Try again.");
+      setVerifyingCode(false);
+      return false;
+    }
+    setVerificationEmail(null);
+    setVerifyingCode(false);
+    await submitRsvp();
+    return true;
+  }, [verificationEmail, name, submitRsvp]);
+
+  /** invite-verify: ask for another code (re-sends the same submission; rate-limited server-side). */
+  const resendCode = useCallback(async () => {
+    setCodeError(null);
+    await submitRsvp();
+  }, [submitRsvp]);
+
+  /** invite-verify: leave the code step to fix the email. */
+  const cancelCodeStep = useCallback(() => {
+    setVerificationEmail(null);
+    setCodeError(null);
+    setStep(1);
+  }, []);
 
   return {
     // Step navigation
@@ -674,6 +748,14 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     guestId,
     setGuestId,
     guestToken,
+
+    // invite-verify: inline email code step
+    verificationEmail,
+    verifyingCode,
+    codeError,
+    verifyCode,
+    resendCode,
+    cancelCodeStep,
 
     // Pizzeria state
     nearbyPizzerias,
