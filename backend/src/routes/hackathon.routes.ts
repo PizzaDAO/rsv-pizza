@@ -5,6 +5,11 @@
  * Every write answers with the full host shape (serialize.hostHackathon) so the UI just replaces
  * its state.
  *
+ * PR 3 adds the host Teams & Submissions routes at the bottom: GET /submissions (every team,
+ * member emails, drafts, signed image URLs), PATCH /submissions/:id (disqualify / restore /
+ * table number) and GET /export.csv (formula-injection-safe). Participant routes live in
+ * hackathon-participant.routes.ts.
+ *
  * Delete rules follow the PR 1 FKs (nothing silently deletes participant data):
  *   - track with prizes or project entries -> 409 (prizes.track_id is NO ACTION)
  *   - prize with awards -> 409; criterion once any score exists -> 409
@@ -18,12 +23,15 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { isUuid } from '../lib/guestToken.js';
 import { requireHackathonHost } from '../lib/hackathon/access.js';
-import { HACKATHON_INCLUDE, hostHackathon } from '../lib/hackathon/serialize.js';
+import { HACKATHON_INCLUDE, TEAM_INCLUDE, hostHackathon, hostTeam, submissionImagePaths } from '../lib/hackathon/serialize.js';
 import { hackathonDefaults } from '../lib/hackathon/defaults.js';
+import { signImagePaths } from '../lib/hackathon/media.js';
+import { toCsv } from '../lib/hackathon/csv.js';
 import {
   LIMITS,
   parseCriterion,
   parseJudge,
+  parseModeration,
   parsePrize,
   parseSettings,
   parseTrack,
@@ -389,6 +397,110 @@ router.delete('/:partyId/hackathon/judges/:judgeId', ...guard, async (req: AuthR
       await prisma.hackathonJudge.update({ where: { id }, data: { status: 'removed' } });
     });
     return respond(res, partyId);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------------------------------------------------------------- teams & submissions (PR 3)
+// Reads skip the write limiter (the host list polls every 30s).
+const readGuard = [requireAuth, hostOnly];
+
+async function loadHostTeams(hackathonId: string) {
+  const teams = await prisma.hackathonTeam.findMany({
+    where: { hackathonId },
+    include: TEAM_INCLUDE,
+    orderBy: { createdAt: 'asc' },
+    take: 2000,
+  });
+  return teams;
+}
+
+// GET /:partyId/hackathon/submissions - every team (incl. without a project), members with
+// emails, projects in every status (drafts too) with signed image URLs.
+router.get('/:partyId/hackathon/submissions', ...readGuard, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const h = await getHackathon(partyId);
+    const teams = await loadHostTeams(h.id);
+    const urls = await signImagePaths(teams.flatMap((t: any) => submissionImagePaths(t.submissions?.[0])));
+    const rows = teams.map((t) => hostTeam(t, urls));
+    const counts = { teams: rows.length, draft: 0, submitted: 0, withdrawn: 0, disqualified: 0 } as Record<string, number>;
+    for (const r of rows) if (r.submission) counts[r.submission.status] = (counts[r.submission.status] ?? 0) + 1;
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ teams: rows, counts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /:partyId/hackathon/submissions/:submissionId - {action: 'disqualify', reason} |
+// {action: 'restore'} | {tableNumber}. Restore returns to 'submitted' if it was ever submitted.
+router.patch('/:partyId/hackathon/submissions/:submissionId', ...guard, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const id = childId(req.params.submissionId);
+    const h = await getHackathon(partyId);
+    const sub = await prisma.hackathonSubmission.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, status: true, submittedAt: true } });
+    if (!sub) throw new AppError('Project not found', 404, 'NOT_FOUND');
+    const m = parseModeration((req.body ?? {}) as Record<string, unknown>);
+    const data: Record<string, unknown> = {};
+    if (m.action === 'disqualify') {
+      data.status = 'disqualified';
+      data.disqualifiedReason = m.reason;
+    } else if (m.action === 'restore') {
+      if (sub.status !== 'disqualified') throw conflict('Only a disqualified project can be restored.', 'NOT_DISQUALIFIED');
+      data.status = sub.submittedAt ? 'submitted' : 'draft';
+      data.disqualifiedReason = null;
+    }
+    if (m.tableNumber !== undefined) data.tableNumber = m.tableNumber;
+    await prisma.hackathonSubmission.update({ where: { id: sub.id }, data });
+    const team = await prisma.hackathonTeam.findFirst({ where: { hackathonId: h.id, submissions: { some: { id: sub.id } } }, include: TEAM_INCLUDE });
+    const urls = await signImagePaths(submissionImagePaths((team as any)?.submissions?.[0]));
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ team: team ? hostTeam(team, urls) : null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /:partyId/hackathon/export.csv?kind=projects|members - host CSV (formula-injection safe).
+router.get('/:partyId/hackathon/export.csv', ...readGuard, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const h = await getHackathon(partyId);
+    const kind = req.query.kind === 'members' ? 'members' : 'projects';
+    const [teams, tracks] = await Promise.all([
+      loadHostTeams(h.id),
+      prisma.hackathonTrack.findMany({ where: { hackathonId: h.id }, select: { id: true, name: true } }),
+    ]);
+    const trackName = new Map(tracks.map((t) => [t.id, t.name]));
+    const rows = teams.map((t) => hostTeam(t, {}));
+    let csv: string;
+    if (kind === 'members') {
+      csv = toCsv(
+        ['Team', 'Member', 'Email', 'Role', 'Joined at', 'Project', 'Project status'],
+        rows.flatMap((t) => t.members.map((m) => [t.name, m.name, m.email, m.role, m.joinedAt, t.submission?.name ?? '', t.submission?.status ?? ''])),
+      );
+    } else {
+      csv = toCsv(
+        ['Project', 'Status', 'Team', 'Members', 'Member emails', 'Tracks', 'Tagline', 'Repo', 'Demo video', 'Deck', 'Live app', 'Table', 'Submitted at', 'Updated at', 'Disqualified reason', 'Description'],
+        rows.map((t) => {
+          const s = t.submission;
+          return [
+            s?.name ?? '', s?.status ?? 'no project', t.name,
+            t.members.map((m) => m.name), t.members.map((m) => m.email ?? ''),
+            (s?.trackIds ?? []).map((id: string) => trackName.get(id) ?? id),
+            s?.tagline, s?.repoUrl, s?.demoVideoUrl, s?.deckUrl, s?.liveUrl, s?.tableNumber,
+            s?.submittedAt, s?.updatedAt, s?.disqualifiedReason, s?.description,
+          ];
+        }),
+      );
+    }
+    res.set('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="hackathon-${kind}.csv"`);
+    res.send(csv);
   } catch (error) {
     next(error);
   }
