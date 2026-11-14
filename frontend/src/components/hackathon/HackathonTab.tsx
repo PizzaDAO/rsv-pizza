@@ -6,12 +6,14 @@ import { ErrorBanner } from './shared';
 import { SetupSection } from './SetupSection';
 import { TracksPrizesSection } from './TracksPrizesSection';
 import { JudgingSection } from './JudgingSection';
+import { TeamsSubmissionsSection } from './TeamsSubmissionsSection';
 
-export type HackathonSection = 'setup' | 'tracks' | 'judging';
+export type HackathonSection = 'setup' | 'tracks' | 'judging' | 'submissions';
 const SECTIONS: Array<{ id: HackathonSection; label: string }> = [
   { id: 'setup', label: 'Setup' },
   { id: 'tracks', label: 'Tracks & Prizes' },
   { id: 'judging', label: 'Judging' },
+  { id: 'submissions', label: 'Teams & Submissions' },
 ];
 
 export function HackathonTab({ partyId }: { partyId: string }) {
@@ -216,6 +218,7 @@ export function HackathonTab({ partyId }: { partyId: string }) {
           }}
         />
       )}
+      {section === 'submissions' && <TeamsSubmissionsSection partyId={partyId} hackathon={hackathon} />}
     </div>
   );
 }
