@@ -689,7 +689,7 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 
 /* ─── White-label brand themes (wl-theme-assets) ───
  * Token-only overrides, inert unless the class is applied (via
- * VITE_BRAND_THEME_CLASS => BRAND.themeClass on <html>). Both are dark themes.
+ * VITE_BRAND_THEME_CLASS => BRAND.themeClass on <html>). Team1 is dark; Monad is light (restyled after monad.xyz, below).
  * Primary accents: Team1 #E6212F, Monad #6E54FF. White on either primary is
  * >= 4.5:1 (AA); --accent-hover is the lighter tint so accent-coloured text on the
  * dark backgrounds clears AA too (#FF4D5A 5.9:1, #8F7BFF 6.0:1). */
@@ -716,26 +716,187 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   --color-scheme: dark;
 }
 
+/* Monad (Monad brand site). Light theme modelled on www.monad.xyz: off-white #FAFAFA page
+ * with a faint dot grid, near-black #111 text, Monad purple #6E54FF primary (white text,
+ * 4.9:1), a soft lavender-to-blush wash behind the hero, thin bordered frame, medium-weight
+ * grotesque headings (Inter here, standing in for their brittiSans; loaded only for this
+ * theme from App.tsx) and small uppercase monospace buttons with 4px corners. Brand kit
+ * accents #85E6FF / #FF8EE4 / #FFAE45 are decorative only (never text on light). */
 .monad-theme {
-  --bg-main: #0E091C;
-  --bg-card: rgba(221, 215, 254, 0.07);
-  --bg-card-hover: rgba(221, 215, 254, 0.11);
-  --bg-surface: rgba(221, 215, 254, 0.05);
-  --bg-surface-hover: rgba(221, 215, 254, 0.09);
-  --bg-overlay: rgba(14, 9, 28, 0.78);
-  --bg-input: rgba(221, 215, 254, 0.07);
-  --bg-input-focus: rgba(221, 215, 254, 0.1);
-  --bg-header: #1a1230;
-  --text-primary: rgba(255, 255, 255, 0.94);
-  --text-secondary: rgba(221, 215, 254, 0.78);
-  --text-muted: rgba(221, 215, 254, 0.6);
-  --text-faint: rgba(221, 215, 254, 0.28);
-  --stroke: rgba(221, 215, 254, 0.14);
-  --stroke-hover: rgba(221, 215, 254, 0.24);
-  --stroke-strong: rgba(221, 215, 254, 0.34);
+  --monad-ink: #111111;
+  --monad-purple: #6E54FF;
+  --monad-purple-deep: #5A41E8;
+  --monad-paper: #FAFAFA;
+  --monad-card: #FFFFFF;
+  --monad-line: #E5E3EC;
+  --monad-font: 'Inter', -apple-system, 'system-ui', 'Segoe UI', Roboto, sans-serif;
+  --monad-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg-main: #FAFAFA;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F6F4FF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #F6F4FF;
+  --bg-overlay: rgba(14, 9, 28, 0.55);
+  --bg-input: #FFFFFF;
+  --bg-input-focus: #FFFFFF;
+  --bg-header: #FDFCFB;
+  --text-primary: #111111;
+  --text-secondary: rgba(17, 17, 17, 0.78);
+  --text-muted: rgba(17, 17, 17, 0.66);
+  --text-faint: rgba(17, 17, 17, 0.45);
+  --text-inverted: #FFFFFF;
+  --stroke: #E5E3EC;
+  --stroke-hover: #C9C2F5;
+  --stroke-strong: #6E54FF;
   --accent: #6E54FF;
-  --accent-hover: #8F7BFF;
-  --color-scheme: dark;
+  --accent-hover: #5A41E8;
+  --success: #1f7a45;
+  --warning: #8a5a00;
+  --error: #b3261e;
+  --color-scheme: light;
+  color-scheme: light;
+  background: #FAFAFA;
+  font-family: var(--monad-font);
+}
+.monad-theme body {
+  font-family: var(--monad-font);
+  background-color: var(--monad-paper);
+  background-image: radial-gradient(circle, rgba(10, 10, 10, 0.07) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+/* Page frame: framed centre column with a lavender-to-blush wash at the top. */
+.monad-theme #root {
+  min-height: 100vh;
+  max-width: 1190px;
+  margin: 0 auto;
+  border-left: 1px solid var(--monad-line);
+  border-right: 1px solid var(--monad-line);
+  background-color: var(--monad-paper);
+  background-image:
+    linear-gradient(180deg, rgba(221, 215, 254, 0.85) 0%, rgba(249, 232, 236, 0.55) 140px, rgba(250, 250, 250, 0) 420px);
+  background-repeat: no-repeat;
+}
+.monad-theme h1, .monad-theme h2, .monad-theme h3 {
+  font-family: var(--monad-font);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.monad-theme h1 { line-height: 1.08; text-wrap: balance; }
+.monad-theme h2 { text-wrap: balance; }
+/* Event title carries an inline Rubik style; force the brand grotesque. */
+.monad-theme h1[data-testid="event-name"] { font-family: var(--monad-font) !important; font-weight: 500; }
+.monad-theme main > header > h1 { font-size: clamp(2.5rem, 7vw, 3.6rem); font-weight: 500; }
+.monad-theme [role="timer"] .tabular-nums { font-family: var(--monad-font); font-weight: 500; }
+/* Header: off-white bar, hairline border, dark wordmark (logo-dark.png swapped in Header). */
+.monad-theme .site-header {
+  background: #FDFCFB !important;
+  border-bottom: 1px solid var(--monad-line) !important;
+  backdrop-filter: none !important;
+}
+.monad-theme .site-header a span { display: none; }
+/* Cards: white, hairline border, soft radius. */
+.monad-theme .card {
+  background: var(--monad-card) !important;
+  border: 1px solid var(--monad-line) !important;
+  border-radius: 12px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 2px rgba(14, 9, 28, 0.04);
+}
+.monad-theme .card:hover { border-color: #C9C2F5 !important; }
+.monad-theme [role="timer"] > div {
+  background: var(--monad-card);
+  border: 1px solid var(--monad-line);
+  border-radius: 8px;
+}
+.monad-theme [role="timer"] .tabular-nums { font-size: 2.25rem; line-height: 1.1; }
+@media (max-width: 480px) {
+  .monad-theme [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .monad-theme [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .monad-theme [role="timer"] .tabular-nums { font-size: 1.875rem; }
+}
+/* Buttons: small uppercase mono, 4px corners; purple primary, pale secondary. */
+.monad-theme .btn-primary, .monad-theme .btn-secondary {
+  font-family: var(--monad-mono);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+.monad-theme .btn-primary {
+  background-color: var(--monad-purple);
+  color: #fff;
+  border: 1px solid #5A41E8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(14, 9, 28, 0.15);
+}
+.monad-theme .btn-primary:hover:not(:disabled) { background-color: var(--monad-purple-deep); color: #fff; }
+.monad-theme .btn-secondary {
+  background: #FBFAF9;
+  border: 1px solid var(--monad-line);
+  color: var(--monad-ink);
+  box-shadow: 0 1px 2px rgba(14, 9, 28, 0.08);
+}
+.monad-theme .btn-secondary:hover { background: #F1EEFF; border-color: #C9C2F5; }
+.monad-theme .text-center > a.btn-primary { padding: 12px 24px; }
+/* Hard-coded white utilities (written for dark themes) -> ink on light. */
+.monad-theme .text-white, .monad-theme .text-white\/90 { color: var(--monad-ink); }
+.monad-theme .text-white\/80, .monad-theme .text-white\/70 { color: rgba(17, 17, 17, 0.8); }
+.monad-theme .text-white\/60, .monad-theme .text-white\/50 { color: rgba(17, 17, 17, 0.68); }
+.monad-theme .text-white\/40, .monad-theme .text-white\/30 { color: rgba(17, 17, 17, 0.6); }
+.monad-theme .text-white\/20 { color: rgba(17, 17, 17, 0.5); }
+.monad-theme .hover\:text-white:hover { color: var(--monad-ink); }
+.monad-theme .hover\:text-white\/60:hover { color: rgba(17, 17, 17, 0.85); }
+.monad-theme .border-white\/10, .monad-theme .border-white\/20 { border-color: var(--monad-line); }
+.monad-theme .bg-white\/5, .monad-theme .bg-white\/6, .monad-theme .bg-white\/10 { background: rgba(110, 84, 255, 0.05); }
+.monad-theme .bg-white\/20 { background: rgba(110, 84, 255, 0.1); }
+.monad-theme .hover\:bg-white\/5:hover, .monad-theme .hover\:bg-white\/10:hover { background: rgba(110, 84, 255, 0.08); }
+.monad-theme .hover\:bg-white\/20:hover { background: rgba(110, 84, 255, 0.12); }
+.monad-theme .bg-red-500, .monad-theme .bg-red-500 .text-white { color: #fff; }
+.monad-theme .btn-primary .text-white { color: inherit; }
+/* Inputs */
+.monad-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.monad-theme textarea, .monad-theme select {
+  background: #fff !important;
+  border: 1px solid #D4D0E0 !important;
+  border-radius: 6px;
+  color: var(--monad-ink) !important;
+}
+.monad-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.monad-theme textarea:focus, .monad-theme select:focus {
+  border-color: var(--monad-purple) !important;
+  box-shadow: 0 0 0 3px rgba(110, 84, 255, 0.22);
+}
+.monad-theme input::placeholder, .monad-theme textarea::placeholder { color: rgba(17, 17, 17, 0.6) !important; }
+.monad-theme input[type="time"], .monad-theme input[type="date"],
+.monad-theme input[type="datetime-local"] { color-scheme: light !important; }
+.monad-theme a:not(.btn-primary):not(.btn-secondary) { text-decoration-color: rgba(110, 84, 255, 0.5); }
+/* Google Places dropdown (appended to <body>, outside #root). */
+.monad-theme .pac-container {
+  background-color: #fff !important;
+  border: 1px solid var(--monad-line) !important;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(14, 9, 28, 0.15) !important;
+}
+.monad-theme .pac-item { background-color: #fff !important; border-color: #EEEBF6 !important; color: var(--monad-ink) !important; }
+.monad-theme .pac-item:hover { background-color: #F6F4FF !important; }
+.monad-theme .pac-item-query { color: var(--monad-ink) !important; }
+/* Footer logo is white; render it dark on the light page. */
+.monad-theme footer img { filter: brightness(0) opacity(0.7); }
+/* Brand-red utilities -> Monad purple (red stays only for real error boxes). */
+.monad-theme .text-\[\#ff393a\] { color: var(--monad-purple); }
+.monad-theme [class*="border-[#ff393a]/30"][class*="text-[#ff393a]"] { color: #b3261e; }
+.monad-theme .bg-\[\#ff393a\] { background-color: var(--monad-purple); color: #fff; }
+.monad-theme .bg-\[\#ff393a\] .text-white, .monad-theme .bg-\[\#ff393a\].text-white { color: #fff; }
+.monad-theme .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #DDD7FE, #F9E4F3); }
+.monad-theme .from-\[\#ff393a\] svg { color: rgba(14, 9, 28, 0.4); }
+.monad-theme .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--monad-purple); }
+/* Modals */
+.monad-theme .fixed.inset-0 .card, .monad-theme .fixed.inset-0 .bg-theme-header {
+  background: #fff !important;
+  border: 1px solid var(--monad-line) !important;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(14, 9, 28, 0.25) !important;
 }
 
 /* Doge Day (Own The Doge brand site). Light cream theme modelled on ownthedoge.com:

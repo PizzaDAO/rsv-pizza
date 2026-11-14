@@ -96,10 +96,15 @@ function App() {
     document.documentElement.classList.add(cls);
     // Doge Day's heavy rounded headline font; only fetched for that brand.
     let fontLink: HTMLLinkElement | null = null;
-    if (cls === 'doge-theme') {
+    const fontHref =
+      cls === 'doge-theme' ? 'https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap'
+      // Monad: Inter for headings/body (stand-in for their brittiSans), JetBrains Mono for buttons/labels.
+      : cls === 'monad-theme' ? 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap'
+      : '';
+    if (fontHref) {
       fontLink = document.createElement('link');
       fontLink.rel = 'stylesheet';
-      fontLink.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap';
+      fontLink.href = fontHref;
       document.head.appendChild(fontLink);
     }
     return () => {
