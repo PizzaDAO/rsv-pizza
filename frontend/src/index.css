@@ -804,7 +804,9 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 }
 .team1-theme input::placeholder, .team1-theme textarea::placeholder { color: #9ca3af !important; }
 /* Brand-red utilities used across the app stay red (it is the brand colour here). */
-.team1-theme .text-\[\#ff393a\] { color: #FF4D5A; }
+.team1-theme .text-\[\#ff393a\] { color: #fff; text-decoration: underline; text-decoration-color: #E6212F; text-underline-offset: 3px; }
+/* The header already shows the wordmark; hide the duplicate series logo in the landing hero. */
+.team1-theme main > header > img:first-child { display: none; }
 .team1-theme .bg-\[\#ff393a\] { background-color: var(--team1-red); }
 .team1-theme .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #E6212F, #7a0f18); }
 /* Google Places dropdown (appended to <body>, outside the themed subtree). */
