@@ -75,7 +75,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
     status?: BudgetStatus;
     pointPerson?: string;
     notes?: string;
-    receiptUrl?: string;
+    receiptUrl?: string | null;
   }) => {
     setSaving(true);
     try {
@@ -89,7 +89,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
         }
       } else {
         // Create new item
-        const result = await createBudgetItem(partyId, data);
+        const result = await createBudgetItem(partyId, { ...data, receiptUrl: data.receiptUrl ?? undefined });
         if (result) {
           await loadBudget(); // Reload to get updated totals
           setShowForm(false);

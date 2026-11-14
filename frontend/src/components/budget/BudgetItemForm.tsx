@@ -15,7 +15,7 @@ interface BudgetItemFormProps {
     status?: BudgetStatus;
     pointPerson?: string;
     notes?: string;
-    receiptUrl?: string;
+    receiptUrl?: string | null;
   }) => Promise<void>;
   onClose: () => void;
   saving?: boolean;
@@ -112,7 +112,9 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
     }
 
     try {
-      let finalReceiptUrl = receiptUrl.trim() || undefined;
+      // When editing an item that had a receipt and the user removed it, send null so the PATCH clears it
+      // (undefined means "no change" to the backend). New items omit the field.
+      let finalReceiptUrl: string | null | undefined = receiptUrl.trim() || (item?.receiptUrl ? null : undefined);
 
       // Upload receipt file if one was selected
       if (receiptFile) {

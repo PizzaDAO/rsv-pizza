@@ -3287,7 +3287,7 @@ export async function createBudgetItem(
 export async function updateBudgetItem(
   partyId: string,
   itemId: string,
-  data: Partial<CreateBudgetItemData>
+  data: Partial<Omit<CreateBudgetItemData, 'receiptUrl'>> & { receiptUrl?: string | null }
 ): Promise<{ item: BudgetItem } | null> {
   try {
     return await apiRequest<{ item: BudgetItem }>(
