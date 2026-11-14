@@ -29,6 +29,7 @@ import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
 import { formatTimezoneDisplay } from '../utils/dateUtils';
+import { formatEventDateRange } from '../utils/eventDateRange';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
@@ -594,6 +595,9 @@ export function EventPage() {
 
   const timezoneAbbr = formatTimezoneDisplay(event.timezone || '');
 
+  // Multi-day events (hackathons): show the date range instead of only the start date.
+  const displayDate = eventDate ? formatEventDateRange(eventDate, endDate, event.timezone).dateLine : formattedDate;
+
   // Extract month abbreviation and day number for calendar icon
   const eventMonthAbbr = eventDate
     ? eventDate.toLocaleDateString('en-US', { month: 'short', timeZone: event.timezone || undefined }).toUpperCase()
@@ -1071,7 +1075,7 @@ export function EventPage() {
                           </div>
                           <div className="flex-1">
                             <p className={`text-lg font-medium text-theme-text${isFutureEvent ? ' group-hover:text-[#ff393a] transition-colors' : ''}`}>
-                              {formattedDate}
+                              {displayDate}
                             </p>
                             <p className={`text-base text-theme-text-secondary${isFutureEvent ? ' group-hover:text-[#ff393a] transition-colors' : ''}`}>
                               {formattedTime}
@@ -1225,7 +1229,7 @@ export function EventPage() {
                     </div>
                     <div className="flex-1">
                       <p className="text-lg font-medium text-theme-text">
-                        {formattedDate}
+                        {displayDate}
                       </p>
                       <p className="text-base text-theme-text-secondary">
                         {formattedTime}

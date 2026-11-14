@@ -111,6 +111,17 @@ export async function siteForParty(
   return s ? brandedSite(s) : fallbackSite(fallbackUrl);
 }
 
+/** The party's branded site, or null when it has no series / the series isn't a live branded site. */
+export async function brandedSiteForParty(
+  party: { eventSeriesId?: string | null } | null | undefined,
+): Promise<SiteBrand | null> {
+  const id = party?.eventSeriesId;
+  if (!id) return null;
+  const { byId } = await getSeriesSites();
+  const s = byId.get(id);
+  return s ? brandedSite(s) : null;
+}
+
 /** Site for a request Origin. Exact match against registered site_urls only; anything else falls back. */
 export async function siteForOrigin(origin: string | null | undefined, fallbackUrl: string): Promise<SiteBrand> {
   const o = normalizeOrigin(origin);

@@ -11,6 +11,7 @@
  */
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
+import { brandedSiteForParty } from '../lib/siteBrand.js';
 
 function esc(s: string): string {
   return s.replace(/[<>&]/g, (c) => (c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'));
@@ -23,6 +24,7 @@ async function loadHostCtx(partyId: string) {
       name: true,
       customUrl: true,
       inviteCode: true,
+      eventSeriesId: true,
       user: { select: { email: true, name: true } },
     },
   });
@@ -30,11 +32,42 @@ async function loadHostCtx(partyId: string) {
   const cityName =
     party.name.replace(/^Global Pizza Party\s+/i, '').trim() || party.name;
   const slug = party.customUrl ?? party.inviteCode;
+  // White-label: a party in a live branded series gets that brand's name/origin/from-address.
+  // null for every other party, which keeps the generic email byte-identical.
+  const site = await brandedSiteForParty(party);
   return {
     toEmail: party.user.email,
     hostName: party.user.name ?? 'there',
     cityName: esc(cityName),
+    eventName: party.name,
     slug,
+    site,
+  };
+}
+
+/** Brand-aware approve/reject email for a branded-series event. Pure (no I/O) so it is unit-testable. */
+export function buildBrandedStatusEmail(
+  site: { url: string; name: string },
+  ctx: { hostName: string; eventName: string; slug: string },
+  newStatus: 'approved' | 'rejected',
+): { subject: string; html: string } {
+  const brandName = esc(site.name);
+  const eventUrl = `${site.url}/${ctx.slug}`;
+  const manageUrl = `${site.url}/host/${ctx.slug}`;
+  if (newStatus === 'approved') {
+    return {
+      subject: `Your ${site.name} event is approved: ${ctx.eventName}`,
+      html: `<p>Hey ${esc(ctx.hostName)},</p>
+<p>Great news — your ${brandName} event <b>${esc(ctx.eventName)}</b> has been approved and is now live.</p>
+<p>Share your <a href="${eventUrl}">event page</a> or manage it from your <a href="${manageUrl}">host dashboard</a>.</p>
+<p>Best,<br>The ${brandName} team</p>`,
+    };
+  }
+  return {
+    subject: `Update on your ${site.name} event`,
+    html: `<p>Hey ${esc(ctx.hostName)},</p>
+<p>Your ${brandName} event <b>${esc(ctx.eventName)}</b> wasn't approved. If you'd like to discuss or resubmit, just reply to this email.</p>
+<p>Best,<br>The ${brandName} team</p>`,
   };
 }
 
@@ -44,6 +77,7 @@ async function sendResend(
   subject: string,
   html: string,
   tag: string,
+  from: string = brand.fromEmail,
 ) {
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -52,7 +86,7 @@ async function sendResend(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from,
       to,
       subject,
       html,
@@ -70,6 +104,11 @@ export async function emailHostOfStatusChange(
     if (!apiKey) return;
     const ctx = await loadHostCtx(partyId);
     if (!ctx) return;
+    if (ctx.site) {
+      const { subject, html } = buildBrandedStatusEmail(ctx.site, ctx, newStatus);
+      await sendResend(apiKey, ctx.toEmail, subject, html, 'emailHostOfStatusChange', ctx.site.fromEmail);
+      return;
+    }
     const eventUrl = `https://rsv.pizza/host/${ctx.slug}`;
     let subject: string;
     let html: string;

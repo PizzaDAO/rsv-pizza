@@ -28,6 +28,7 @@ import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
+import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
 import { applyCreatePreset, enforceBrandCreateLimit } from '../lib/brandCreate.js';
 
 // Helper function to get party with ownership check
@@ -429,6 +430,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         },
       });
     }
+
+    // White-label: brand-site events wait for admin approval; tell the admins (fire-and-forget).
+    if (brandedSeries) void notifyAdminsOfBrandEvent(party.id);
 
     // Trigger webhook for party creation
     await triggerWebhook('party.created', party, req.userId!);
