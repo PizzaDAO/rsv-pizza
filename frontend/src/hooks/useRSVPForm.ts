@@ -536,8 +536,13 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       );
 
       if (result) {
-        // Save preferences to profile if checkbox is checked and email is provided
-        if (email.trim() && !result.alreadyRegistered) {
+        // Save preferences to the logged-in user's profile. /api/preferences is
+        // self-only (guest-oracles), so only when the RSVP email is the user's own.
+        if (
+          user?.email &&
+          email.trim().toLowerCase() === user.email.trim().toLowerCase() &&
+          !result.alreadyRegistered
+        ) {
           await saveUserPreferences(email.trim(), {
             dietary_restrictions: dietaryRestrictions,
             liked_toppings: likedToppings,
@@ -576,7 +581,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     eventData, name, email, ethereumAddress, roles, mailingListOptIn,
     dietaryRestrictions, likedToppings, dislikedToppings, likedBeverages,
     dislikedBeverages, pizzeriaRankings, suggestedPizzerias, swcOptIn, swcCaOptIn, swcAuOptIn, swcEuOptIn, swcUkOptIn, swcBrOptIn, ethconfOptIn, optinAbVariant,
-    saveToProfile, isEditing, onSuccess,
+    saveToProfile, isEditing, onSuccess, user?.email,
   ]);
 
   return {

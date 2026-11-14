@@ -1874,29 +1874,6 @@ function mapExistingGuest(guest: any): ExistingGuestData {
   };
 }
 
-export async function getExistingGuest(
-  inviteCode: string,
-  email: string
-): Promise<ExistingGuestData | null> {
-  try {
-    const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest/${encodeURIComponent(email)}`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      console.error('Error fetching guest:', await response.text());
-      return null;
-    }
-
-    const data = await response.json();
-    return mapExistingGuest(data.guest);
-  } catch (error) {
-    console.error('Error fetching guest:', error);
-    return null;
-  }
-}
-
 export async function addGuestByHost(
   partyId: string,
   name: string,
@@ -2409,12 +2386,16 @@ export interface UserPreferences {
   disliked_beverages: string[];
 }
 
+// guest-oracles: /api/preferences is auth-only and self-only (the email comes from the
+// JWT). Logged-out callers get null/false without a request. `email` is still sent so
+// the backend can refuse a mismatch instead of silently using a different account.
 export async function getUserPreferences(email: string): Promise<UserPreferences | null> {
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
   try {
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-    const token = localStorage.getItem('authToken');
     const response = await fetch(`${apiUrl}/api/preferences?email=${encodeURIComponent(email)}`, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      headers: { 'Authorization': `Bearer ${token}` },
     });
 
     if (!response.ok) return null;
@@ -2439,13 +2420,15 @@ export async function saveUserPreferences(
   email: string,
   preferences: UserPreferences
 ): Promise<boolean> {
+  const token = localStorage.getItem('authToken');
+  if (!token) return false;
   try {
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
     const response = await fetch(`${apiUrl}/api/preferences`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(localStorage.getItem('authToken') ? { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` } : {}),
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ email, preferences }),
     });

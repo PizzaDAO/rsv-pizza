@@ -5,6 +5,7 @@ import { triggerWebhook } from '../services/webhook.service.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 import { siteForParty } from '../lib/siteBrand.js';
 import { verifySecret } from '../lib/secretHash.js';
+import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -205,10 +206,22 @@ router.post('/:inviteCode/verify-password', async (req: Request, res: Response, 
   }
 });
 
-// GET /api/rsvp/:inviteCode/guest/:email - Get existing guest by email (public)
-router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/rsvp/:inviteCode/guest/:email - Get the caller's own guest row (auth, self only)
+// guest-oracles (guests-anon-exposure PR3): this used to be public, so anyone could test
+// whether an email RSVP'd to an event and read its name, wallet, roles and preferences.
+// Now the caller must be logged in as that email. Anything else gets the same 404 a
+// missing guest gets, so old bundles (which treat 404 as "no RSVP") keep working quietly
+// and the response never reveals whether someone else's email is on the list.
+// The current frontend uses GET /api/parties/:id/my-guest instead.
+router.get('/:inviteCode/guest/:email', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode, email } = req.params;
+
+    const callerEmail = req.userEmail?.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!callerEmail || callerEmail !== normalizedEmail) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
 
     // Find party by invite code OR custom URL
     let party = await prisma.party.findUnique({
@@ -245,7 +258,7 @@ router.get('/:inviteCode/guest/:email', async (req: Request, res: Response, next
     const guest = await prisma.guest.findFirst({
       where: {
         partyId: party.id,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
       },
       select: {
         id: true,
