@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countEip6963Wallets, needsLegacyInjected } from './connectors';
+import { countEip6963Wallets, needsLegacyInjected, walletConnectors } from './connectors';
 
 function fakeWin(opts: { ethereum?: boolean; announce?: number }) {
   const target = new EventTarget();
@@ -20,5 +20,12 @@ describe('legacy injected fallback', () => {
     expect(needsLegacyInjected(fakeWin({ ethereum: true, announce: 1 }))).toBe(false);
     expect(needsLegacyInjected(fakeWin({ ethereum: false, announce: 0 }))).toBe(false);
     expect(needsLegacyInjected(undefined)).toBe(false);
+  });
+});
+
+describe('walletConnectors', () => {
+  it('is only Coinbase when no wallet is injected (no MetaMask SDK connector)', () => {
+    const list = walletConnectors({ name: 'Test', url: 'https://example.org', icon: 'https://example.org/i.png' });
+    expect(list).toHaveLength(1);
   });
 });
