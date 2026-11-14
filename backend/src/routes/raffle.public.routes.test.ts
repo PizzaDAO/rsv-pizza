@@ -61,7 +61,7 @@ const raffle = (status: string) => ({
   ],
   winners:
     status === 'drawn'
-      ? [{ id: 'w1', raffleId: RAFFLE_ID, prizeId: 'p1', guestId: ALICE, claimedAt: null, guest: { id: ALICE, name: 'Alice' }, prize: { id: 'p1', name: 'Pizza' } }]
+      ? [{ id: 'w1', raffleId: RAFFLE_ID, prizeId: 'p1', guestId: ALICE, claimedAt: null, guest: { id: ALICE, name: 'Alice Anderson' }, prize: { id: 'p1', name: 'Pizza' } }]
       : [],
   _count: { entries: 2 },
 });
@@ -86,8 +86,9 @@ describe('GET /:partyId/raffles', () => {
     expect(r._count.entries).toBe(2);
     expect(r.hasEntered).toBe(false);
     expect(r.winners).toEqual([
-      { id: 'w1', raffleId: RAFFLE_ID, prizeId: 'p1', guest: { name: 'Alice' }, prize: { id: 'p1', name: 'Pizza' }, isMine: false },
+      { id: 'w1', raffleId: RAFFLE_ID, prizeId: 'p1', guest: { name: 'Alice A.' }, prize: { id: 'p1', name: 'Pizza' }, isMine: false },
     ]);
+    expect(JSON.stringify(res.body)).not.toContain('Anderson');
     const body = JSON.stringify(res.body);
     expect(body).not.toContain(ALICE);
     expect(body).not.toContain(BOB);
@@ -134,6 +135,7 @@ describe('GET /:partyId/raffles', () => {
     expect(r.entries).toHaveLength(2);
     expect(r.entries[0].guest).toEqual({ id: ALICE, name: 'Alice' });
     expect(r.winners[0].guestId).toBe(ALICE);
+    expect(r.winners[0].guest.name).toBe('Alice Anderson');
   });
 });
 

@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 import { AppError } from '../middleware/error.js';
+import { shortName } from '../lib/displayName.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
@@ -39,7 +40,7 @@ function publicRaffleView(raffle: any, viewerGuestId: string | null) {
           id: w.id,
           raffleId: w.raffleId,
           prizeId: w.prizeId,
-          guest: { name: w.guest?.name ?? 'Guest' },
+          guest: { name: shortName(w.guest?.name) },
           prize: w.prize,
           isMine: !!viewerGuestId && w.guestId === viewerGuestId,
         }))
