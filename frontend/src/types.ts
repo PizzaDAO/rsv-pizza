@@ -1142,6 +1142,9 @@ export interface Raffle {
   _count?: {
     entries: number;
   };
+  /** Public (non-host) responses only: whether the verified viewer has entered. */
+  hasEntered?: boolean;
+  myEntryCount?: number;
 }
 
 export interface RafflePrize {
@@ -1169,11 +1172,14 @@ export interface RaffleWinner {
   id: string;
   raffleId: string;
   prizeId: string;
-  guestId: string;
-  claimedAt: string | null;
-  createdAt: string;
+  /** Absent in public (non-host) responses. */
+  guestId?: string;
+  claimedAt?: string | null;
+  createdAt?: string;
+  /** Public responses: true when the verified viewer is this winner. */
+  isMine?: boolean;
   guest?: {
-    id: string;
+    id?: string;
     name: string;
   };
   prize?: {

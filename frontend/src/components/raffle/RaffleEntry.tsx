@@ -22,11 +22,11 @@ export function RaffleEntry({ partyId, guestId, guestToken }: RaffleEntryProps) 
 
   useEffect(() => {
     loadRaffles();
-  }, [partyId]);
+  }, [partyId, guestId, guestToken]);
 
   const loadRaffles = async () => {
     setLoading(true);
-    const result = await getRaffles(partyId);
+    const result = await getRaffles(partyId, { guestId, guestToken });
     if (result) {
       // Only show open or drawn raffles to guests
       const visibleRaffles = result.raffles.filter(
@@ -62,12 +62,12 @@ export function RaffleEntry({ partyId, guestId, guestToken }: RaffleEntryProps) 
 
   const hasEnteredRaffle = (raffle: Raffle): boolean => {
     if (!guestId) return false;
-    return raffle.entries.some((e) => e.guestId === guestId);
+    return !!raffle.hasEntered;
   };
 
   const isWinner = (raffle: Raffle): { won: boolean; prizes: string[] } => {
     if (!guestId || raffle.status !== 'drawn') return { won: false, prizes: [] };
-    const wins = raffle.winners.filter((w) => w.guestId === guestId);
+    const wins = raffle.winners.filter((w) => w.isMine);
     return {
       won: wins.length > 0,
       prizes: wins.map((w) => w.prize?.name || 'Prize'),
