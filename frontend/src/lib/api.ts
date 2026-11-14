@@ -26,6 +26,8 @@ interface ApiOptions {
    * (on-chain payout execution, bulk jobs, exports, OCR).
    */
   timeoutMs?: number | null;
+  /** Extra request headers (e.g. X-Guest-Token). */
+  headers?: Record<string, string>;
 }
 
 // Custom event name for auth expiration
@@ -51,6 +53,7 @@ export async function apiRequest<T>(
   // basil-14648 P2: a FormData body (a menu upload) goes as multipart; the browser sets the boundary itself
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
+  if (options.headers) Object.assign(headers, options.headers);
 
   if (requireAuth) {
     const token = getAuthToken();
@@ -3042,11 +3045,20 @@ export async function getDisplayPhotos(
 
 // Raffle API Functions
 
-export async function getRaffles(partyId: string): Promise<{ raffles: Raffle[] } | null> {
+/**
+ * Hosts get full entrant lists; everyone else gets counts, winners' names, and (when
+ * guestId + token/login prove it) their own hasEntered / isMine flags.
+ */
+export async function getRaffles(
+  partyId: string,
+  viewer?: { guestId?: string; guestToken?: string | null }
+): Promise<{ raffles: Raffle[] } | null> {
   try {
-    return await apiRequest<{ raffles: Raffle[] }>(`/api/parties/${partyId}/raffles`, {
+    const qs = viewer?.guestId ? `?guestId=${encodeURIComponent(viewer.guestId)}` : '';
+    return await apiRequest<{ raffles: Raffle[] }>(`/api/parties/${partyId}/raffles${qs}`, {
       method: 'GET',
       requireAuth: false,
+      ...(viewer?.guestToken ? { headers: { 'X-Guest-Token': viewer.guestToken } } : {}),
     });
   } catch (error) {
     console.error('Error fetching raffles:', error);

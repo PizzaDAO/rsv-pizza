@@ -7,8 +7,69 @@ import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
 const router = Router();
 
+const FULL_INCLUDE = {
+  prizes: { orderBy: { createdAt: 'asc' as const } },
+  entries: { include: { guest: { select: { id: true, name: true } } } },
+  winners: {
+    include: {
+      guest: { select: { id: true, name: true } },
+      prize: { select: { id: true, name: true } },
+    },
+  },
+  _count: { select: { entries: true } },
+};
+
+/**
+ * Privacy trim: the public raffle GETs used to list every entrant's guest id + name. Hosts
+ * (canUserEditParty) still get the full rows. Everyone else gets aggregates only: the entry
+ * count, whether *they* entered / won (proved by guest token or login as the guest, via
+ * ?guestId=), and after the draw the winners' display names + prize (no ids).
+ */
+function publicRaffleView(raffle: any, viewerGuestId: string | null) {
+  const { entries, winners, ...rest } = raffle;
+  const drawn = raffle.status === 'drawn';
+  const mine = viewerGuestId
+    ? (entries as any[]).filter((e) => e.guestId === viewerGuestId).length
+    : 0;
+  return {
+    ...rest,
+    entries: [],
+    winners: drawn
+      ? (winners as any[]).map((w) => ({
+          id: w.id,
+          raffleId: w.raffleId,
+          prizeId: w.prizeId,
+          guest: { name: w.guest?.name ?? 'Guest' },
+          prize: w.prize,
+          isMine: !!viewerGuestId && w.guestId === viewerGuestId,
+        }))
+      : [],
+    hasEntered: mine > 0,
+    myEntryCount: mine,
+  };
+}
+
+/** The guest id the caller can prove they own (token or login), else null. */
+async function resolveViewerGuestId(req: AuthRequest, partyId: string): Promise<string | null> {
+  const gid = req.query.guestId;
+  if (!isUuid(gid)) return null;
+  const guest = await prisma.guest.findUnique({
+    where: { id: gid },
+    select: { id: true, email: true, partyId: true },
+  });
+  if (!guest || guest.partyId !== partyId) return null;
+  return callerOwnsGuest(req, guest) ? guest.id : null;
+}
+
+async function respondRaffles(req: AuthRequest, partyId: string, raffles: any[]) {
+  const isHost = await canUserEditParty(partyId, req.userId, req.userEmail);
+  if (isHost) return raffles;
+  const viewer = await resolveViewerGuestId(req, partyId);
+  return raffles.map((r) => publicRaffleView(r, viewer));
+}
+
 // GET /api/parties/:partyId/raffles - List all raffles for a party (public)
-router.get('/:partyId/raffles', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/raffles', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
 
@@ -24,29 +85,11 @@ router.get('/:partyId/raffles', async (req: AuthRequest, res: Response, next: Ne
 
     const raffles = await prisma.raffle.findMany({
       where: { partyId },
-      include: {
-        prizes: {
-          orderBy: { createdAt: 'asc' },
-        },
-        entries: {
-          include: {
-            guest: { select: { id: true, name: true } },
-          },
-        },
-        winners: {
-          include: {
-            guest: { select: { id: true, name: true } },
-            prize: { select: { id: true, name: true } },
-          },
-        },
-        _count: {
-          select: { entries: true },
-        },
-      },
+      include: FULL_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ raffles });
+    res.json({ raffles: await respondRaffles(req, partyId, raffles) });
   } catch (error) {
     next(error);
   }
@@ -97,36 +140,21 @@ router.post('/:partyId/raffles', requireAuth, async (req: AuthRequest, res: Resp
 });
 
 // GET /api/parties/:partyId/raffles/:raffleId - Get single raffle details (public)
-router.get('/:partyId/raffles/:raffleId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/raffles/:raffleId', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, raffleId } = req.params;
 
     const raffle = await prisma.raffle.findFirst({
       where: { id: raffleId, partyId },
-      include: {
-        prizes: {
-          orderBy: { createdAt: 'asc' },
-        },
-        entries: {
-          include: {
-            guest: { select: { id: true, name: true } },
-          },
-        },
-        winners: {
-          include: {
-            guest: { select: { id: true, name: true } },
-            prize: { select: { id: true, name: true } },
-          },
-        },
-        _count: { select: { entries: true } },
-      },
+      include: FULL_INCLUDE,
     });
 
     if (!raffle) {
       throw new AppError('Raffle not found', 404, 'NOT_FOUND');
     }
 
-    res.json({ raffle });
+    const [out] = await respondRaffles(req, partyId, [raffle]);
+    res.json({ raffle: out });
   } catch (error) {
     next(error);
   }
