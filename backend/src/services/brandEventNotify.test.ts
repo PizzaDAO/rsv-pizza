@@ -26,6 +26,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   process.env.RESEND_API_KEY = 'test-key';
   delete process.env.BRAND_EVENT_NOTIFY_EMAILS;
+  process.env.BRAND_EVENT_ADMIN_ALERTS = 'on';
   mockPrisma.party.findUnique.mockResolvedValue(party);
   mockPrisma.admin.findMany.mockResolvedValue([{ email: 'A@x.com' }, { email: 'b@x.com' }, { email: 'a@x.com' }]);
   mockBranded.mockResolvedValue(TEAM1);
@@ -33,6 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.RESEND_API_KEY;
+  delete process.env.BRAND_EVENT_ADMIN_ALERTS;
 });
 
 describe('notifyAdminsOfBrandEvent', () => {
@@ -55,6 +57,13 @@ describe('notifyAdminsOfBrandEvent', () => {
     await notifyAdminsOfBrandEvent('p1');
     expect(mockPrisma.admin.findMany).not.toHaveBeenCalled();
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).to).toEqual(['ops@x.com', 'ops2@x.com']);
+  });
+
+  it('is off by default: no DB read, no send', async () => {
+    delete process.env.BRAND_EVENT_ADMIN_ALERTS;
+    await notifyAdminsOfBrandEvent('p1');
+    expect(mockPrisma.party.findUnique).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('sends nothing without RESEND_API_KEY', async () => {

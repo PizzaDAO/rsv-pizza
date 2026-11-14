@@ -3,6 +3,8 @@
  * waiting for approval. Brand events default to underbossStatus='pending' and stay off the public
  * listing until an admin approves them on the underboss/admin dashboard.
  *
+ * OFF by default: does nothing unless env BRAND_EVENT_ADMIN_ALERTS === 'on'.
+ *
  * Recipients: `BRAND_EVENT_NOTIFY_EMAILS` (csv) when set, else every DB admin (role admin or
  * super_admin; NOT payment_admin). Uses the existing Resend path. No-ops without RESEND_API_KEY
  * (so dev and tests never send), and never throws: callers fire-and-forget it (`void ...`).
@@ -44,6 +46,8 @@ export async function resolveAdminRecipients(): Promise<string[]> {
 
 export async function notifyAdminsOfBrandEvent(partyId: string): Promise<void> {
   try {
+    // Shipped disabled: opt in with BRAND_EVENT_ADMIN_ALERTS=on. Checked before any DB read.
+    if (process.env.BRAND_EVENT_ADMIN_ALERTS !== 'on') return;
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) return;
     const party = await prisma.party.findUnique({
