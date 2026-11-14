@@ -53,3 +53,6 @@ payout-receipts-backfill-backup-*.json
 
 # budget-receipts-private backfill row backups (contain receipt object paths)
 budget-receipts-backfill-backup-*.json
+
+# Claude Code agent worktrees (local only)
+.claude/worktrees/
