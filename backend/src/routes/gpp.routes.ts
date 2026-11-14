@@ -470,7 +470,9 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
       codeExists = !!existing;
     }
 
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days for GPP
+    // 24h: long enough to finish setup from the welcome email, short enough that guessing a
+    // 6-digit code within its lifetime stays negligible (was 7 days; see invite-verify #1253).
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prisma.magicLink.create({
       data: {
