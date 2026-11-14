@@ -13,7 +13,7 @@
  */
 import { prisma } from '../config/database.js';
 import { isPaymentAdmin } from '../middleware/auth.js';
-import { canUserEditParty } from './partyAccess.js';
+import { canUserEditParty, canUserAccessTab } from './partyAccess.js';
 import { isAggregatorForParty } from '../services/payout-recipients.js';
 
 export interface ReceiptCaller {
@@ -47,4 +47,18 @@ export async function canAccessPartyReceipts(
   if (caller.userEmail && (await isAggregatorForParty(caller.userEmail, party))) return true;
   if (opts.allowShippingCoordinator && (await isActiveShippingCoordinator(caller.userEmail))) return true;
   return false;
+}
+
+/**
+ * budget-receipts-private: who may see (get signed URLs for) / upload BUDGET
+ * receipts of party P. Exactly the gate every /api/parties/:partyId/budget
+ * route applies today: someone who can edit P (owner, editing co-host, super
+ * admin, scoped GPP roles) AND has the budget tab (canUserAccessTab: owner,
+ * super admin, GPP global editors/admins/scoped underbosses, co-hosts whose
+ * tab permissions include budget). Never wider than the budget routes.
+ */
+export async function canAccessPartyBudget(caller: ReceiptCaller, partyId: string): Promise<boolean> {
+  if (!caller.userId && !caller.userEmail) return false;
+  if (!(await canUserEditParty(partyId, caller.userId, caller.userEmail))) return false;
+  return canUserAccessTab(partyId, caller.userEmail, caller.userId, 'budget');
 }

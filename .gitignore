@@ -50,3 +50,6 @@ secrets.md
 
 # payout-receipts-private backfill row backups (contain receipt object paths)
 payout-receipts-backfill-backup-*.json
+
+# budget-receipts-private backfill row backups (contain receipt object paths)
+budget-receipts-backfill-backup-*.json

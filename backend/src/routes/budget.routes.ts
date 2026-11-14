@@ -4,8 +4,38 @@ import { requireAuth, isSuperAdmin, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { Decimal } from '@prisma/client/runtime/library';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { rateLimit } from 'express-rate-limit';
+import {
+  isBudgetReceiptPath,
+  partyIdFromBudgetReceiptPath,
+  isPrivateReceiptPath,
+  buildBudgetReceiptUploadPath,
+  createReceiptUploadTarget,
+} from '../services/payoutReceiptStorage.service.js';
+import { canAccessPartyBudget } from '../helpers/payoutReceiptAccess.js';
 
 const router = Router();
+
+/**
+ * budget-receipts-private: receipt_url holds either a bare private path
+ * (`receipts/<partyId>/...` in the PRIVATE payout-receipts bucket; signed on
+ * the way out by middleware/payoutReceiptUrls.ts), a legacy public URL, or a
+ * host-pasted link. A bare private path must belong to THIS party, and a
+ * payout receipt path is never accepted here.
+ */
+export function assertBudgetReceiptRef(receiptUrl: unknown, partyId: string): void {
+  if (receiptUrl === undefined || receiptUrl === null) return;
+  if (typeof receiptUrl !== 'string') {
+    throw new AppError('receiptUrl must be a string', 400, 'VALIDATION_ERROR');
+  }
+  const v = receiptUrl.trim();
+  if (isPrivateReceiptPath(v)) {
+    throw new AppError('receiptUrl is not a budget receipt', 400, 'INVALID_RECEIPT_URL');
+  }
+  if (/^receipts\//i.test(v) && (!isBudgetReceiptPath(v) || partyIdFromBudgetReceiptPath(v)?.toLowerCase() !== partyId.toLowerCase())) {
+    throw new AppError(`receiptUrl must be under receipts/${partyId}/`, 400, 'INVALID_RECEIPT_URL');
+  }
+}
 
 // All budget routes require authentication
 router.use(requireAuth);
@@ -26,6 +56,39 @@ export type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 // Budget item status
 export const BUDGET_STATUSES = ['pending', 'paid'] as const;
 export type BudgetStatus = typeof BUDGET_STATUSES[number];
+
+// POST /api/parties/:partyId/budget/receipt-upload-url
+//
+// budget-receipts-private: budget receipts go to the PRIVATE payout-receipts
+// bucket (no anon/authenticated storage policies). The browser asks here for a
+// one-shot signed upload URL; the SERVER picks the path (always
+// receipts/{partyId}/...) and the caller must pass the same gate as every
+// other budget route. Body: { ext }. Returns: { path, token }.
+const budgetReceiptUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
+
+router.post('/:partyId/budget/receipt-upload-url', budgetReceiptUploadLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(partyId)) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    if (!(await canAccessPartyBudget({ userId: req.userId, userEmail: req.userEmail }, partyId))) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const ext = (req.body || {}).ext;
+    const path = buildBudgetReceiptUploadPath(partyId.toLowerCase(), typeof ext === 'string' ? ext : 'jpg');
+    const target = await createReceiptUploadTarget(path);
+    res.json({ path: target.path, token: target.token });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/parties/:partyId/budget - Get budget overview and items
 router.get('/:partyId/budget', async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -182,6 +245,8 @@ router.post('/:partyId/budget/items', async (req: AuthRequest, res: Response, ne
       throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
     }
 
+    assertBudgetReceiptRef(receiptUrl, partyId);
+
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
@@ -240,6 +305,8 @@ router.patch('/:partyId/budget/items/:itemId', async (req: AuthRequest, res: Res
     if (!canAccess) {
       throw new AppError('You do not have access to the budget tab', 403, 'TAB_ACCESS_DENIED');
     }
+
+    assertBudgetReceiptRef(receiptUrl, partyId);
 
     // Validate category if provided
     if (category !== undefined && !BUDGET_CATEGORIES.includes(category)) {

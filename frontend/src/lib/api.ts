@@ -6972,6 +6972,18 @@ export interface ReceiptUploadTarget {
   thumb: { path: string; token: string } | null;
 }
 
+// budget-receipts-private: budget receipts also live in the PRIVATE
+// payout-receipts bucket, under receipts/{partyId}/ (server-chosen path).
+export async function getBudgetReceiptUploadUrl(
+  partyId: string,
+  ext: string,
+): Promise<{ path: string; token: string }> {
+  return apiRequest<{ path: string; token: string }>(
+    `/api/parties/${partyId}/budget/receipt-upload-url`,
+    { method: 'POST', body: { ext }, requireAuth: true }
+  );
+}
+
 export async function getReceiptUploadUrl(
   partyId: string,
   opts: { group: string; ext: string; withThumb?: boolean },
