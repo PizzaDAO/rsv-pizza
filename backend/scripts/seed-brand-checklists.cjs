@@ -23,7 +23,11 @@
  *       are skipped; the app seeds them fresh on next open.
  *   (b) insert the missing checklist_defaults rows (ON CONFLICT DO NOTHING).
  *   (c) realign sort_order of the existing default rows (and of those parties'
- *       default items) to the planned order. Names, rules and links are untouched.
+ *       default items) to the planned order.
+ *   (d) fill a link_tab that is EMPTY on an existing row (template + every
+ *       party's default item), so rows like "Add a co-host" open Settings the
+ *       way the GPP rows do. A link already set (e.g. by an admin) is never
+ *       overwritten. Names and auto rules are never changed.
  *
  * Idempotent: existing names are skipped; a second run inserts nothing.
  * Rows that exist in the DB but not in the plan (e.g. added at /admin/series)
@@ -55,54 +59,54 @@ const VALID_LINK_TABS = new Set([
 const BRAND_CHECKLISTS = {
   // Doge Day: one global celebration on Nov 2, Doge/Kabosu themed.
   doge: [
-    ['Create your event', 'event_created', null], // existing
+    ['Create your event', 'event_created', 'details'], // existing
     ['Get approved', 'underboss_reviewed', null], // existing
-    ['Add a co-host', 'team_built', null], // existing
+    ['Add a co-host', 'team_built', 'details'], // existing
     ['Pick a venue', 'venue_added', 'venue'], // existing
     ['Estimate attendance', 'attendance_estimated', 'attendance'], // existing
     ['Choose a pizzeria', 'pizzerias_selected', 'pizza'], // existing
     ['Find partners', null, 'partners'],
     ['Customize your flyer', null, 'flyer'],
-    ['Share your invite link', null, null], // existing
+    ['Share your invite link', null, 'promo'], // existing
     ['Share the Doge Day countdown', null, null],
-    ['Post on X with #DogeDay', null, null], // existing
+    ['Post on X with #DogeDay', null, 'social-post'], // existing
     ['Plan Doge decor and a Kabosu photo spot', null, null],
     ['Print flyers and stickers', null, 'print'],
-    ['Pick a photo/video person', null, null],
+    ['Pick a photo/video person', null, 'photos'],
     ['Use your Party Guide on Doge Day', null, 'party-guide'],
     ['Upload photos after the party', null, 'photos'], // existing
   ],
   // Team1: community meetup.
   team1: [
-    ['Create your event', 'event_created', null], // existing
+    ['Create your event', 'event_created', 'details'], // existing
     ['Get approved', 'underboss_reviewed', null], // existing
     ['Confirm venue', 'venue_added', 'venue'], // existing
     ['Line up a speaker or topic', null, null], // existing
-    ['Add a co-host', 'team_built', null],
+    ['Add a co-host', 'team_built', 'details'],
     ['Estimate attendance', 'attendance_estimated', 'attendance'], // existing
     ['Choose a pizzeria', 'pizzerias_selected', 'pizza'], // existing
     ['Share in your Team1 community chat', null, null], // existing
     ['Post to socials', null, 'social-post'],
     ['Remind guests the day before', null, 'guests'],
     ['Print name tags for check-in', null, 'print'],
-    ['Pick a photo/video person', null, null],
+    ['Pick a photo/video person', null, 'photos'],
     ['Post photos and a recap', null, 'photos'], // existing
     ['Schedule the next meetup', null, null], // existing
   ],
   // Monad: multi-day hackathon.
   monad: [
-    ['Create your event', 'event_created', null], // existing
+    ['Create your event', 'event_created', 'details'], // existing
     ['Get approved', 'underboss_reviewed', null], // existing
     ['Confirm venue and Wi-Fi/power', 'venue_added', 'venue'], // existing
     ['Publish tracks, prizes and rules', null, 'details'], // existing
     ['Set up the submission platform', null, null],
     ['Post the day-by-day schedule', null, 'details'],
     ['Line up judges and mentors', null, null], // existing
-    ['Add a co-host or volunteers', 'team_built', null], // existing
+    ['Add a co-host or volunteers', 'team_built', 'details'], // existing
     ['Set capacity and review applications', null, 'guests'], // existing
     ['Plan meals per day: choose pizzerias', 'pizzerias_selected', 'pizza'], // existing
     ['Post to socials', null, 'social-post'],
-    ['Pick a photo/video person', null, null],
+    ['Pick a photo/video person', null, 'photos'],
     ['Day-of: check-in and displays', null, 'displays'], // existing
     ['Run demos and judging', null, null],
     ['Post winners and photos', null, 'photos'], // existing
@@ -112,7 +116,7 @@ const BRAND_CHECKLISTS = {
 
 /**
  * Pure diff of a series' existing default rows against its planned list.
- * existing: [{ name, sort_order }]; planned: [[name, autoRule, linkTab], ...].
+ * existing: [{ name, sort_order, link_tab }]; planned: [[name, autoRule, linkTab], ...].
  * sortOrder is 1-based position in the plan.
  */
 function planSeries(existing, planned) {
@@ -121,6 +125,7 @@ function planSeries(existing, planned) {
   const insert = [];
   const reorder = [];
   const keep = [];
+  const linkFixes = [];
   planned.forEach(([name, autoRule, linkTab], i) => {
     const sortOrder = i + 1;
     const row = byName.get(name);
@@ -130,9 +135,11 @@ function planSeries(existing, planned) {
     }
     keep.push(name);
     if (row.sort_order !== sortOrder) reorder.push({ name, from: row.sort_order, to: sortOrder });
+    // Only fill a MISSING link; a link set by an admin (/admin/series) is never overwritten.
+    if (linkTab && !row.link_tab) linkFixes.push({ name, to: linkTab });
   });
   const extras = existing.filter((r) => !plannedNames.has(r.name)).map((r) => r.name);
-  return { insert, reorder, keep, extras };
+  return { insert, reorder, keep, extras, linkFixes };
 }
 
 /** Returns a list of problems with the brand lists (empty = valid). */
@@ -182,12 +189,12 @@ async function main() {
         }
         const seriesId = s.rows[0].id;
         const ex = await client.query(
-          'SELECT name, sort_order FROM checklist_defaults WHERE series_id = $1 ORDER BY sort_order, name',
+          'SELECT name, sort_order, link_tab FROM checklist_defaults WHERE series_id = $1 ORDER BY sort_order, name',
           [seriesId],
         );
         const existingNames = ex.rows.map((r) => r.name);
         const threshold = existingNames.length;
-        const { insert, reorder, keep, extras } = planSeries(ex.rows, planned);
+        const { insert, reorder, keep, extras, linkFixes } = planSeries(ex.rows, planned);
 
         // Parties fully seeded from THIS series' template: they hold at least
         // `threshold` default items whose names are in the series template.
@@ -206,7 +213,7 @@ async function main() {
         );
 
         console.log(`\n--- '${slug}' (${seriesId}) ---`);
-        console.log(`existing defaults: ${threshold}; planned: ${planned.length}; keep ${keep.length}, insert ${insert.length}, reorder ${reorder.length}`);
+        console.log(`existing defaults: ${threshold}; planned: ${planned.length}; keep ${keep.length}, insert ${insert.length}, reorder ${reorder.length}, link fixes ${linkFixes.length}`);
         if (insert.length) {
           console.log(`${APPLY ? 'Inserting' : 'Would insert'} ${insert.length} checklist_defaults row(s):`);
           for (const r of insert) {
@@ -216,6 +223,17 @@ async function main() {
         if (reorder.length) {
           console.log(`${APPLY ? 'Reordering' : 'Would reorder'} ${reorder.length} existing row(s): ` +
             reorder.map((r) => `'${r.name}' ${r.from}->${r.to}`).join(', '));
+        }
+        if (linkFixes.length) {
+          const linkItems = await client.query(
+            `SELECT ci.name, COUNT(*)::int AS n FROM checklist_items ci JOIN parties p ON p.id = ci.party_id
+              WHERE p.event_series_id = $1 AND ci.is_default = true AND ci.link_tab IS NULL AND ci.name = ANY($2::text[])
+              GROUP BY ci.name`,
+            [seriesId, linkFixes.map((l) => l.name)],
+          );
+          const perName = Object.fromEntries(linkItems.rows.map((r) => [r.name, r.n]));
+          console.log(`${APPLY ? 'Setting' : 'Would set'} link on ${linkFixes.length} existing row(s) (only where link is empty):`);
+          for (const l of linkFixes) console.log(`  '${l.name}' -> ${l.to}  (+ ${perName[l.name] || 0} party item(s))`);
         }
         if (extras.length) console.log(`Leaving alone (in DB, not in plan): ${extras.map((n) => `'${n}'`).join(', ')}`);
         if (threshold === 0) console.log('WARN: series had no defaults; its parties used the global template and are not backfilled.');
@@ -274,6 +292,23 @@ async function main() {
           );
         }
 
+        // (d) fill missing links on template rows + every party's default items.
+        let linked = 0;
+        for (const l of linkFixes) {
+          await client.query(
+            'UPDATE checklist_defaults SET link_tab = $3, updated_at = now() WHERE series_id = $1 AND name = $2 AND link_tab IS NULL',
+            [seriesId, l.name, l.to],
+          );
+          const res = await client.query(
+            `UPDATE checklist_items ci SET link_tab = $3, updated_at = now()
+               FROM parties p
+              WHERE p.id = ci.party_id AND p.event_series_id = $1
+                AND ci.is_default = true AND ci.name = $2 AND ci.link_tab IS NULL`,
+            [seriesId, l.name, l.to],
+          );
+          linked += res.rowCount;
+        }
+
         const after = await client.query(
           'SELECT COUNT(*)::int AS n FROM checklist_defaults WHERE series_id = $1', [seriesId],
         );
@@ -282,7 +317,7 @@ async function main() {
           throw new Error(`'${slug}' has ${after.rows[0].n} defaults after insert, expected ${expected}`);
         }
         await client.query('COMMIT');
-        console.log(`OK '${slug}': inserted ${inserted} default(s), backfilled ${backfilled} party item(s), reordered ${reorder.length}; now ${after.rows[0].n} defaults`);
+        console.log(`OK '${slug}': inserted ${inserted} default(s), backfilled ${backfilled} party item(s), reordered ${reorder.length}, linked ${linkFixes.length} default(s) + ${linked} party item(s); now ${after.rows[0].n} defaults`);
       } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
         throw err;

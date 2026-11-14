@@ -230,8 +230,26 @@ router.patch('/checklist/:defaultId', async (req: AuthRequest, res: Response, ne
     if (b.linkTab !== undefined) data.linkTab = str(b.linkTab) ?? null;
     if (b.sortOrder !== undefined && typeof b.sortOrder === 'number') data.sortOrder = b.sortOrder;
 
+    const before = await prisma.checklistDefault.findUnique({
+      where: { id: req.params.defaultId },
+      select: { name: true, seriesId: true },
+    });
     const item = await prisma.checklistDefault.update({ where: { id: req.params.defaultId }, data });
-    res.json({ item });
+
+    // brand-checklists: like the GPP defaults PATCH, propagate due-date / link
+    // changes to the already-seeded default items of this series' parties.
+    let propagated = 0;
+    if (before?.seriesId && (data.dueDate !== undefined || data.linkTab !== undefined)) {
+      const itemData: Prisma.ChecklistItemUpdateManyMutationInput = {};
+      if (data.dueDate !== undefined) itemData.dueDate = data.dueDate as Date | null;
+      if (data.linkTab !== undefined) itemData.linkTab = data.linkTab as string | null;
+      const result = await prisma.checklistItem.updateMany({
+        where: { isDefault: true, name: before.name, party: { eventSeriesId: before.seriesId } },
+        data: itemData,
+      });
+      propagated = result.count;
+    }
+    res.json({ item, propagated });
   } catch (error: any) {
     if (error?.code === 'P2025') return next(new AppError('Checklist default not found', 404, 'NOT_FOUND'));
     next(error);

@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { withBrandDueDates } from '../lib/brandChecklistDueDates.js';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     // 2. venue_added: party.address is set (picking a venue or filling the location autocomplete both write address)
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { address: true, addressIsCityDefault: true, venueName: true, coHosts: true, userId: true, region: true, selectedPizzerias: true, underbossStatus: true, estimatedAttendance: true, eventSeriesId: true, user: { select: { email: true, name: true } } },
+      select: { address: true, addressIsCityDefault: true, venueName: true, coHosts: true, userId: true, region: true, selectedPizzerias: true, underbossStatus: true, estimatedAttendance: true, eventSeriesId: true, date: true, endTime: true, timezone: true, createdAt: true, eventSeries: { select: { createFlow: true } }, user: { select: { email: true, name: true } } },
     });
 
     // 3. budget_submitted: budget_items has items for this party
@@ -118,8 +119,14 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
       expectedCount = await prisma.checklistDefault.count({ where: { seriesId: null } });
     }
 
+    // brand-checklists: brand-series items get due dates relative to the party's
+    // own date (GPP rows carry absolute dates on checklist_defaults instead).
+    const itemsWithDue = party
+      ? withBrandDueDates(items, party.eventSeries?.createFlow, party)
+      : items;
+
     res.json({
-      items,
+      items: itemsWithDue,
       autoCompleteStates,
       seeded: defaultCount >= expectedCount && expectedCount > 0,
     });

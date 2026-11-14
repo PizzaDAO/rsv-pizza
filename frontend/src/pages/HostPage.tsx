@@ -44,7 +44,8 @@ import { FlyerTab } from '../components/flyer';
 import { PrintTab } from '../components/print';
 import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
-import { GPPDashboardTab, GPP27DashboardTab } from '../components/gpp-dashboard';
+import { GPPDashboardTab, GPP27DashboardTab, SeriesDashboardTab } from '../components/gpp-dashboard';
+import { hostDefaultTab, isBrandSeriesParty } from '../lib/hostDefaultTab';
 import { PayoutsTab } from '../components/payouts';
 import { DayOfTab } from '../components/day-of';
 
@@ -133,7 +134,10 @@ function HostPageContent() {
   // Derived at component scope (above any early return) per the React Rules
   // of Hooks — see arugula-38633 v2 incident in MEMORY.
   const isApproved = party?.underbossStatus === 'approved';
-  const defaultTab: TabType = isGPP ? 'dashboard' : 'details';
+  // brand-checklists: brand-series parties (Team1, Monad, Doge Day, ...) land on a
+  // dashboard with their task list, like GPP hosts. Settings stays at /details.
+  const isBrandSeries = isBrandSeriesParty(party);
+  const defaultTab: TabType = hostDefaultTab(party);
   const activeTab: TabType = (tab && ALL_VALID_TABS.includes(tab as TabType)) ? tab as TabType : defaultTab;
 
   const setActiveTab = (newTab: TabType) => {
@@ -222,7 +226,7 @@ function HostPageContent() {
   // All hooks must be called before any conditional returns (React Rules of Hooks)
   const tabs = useMemo(() => {
     const coreTabs = [
-      ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
+      ...(isGPP || isBrandSeries ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
       // pepperoni-58341 / salami-39204: Day-of host dashboard (also mirrored at
       // /run/:inviteCode for mobile). Approval gate: visible to hosts/cohosts of
       // approved parties (underbossStatus === 'approved'), regardless of admin
@@ -256,7 +260,7 @@ function HostPageContent() {
     return allowedTabs === 'all'
       ? allTabs
       : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
-  }, [isGPP, isApproved, party?.pinnedApps, allowedTabs, t]);
+  }, [isGPP, isBrandSeries, isApproved, party?.pinnedApps, allowedTabs, t]);
 
   // Redirect to first allowed tab if current tab is not permitted
   useEffect(() => {
@@ -368,7 +372,7 @@ function HostPageContent() {
         </div>
 
         {activeTab === 'dashboard' && party ? (
-          useGpp27Dashboard ? <GPP27DashboardTab /> : <GPPDashboardTab />
+          !isGPP ? <SeriesDashboardTab /> : useGpp27Dashboard ? <GPP27DashboardTab /> : <GPPDashboardTab />
         ) : activeTab === 'party-guide' && party ? (
           <DayOfTab party={party} />
         ) : activeTab === 'apps' && party ? (

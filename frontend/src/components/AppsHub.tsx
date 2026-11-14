@@ -268,11 +268,9 @@ function AppCard({
     if (app.status === 'coming-soon') return;
 
     if (app.status === 'live' && app.tab) {
-      if (app.tab === 'details') {
-        navigate(`/host/${inviteCode}`);
-      } else {
-        navigate(`/host/${inviteCode}/${app.tab}`);
-      }
+      // brand-checklists: /host/:code is the party's default tab (the dashboard for
+      // GPP and brand-series parties), so Settings always uses /details.
+      navigate(`/host/${inviteCode}/${app.tab}`);
     } else if (app.status === 'live' && app.externalPath) {
       navigate(app.externalPath);
     } else if (app.status === 'preview' && app.previewUrl) {

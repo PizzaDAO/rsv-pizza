@@ -127,11 +127,8 @@ export const GPP27DashboardTab: React.FC = () => {
   const goToTab = useCallback(
     (tab: string) => {
       if (!inviteCode) return;
-      if (tab === 'details') {
-        navigate(`/host/${inviteCode}`);
-      } else {
-        navigate(`/host/${inviteCode}/${tab}`);
-      }
+      // brand-checklists: /host/:code is the default tab (dashboard), not Settings.
+      navigate(`/host/${inviteCode}/${tab}`);
     },
     [inviteCode, navigate],
   );

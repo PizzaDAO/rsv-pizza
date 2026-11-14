@@ -69,11 +69,31 @@ describe('seed-brand-checklists', () => {
 
   it('planSeries is idempotent: a fully applied plan is a no-op', () => {
     for (const planned of Object.values(BRAND_CHECKLISTS) as [string, string | null, string | null][][]) {
-      const applied = planned.map(([name], i) => ({ name, sort_order: i + 1 }));
+      const applied = planned.map(([name, , linkTab], i) => ({ name, sort_order: i + 1, link_tab: linkTab }));
       const plan = planSeries(applied, planned);
       expect(plan.insert).toEqual([]);
       expect(plan.reorder).toEqual([]);
       expect(plan.extras).toEqual([]);
+      expect(plan.linkFixes).toEqual([]);
+    }
+  });
+
+  it('planSeries fills only EMPTY links, never overwrites an admin-set one', () => {
+    const existing = [
+      { name: 'Add a co-host', sort_order: 1, link_tab: null },
+      { name: 'Pick a photo/video person', sort_order: 2, link_tab: 'guests' },
+    ];
+    const planned = [['Add a co-host', 'team_built', 'details'], ['Pick a photo/video person', null, 'photos']];
+    expect(planSeries(existing, planned).linkFixes).toEqual([{ name: 'Add a co-host', to: 'details' }]);
+  });
+
+  it('co-host items link to Settings and photo/video items to Photos, like GPP27', () => {
+    for (const rows of Object.values(BRAND_CHECKLISTS) as [string, string | null, string | null][][]) {
+      for (const [name, rule, tab] of rows) {
+        if (rule === 'team_built') expect(tab).toBe('details');
+        if (name === 'Pick a photo/video person') expect(tab).toBe('photos');
+        if (rule === 'event_created') expect(tab).toBe('details');
+      }
     }
   });
 });
