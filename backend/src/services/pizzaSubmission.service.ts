@@ -31,6 +31,7 @@ import { buildHistoryLines, type HistoryKind, type HistoryLineIn, type HistoryRe
 import { normalizeMerchantKey } from './pizzaSize.service.js';
 import { invalidatePizzaIndexCache, refreshOutliers } from './pizzaIndex.service.js';
 import { getJwtSecret } from '../config/secrets.js';
+import { normalizeIp } from '../lib/normalizeIp.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -91,18 +92,8 @@ export const submissionsEnabled = () => getConfigFlag(FLAG_ENABLED, false);
 // Pure helpers (unit tested)
 // ---------------------------------------------------------------------------
 
-/** IPv4 as-is; IPv6 reduced to its /64 prefix (a single device/home can rotate the rest at will). */
-export function normalizeIp(ip: string | undefined): string {
-  if (!ip) return 'unknown';
-  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
-  if (mapped) return mapped[1];
-  if (!ip.includes(':')) return ip;
-  const [head, tail = ''] = ip.split('%')[0].split('::');
-  const a = head ? head.split(':') : [];
-  const b = ip.includes('::') && tail ? tail.split(':') : [];
-  const groups = ip.includes('::') ? [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b] : a;
-  return groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
-}
+// IPv4 as-is; IPv6 reduced to its /64 prefix. Shared with hackathon vote ip_hash (lib/normalizeIp.ts).
+export { normalizeIp };
 
 export function hashIp(ip: string | undefined): string {
   const secret = process.env.PIZZA_SUBMISSION_IP_SECRET || getJwtSecret();

@@ -41,10 +41,11 @@ import raffleRoutes from './routes/raffle.routes.js';
 import hackathonPublicRoutes from './routes/hackathon-public.routes.js';
 import hackathonGalleryRoutes from './routes/hackathon-gallery.routes.js';
 import hackathonParticipantRoutes, { hackathonCronRouter } from './routes/hackathon-participant.routes.js';
-import { hackathonPollLimiter, isHackathonPollRead } from './lib/hackathon/pollLimit.js';
+import { hackathonPollLimiter, isHackathonPollRead, isHackathonVoteWrite } from './lib/hackathon/pollLimit.js';
 import hackathonRoutes from './routes/hackathon.routes.js';
 import hackathonAwardsRoutes from './routes/hackathon-awards.routes.js';
 import hackathonJudgeRoutes from './routes/hackathon-judge.routes.js';
+import hackathonVotingRoutes from './routes/hackathon-voting.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import performerRoutes from './routes/performer.routes.js';
 import venueRoutes from './routes/venue.routes.js';
@@ -174,8 +175,9 @@ const limiter = rateLimit({
   // Host guest-list refetches (live updates) get their own per-user limiter below, so they can
   // neither starve nor be starved by check-in POSTs on shared venue Wi-Fi.
   // Authenticated hackathon polls (GET /hackathon/me, /hackathon/submissions) likewise get a
-  // per-user limiter (lib/hackathon/pollLimit.ts).
-  skip: (req) => isHostGuestListRead(req) || isHackathonPollRead(req),
+  // per-user limiter (lib/hackathon/pollLimit.ts), and authenticated vote writes are bounded
+  // per user by the voting router (PR 7).
+  skip: (req) => isHostGuestListRead(req) || isHackathonPollRead(req) || isHackathonVoteWrite(req),
 });
 app.use('/api', limiter);
 
@@ -259,6 +261,7 @@ app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
 app.use('/api/parties', hackathonPublicRoutes); // Hackathon public read (host gets the full setup)
 app.use('/api/parties', hackathonGalleryRoutes); // Hackathon public gallery + project pages (PR 6; host gets a preview)
+app.use('/api/parties', hackathonVotingRoutes); // Hackathon public voting (PR 7; voter + host routes, checks per route)
 app.use('/api/parties', hackathonParticipantRoutes); // Hackathon teams + submissions (auth + eligibility / team checks per route)
 app.use('/api/parties', hackathonRoutes); // Hackathon host setup (auth + host check per route)
 app.use('/api/parties', hackathonAwardsRoutes); // Hackathon winners, reveal, payout tracking (host only, PR 5)

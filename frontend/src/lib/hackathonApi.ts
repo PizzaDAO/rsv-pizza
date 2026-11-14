@@ -551,10 +551,14 @@ export interface AwardsResponse {
   prizes: HackathonPrize[];
   awards: HostAward[];
   candidates: AwardCandidate[];
-  /** prizeId -> suggested submission ids, from the leaderboard (judged prizes only). */
+  /** prizeId -> suggested submission ids: judged prizes from the leaderboard, People's Choice from the closed vote. */
   suggestions: Record<string, string[]>;
   ranking: { overall: RankEntry[]; byTrack: Array<{ trackId: string; rows: RankEntry[] }> };
+  /** PR 7: public voting status; the vote ranking only once voting is closed (and a People's Choice prize exists). */
+  voting?: { status: 'off' | 'scheduled' | 'open' | 'closed'; ranking: { overall: VoteRankEntry[]; byTrack: Array<{ trackId: string; rows: VoteRankEntry[] }> } | null };
 }
+
+export interface VoteRankEntry { submissionId: string; votes: number; rank: number | null; tied: boolean }
 
 export type PayoutInput = Partial<{
   status: PayoutStatus;
