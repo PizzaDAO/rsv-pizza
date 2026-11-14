@@ -22,6 +22,13 @@
  * per-caller party check (and normalises signed URLs that clients send back
  * into bare paths). Server-side fetches (OCR, authenticity check, rotate) go
  * through `resolveFetchableUrl`.
+ *
+ * budget-receipts-private: BUDGET receipts (budget_items.receipt_url) share
+ * this bucket under their own prefix, `receipts/<partyUuid>/<file>` (the same
+ * object path they had in event-images). Same sensitivity, MIME allowlist and
+ * size cap, so one private bucket; the two namespaces are kept apart by path
+ * predicate: payout routers only sign `payouts/...` paths, the budget router
+ * only signs `receipts/...` paths (see isBudgetReceiptPath).
  */
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
@@ -51,14 +58,44 @@ export function partyIdFromPrivateReceiptPath(path: string): string | null {
   return path.split('/')[1] ?? null;
 }
 
+/**
+ * budget-receipts-private: a bare BUDGET receipt path in the same private
+ * bucket. Always `receipts/<party uuid>/<rest>`; same shape rules as above.
+ */
+const BUDGET_RECEIPT_PATH_RE = /^receipts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[^\s?#]+$/i;
+
+export function isBudgetReceiptPath(value: unknown): value is string {
+  return typeof value === 'string' && BUDGET_RECEIPT_PATH_RE.test(value) && !value.includes('..');
+}
+
+/** Party id embedded in a budget receipt path (or null). */
+export function partyIdFromBudgetReceiptPath(path: string): string | null {
+  if (!isBudgetReceiptPath(path)) return null;
+  return path.split('/')[1] ?? null;
+}
+
+/** Any object path this module may sign / upload: payout OR budget receipts. */
+export function isPrivateBucketPath(value: unknown): value is string {
+  return isPrivateReceiptPath(value) || isBudgetReceiptPath(value);
+}
+
 const SIGNED_URL_MARKER = `/storage/v1/object/sign/${PAYOUT_RECEIPTS_BUCKET}/`;
 
 /**
- * If `value` is a signed URL for an object in the private payout-receipts
- * bucket (as handed out by this backend), return the bare object path.
- * Otherwise null. Only Supabase-hosted URLs are recognised.
+ * If `value` is a signed URL for a PAYOUT receipt in the private
+ * payout-receipts bucket (as handed out by this backend), return the bare
+ * object path. Otherwise null. Only Supabase-hosted URLs are recognised.
  */
 export function privatePathFromSignedUrl(value: unknown): string | null {
+  return pathFromSignedUrl(value, isPrivateReceiptPath);
+}
+
+/** Same as privatePathFromSignedUrl, for BUDGET receipt paths (`receipts/...`). */
+export function budgetPathFromSignedUrl(value: unknown): string | null {
+  return pathFromSignedUrl(value, isBudgetReceiptPath);
+}
+
+function pathFromSignedUrl(value: unknown, accept: (p: string) => boolean): string | null {
   if (typeof value !== 'string' || !value.includes(SIGNED_URL_MARKER)) return null;
   let url: URL;
   try {
@@ -75,7 +112,7 @@ export function privatePathFromSignedUrl(value: unknown): string | null {
   } catch {
     return null;
   }
-  return isPrivateReceiptPath(path) ? path : null;
+  return accept(path) ? path : null;
 }
 
 /** Signed private URL → bare path; every other value is returned unchanged. */
@@ -160,7 +197,7 @@ export async function signReceiptPaths(
   paths: Iterable<string>,
   ttlSeconds: number = RECEIPT_SIGNED_URL_TTL_SECONDS,
 ): Promise<Map<string, string>> {
-  const unique = Array.from(new Set(Array.from(paths).filter(isPrivateReceiptPath)));
+  const unique = Array.from(new Set(Array.from(paths).filter(isPrivateBucketPath)));
   const out = new Map<string, string>();
   if (unique.length === 0) return out;
   const supabase = getSupabaseAdmin();
@@ -247,6 +284,18 @@ export function buildReceiptUploadPath(partyId: string, group: string, ext: stri
   return `payouts/${partyId}/${safeGroup}/receipt/${Date.now()}-${rand}.${safeExt}`;
 }
 
+/**
+ * budget-receipts-private: server-chosen object path for a budget receipt
+ * upload (same layout as the historical public one):
+ *   receipts/{partyId}/{timestamp}-{rand}.{ext}
+ */
+export function buildBudgetReceiptUploadPath(partyId: string, ext: string): string {
+  const lowerExt = (ext || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const safeExt = ALLOWED_EXTS.has(lowerExt) ? lowerExt : 'jpg';
+  const rand = randomBytes(6).toString('hex');
+  return `receipts/${partyId}/${Date.now()}-${rand}.${safeExt}`;
+}
+
 export interface ReceiptUploadTarget {
   path: string;
   token: string;
@@ -258,7 +307,7 @@ export interface ReceiptUploadTarget {
  * without any storage RLS policy for anon/authenticated.
  */
 export async function createReceiptUploadTarget(path: string): Promise<ReceiptUploadTarget> {
-  if (!isPrivateReceiptPath(path)) throw new Error(`Invalid private receipt path: ${path}`);
+  if (!isPrivateBucketPath(path)) throw new Error(`Invalid private receipt path: ${path}`);
   await ensurePayoutReceiptsBucket();
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.storage

@@ -11,6 +11,7 @@ import {
   uncheckInGuestApi,
   promoteGuestApi,
   getReceiptUploadUrl,
+  getBudgetReceiptUploadUrl,
 } from './api';
 import type { OneSheetConfig } from './api';
 import { uuid } from './utils';
@@ -294,14 +295,26 @@ export async function uploadDescriptionImage(file: File, partyId: string): Promi
 }
 
 /**
- * Upload a receipt file (image or PDF) to Supabase Storage and return the public URL
+ * Upload a BUDGET receipt file (image or PDF).
+ *
+ * budget-receipts-private: receipts go to the PRIVATE `payout-receipts`
+ * bucket through a backend-minted one-shot signed upload URL (the backend
+ * picks the path, always `receipts/{partyId}/...`, and checks budget access).
+ * Returns the bare object path to store in budget_items.receipt_url; the
+ * budget API turns it into a short-lived signed URL on every read.
  * @param file The receipt file to upload (JPEG, PNG, WebP, or PDF)
  * @param partyId The party ID for organizing uploads
- * @returns The public URL of the uploaded receipt, or null if upload failed
+ * @returns The bare private object path, or null if upload failed
  */
 export async function uploadReceipt(file: File, partyId: string): Promise<string | null> {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-  if (!allowedTypes.includes(file.type)) {
+  const extByType: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'application/pdf': 'pdf',
+  };
+  const ext = extByType[file.type];
+  if (!ext) {
     console.error('Invalid file type for receipt:', file.type);
     return null;
   }
@@ -313,14 +326,12 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
   }
 
   try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `receipts/${partyId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
+    const target = await getBudgetReceiptUploadUrl(partyId, ext);
     const { error } = await supabase.storage
-      .from('event-images')
-      .upload(fileName, file, {
+      .from('payout-receipts')
+      .uploadToSignedUrl(target.path, target.token, file, {
         cacheControl: '3600',
-        upsert: false
+        contentType: file.type,
       });
 
     if (error) {
@@ -328,11 +339,7 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
       return null;
     }
 
-    const { data: urlData } = supabase.storage
-      .from('event-images')
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
+    return target.path;
   } catch (error) {
     console.error('Error uploading receipt:', error);
     return null;
