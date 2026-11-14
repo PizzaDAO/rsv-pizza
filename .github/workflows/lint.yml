@@ -17,6 +17,10 @@ on:
     paths:
       - 'frontend/src/**'
       - 'frontend/eslint.hooks.config.js'
+      # Dependency bumps (e.g. Dependabot PRs) must run CI too.
+      - 'package.json'
+      - 'package-lock.json'
+      - 'frontend/package.json'
       - '.github/workflows/lint.yml'
 
 jobs:

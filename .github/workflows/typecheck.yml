@@ -12,6 +12,11 @@ on:
       - 'backend/src/**'
       - 'frontend/tsconfig*.json'
       - 'backend/tsconfig*.json'
+      # Dependency bumps (e.g. Dependabot PRs) must run CI too.
+      - 'package.json'
+      - 'package-lock.json'
+      - 'frontend/package.json'
+      - 'backend/package.json'
       - '.github/workflows/typecheck.yml'
 
 jobs:
