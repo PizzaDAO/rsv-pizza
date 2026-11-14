@@ -65,11 +65,17 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // e2e/ holds Playwright specs (run by `playwright test`); vitest can't execute them.
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
     env: {
       VITE_SUPABASE_URL: 'https://test.supabase.co',
       VITE_SUPABASE_ANON_KEY: 'test-anon-key',
       VITE_API_URL: 'http://localhost:3001',
       VITE_GOOGLE_MAPS_API_KEY: 'test-api-key',
+      // napoletana-58547: the app defaults to the keyless `osm` provider; tests exercise the
+      // Google branch (src/test/setup.ts documents this, but its import.meta.env override
+      // does not reach src/lib/maps/provider.ts, so set it here where vitest injects env).
+      VITE_MAP_PROVIDER: 'google',
     },
   },
 }));

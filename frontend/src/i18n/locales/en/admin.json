@@ -145,8 +145,31 @@
       "cities": "Cities",
       "partners": "Partners",
       "fakeDetection": "Fake Detection",
-      "outreach": "Outreach"
+      "outreach": "Outreach",
+      "bestOf": "Best Of",
+      "survey": "Survey",
+      "surveyResponses": "Survey Responses",
+      "hostSurveyResponses": "Host Survey Responses",
+      "telegramGroups": "Telegram Groups",
+      "verification": "Verification",
+      "pizzaIndex": "Pizza Index"
     }
+  },
+  "verification": {
+    "all": "All",
+    "fail": "Fail",
+    "warn": "Warn",
+    "pass": "Pass",
+    "intro": "Checks every approved GPP {{year}} city page so problems can be fixed before launch.",
+    "search": "Search city or URL",
+    "allRegions": "All regions",
+    "allCountries": "All countries",
+    "copied": "Copied",
+    "copyFailing": "Copy failing cities",
+    "refresh": "Refresh",
+    "empty": "No cities match.",
+    "publicPage": "Public page",
+    "hostEdit": "Host edit page"
   },
   "fakeDetection": {
     "loading": "Computing risk scores…",

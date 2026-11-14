@@ -173,10 +173,14 @@ describe('CI guards C1/C3/C4 config', () => {
 describe('CI guards C1/C3/C4 logic (fake catalog)', () => {
   const guards = createRequire(import.meta.url)(path.join(REPO, 'scripts/check-rls-anon-exposure.js'));
 
+  // Existing tables in the fake catalog = whatever the C1 config lists (it grows as new
+  // no-access tables are added, e.g. hackathon_*), so the mock never goes stale.
+  const noAccessTables: string[] = JSON.parse(read('scripts/anon-no-access-tables.json')).tables;
+
   type Row = Record<string, unknown>;
   function fakeCatalog(opts: { privs: boolean; permissive: string[]; published: string[]; anonCols: Record<string, string[]> }) {
     return async (sql: string, params: unknown[] = []): Promise<Row[]> => {
-      if (sql.includes('to_regclass')) return [{ ok: ['guests', 'user_preferences'].includes(params[0] as string) }];
+      if (sql.includes('to_regclass')) return [{ ok: noAccessTables.includes(params[0] as string) }];
       if (sql.includes('has_any_column_privilege')) {
         const v = opts.privs;
         return [{ sel: v, ins: v, upd: v, del: v, trunc: v }];
@@ -208,7 +212,7 @@ describe('CI guards C1/C3/C4 logic (fake catalog)', () => {
     const q = fakeCatalog({ privs: false, permissive: ['slug_aliases'], published: [], anonCols: { slug_aliases: ['old_slug', 'new_slug'] } });
     const out = await guards.guestsClassChecks(q);
     expect(out.fail).toEqual([]);
-    expect(out.info.join('\n')).toMatch(/C1 .*2 table/);
+    expect(out.info.join('\n')).toMatch(new RegExp(`C1 .*${noAccessTables.length} table`));
   });
 
   it('a missing no-access table fails (no silent typos)', async () => {
