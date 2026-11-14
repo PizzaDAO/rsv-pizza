@@ -4,9 +4,14 @@ version: 2
 # (build + typecheck + schema/rls/migration guards) instead of piling up.
 # Majors with no advisory/EOL are ignored to cut noise (2026-10-15). wagmi and prisma
 # majors are deliberately NOT ignored: they carry real advisories and should keep resurfacing.
+# npm: ONE entry at "/" for the whole npm-workspaces repo (frontend + backend + root).
+# There is a single lockfile (root package-lock.json); the workspace dirs have none, so
+# per-directory entries ("/frontend", "/backend") would have no lockfile to update.
+# Dependabot's npm updater resolves workspace packages from the root manifest/lockfile.
+# Ignore rules from the former per-directory entries are merged below.
 updates:
   - package-ecosystem: npm
-    directory: /frontend
+    directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -30,22 +35,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-helmet-async"
         update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /backend
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 10
-    groups:
-      dev-and-build:
-        patterns: ['*']
-        update-types: ['minor', 'patch']
-    ignore:
       - dependency-name: "express"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/express"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
@@ -56,19 +48,6 @@ updates:
       - dependency-name: "@napi-rs/canvas"
         update-types: ["version-update:semver-major"]
       - dependency-name: "pdfjs-dist"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      dev-and-build:
-        patterns: ['*']
-        update-types: ['minor', 'patch']
-    ignore:
-      - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
