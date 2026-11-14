@@ -8,7 +8,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | prosciutto-60417 | Upgrade Prisma 6 → 7 (security advisories; Dependabot #1272) | todo | P2 |  |  | security, deps |  |  | Dependabot #1272 open as reference; needs a plan (schema/client changes, migrate deploy in Deploy Backend, CLAUDE.md migration-safety rules) |
-| focaccia-61802 | Upgrade frontend vite 5 → 6 (security advisories; dev/build only) | review | P2 |  | Snax | security, deps | plans/focaccia-61802.md | #1297 | frontend devDependency vite ^5.4.2 (5.4.21) has 4 Dependabot alerts fixed only in >=6.4.4; remove the vite-major ignore in .github/dependabot.yml as part of this; backend/vitest already on vite 8.3.8 |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
@@ -76,6 +75,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 | deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | P1 | 2026-11-14 |  | 2026-10-29: superseded for ordering by openpizza/plans/rsv-pizza-ordering.md (host pays at pickup, reimbursed); PR #164 not needed for that skipped: superseded by openpizza/plans/rsv-pizza-ordering.md (2026-10-29); PR #164 closed |
+| focaccia-61802 | Upgrade frontend vite 5 → 6 (security advisories; dev/build only) | P2 | 2026-11-14 | #1297 | vite 6.4.6; Safe connector lazy chunk +658 kB accepted (see plan) |
 | blackolive-76568 | Add Google Maps geocoding fallback in VenueMap when Nominatim returns no results (e.g. Chinese addresses like Shenzhen) | P2 | 2026-11-14 |  | skipped: Nominatim already resolves 203/204 venues; PR #273 closed |
 | onion-42535 | iphone 8 couldn't load page | P2 | 2026-10-29 |  | duplicate of forno-81402 (#1164) |
 | stromboli-75934 | Selecting vegetarian or vegan should not allow to select meat options | P3 | 2026-03-18 | #76 |  |
