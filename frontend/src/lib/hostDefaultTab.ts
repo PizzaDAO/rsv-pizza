@@ -20,3 +20,13 @@ export function hostDefaultTab(party: PartyLike): 'dashboard' | 'details' {
   if (!party) return 'details';
   return party.eventType === 'gpp' || isBrandSeriesParty(party) ? 'dashboard' : 'details';
 }
+
+/**
+ * Which dashboard /host/:code/dashboard renders. Brand-series parties get the
+ * series dashboard; everyone else (GPP and plain parties) keeps the original
+ * routing: GPP27 preview when opted in, else the GPP dashboard.
+ */
+export function dashboardKind(isBrandSeries: boolean, useGpp27: boolean): 'series' | 'gpp27' | 'gpp' {
+  if (isBrandSeries) return 'series';
+  return useGpp27 ? 'gpp27' : 'gpp';
+}

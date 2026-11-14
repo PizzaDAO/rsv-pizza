@@ -263,7 +263,7 @@ export const GPPDashboardTab: React.FC = () => {
       </div>
 
       {/* Checklist progress (shared with brand-series dashboards) */}
-      <HostChecklistCard />
+      <HostChecklistCard variant="gpp" />
 
       {/* Host Resources */}
       <HostResources />

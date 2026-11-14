@@ -1,16 +1,21 @@
 import type { ChecklistItem } from '../../types';
 
 /**
- * brand-checklists: what clicking a host checklist row does. Shared by the GPP
- * dashboard and the brand-series dashboard so both behave the same.
+ * brand-checklists: what clicking a host-dashboard checklist row does.
  *
- * Resolved from the item's auto rule / link tab (not its name) so brand items
- * get the same behavior as the GPP items with the same meaning:
- *   - team_built            -> expand the co-host manager inline ("Build a Team")
- *   - link 'venue'          -> Find Venue modal ("Find a Venue")
- *   - link 'attendance'     -> Estimated Attendance modal
- *   - link 'social-post'    -> Social Post modal
- *   - any other link tab    -> navigate to that host tab
+ * 'gpp' reproduces the original GPPDashboardTab behavior exactly: actions are
+ * matched by GPP item NAME, anything else with a link navigates to that tab.
+ *
+ * 'series' (brand-series parties) resolves by auto rule + link instead, so brand
+ * items get the same behavior as the GPP items with the same meaning:
+ *   - team_built                       -> inline co-host manager ("Build a Team")
+ *   - venue_added rule + link 'venue'  -> Find Venue modal ("Find a Venue")
+ *   - link 'attendance'                -> Estimated Attendance modal
+ *   - link 'social-post'               -> Social Post modal
+ *   - any other link                   -> navigate to that host tab
+ *
+ * In both modes a legacy link 'sponsors' (not a host tab; on older GPP2026
+ * rows) navigates to the Partners tab.
  */
 export type ChecklistAction =
   | { kind: 'hosts' }
@@ -19,24 +24,36 @@ export type ChecklistAction =
   | { kind: 'social-modal' }
   | { kind: 'tab'; tab: string };
 
+export type ChecklistVariant = 'gpp' | 'series';
+
 type ActionItem = Pick<ChecklistItem, 'name' | 'autoRule' | 'linkTab'>;
 
-export function resolveChecklistAction(item: ActionItem): ChecklistAction | null {
-  if (item.autoRule === 'team_built' || item.name === 'Build a Team') return { kind: 'hosts' };
-  switch (item.linkTab) {
-    case 'venue':
-      return { kind: 'venue-modal' };
-    case 'attendance':
-      return { kind: 'attendance-modal' };
-    case 'social-post':
-      return { kind: 'social-modal' };
-    case null:
-    case undefined:
-    case '':
-      return null;
-    default:
-      return { kind: 'tab', tab: item.linkTab };
+/** Legacy link values that aren't host tabs, mapped to the tab they meant. */
+const LEGACY_TAB_ALIASES: Record<string, string> = { sponsors: 'partners' };
+
+function tabAction(linkTab: string | null | undefined): ChecklistAction | null {
+  if (!linkTab) return null;
+  return { kind: 'tab', tab: LEGACY_TAB_ALIASES[linkTab] ?? linkTab };
+}
+
+// Original GPPDashboardTab name matches (pre brand-checklists).
+const GPP_NAME_ACTIONS: Record<string, ChecklistAction> = {
+  'Build a Team': { kind: 'hosts' },
+  'Find Partners': { kind: 'tab', tab: 'partners' },
+  'Find a Venue': { kind: 'venue-modal' },
+  'Estimated Attendance': { kind: 'attendance-modal' },
+  'Post about the party on socials': { kind: 'social-modal' },
+};
+
+export function resolveChecklistAction(item: ActionItem, variant: ChecklistVariant = 'gpp'): ChecklistAction | null {
+  if (variant === 'gpp') {
+    return GPP_NAME_ACTIONS[item.name] ?? tabAction(item.linkTab);
   }
+  if (item.autoRule === 'team_built') return { kind: 'hosts' };
+  if (item.linkTab === 'venue' && item.autoRule === 'venue_added') return { kind: 'venue-modal' };
+  if (item.linkTab === 'attendance') return { kind: 'attendance-modal' };
+  if (item.linkTab === 'social-post') return { kind: 'social-modal' };
+  return tabAction(item.linkTab);
 }
 
 /**

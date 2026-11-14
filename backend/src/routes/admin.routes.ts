@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { isValidLinkTab } from '../lib/checklistLinkTabs.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 import { getSocialPostConfig, invalidate } from '../lib/privateConfig.js';
@@ -313,20 +314,8 @@ router.patch('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, ne
 // Checklist Defaults — using dedicated table
 // ============================================
 
-// Allow-list for `link_tab` values. Mirrors the host-page TabType enumeration
-// (excluding `dashboard`, `checklist`, `apps`, and null/empty which is "no link").
-const ALLOWED_LINK_TABS = [
-  'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
-  'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
-  'flyer', 'print', 'party-guide', 'payments',
-];
-
-function isValidLinkTab(v: unknown): v is string | null {
-  if (v === null || v === undefined) return true;
-  if (typeof v !== 'string') return false;
-  if (v === '') return true; // coerced to null upstream
-  return ALLOWED_LINK_TABS.includes(v);
-}
+// link_tab allow-list + isValidLinkTab live in lib/checklistLinkTabs.ts (shared
+// with the series checklist route).
 
 // Raw-SQL admin check helpers (bypass Prisma UUID deserialization bug)
 async function rawIsAdmin(email?: string): Promise<boolean> {

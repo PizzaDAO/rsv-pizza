@@ -21,6 +21,7 @@ import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
+import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -193,6 +194,7 @@ router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: Next
     const b = (req.body || {}) as Record<string, unknown>;
     const name = str(b.name);
     if (!name) throw new AppError('name is required', 400, 'VALIDATION_ERROR');
+    if (!isValidSeriesLinkTab(b.linkTab)) throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
 
     const max = await prisma.checklistDefault.aggregate({
       where: { seriesId },
@@ -222,6 +224,10 @@ router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: Next
 router.patch('/checklist/:defaultId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const b = (req.body || {}) as Record<string, unknown>;
+    // Same allow-list as the GPP defaults route (+ the checklist modal sentinels).
+    if (b.linkTab !== undefined && !isValidSeriesLinkTab(b.linkTab)) {
+      throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
+    }
     const data: Prisma.ChecklistDefaultUpdateInput = {};
     if (b.name !== undefined) data.name = str(b.name);
     if (b.dueDate !== undefined) data.dueDate = b.dueDate ? new Date(`${b.dueDate as string}T00:00:00.000Z`) : null;

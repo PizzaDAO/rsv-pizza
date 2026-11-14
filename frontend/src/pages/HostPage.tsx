@@ -45,7 +45,7 @@ import { PrintTab } from '../components/print';
 import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab, GPP27DashboardTab, SeriesDashboardTab } from '../components/gpp-dashboard';
-import { hostDefaultTab, isBrandSeriesParty } from '../lib/hostDefaultTab';
+import { hostDefaultTab, isBrandSeriesParty, dashboardKind } from '../lib/hostDefaultTab';
 import { PayoutsTab } from '../components/payouts';
 import { DayOfTab } from '../components/day-of';
 
@@ -372,7 +372,9 @@ function HostPageContent() {
         </div>
 
         {activeTab === 'dashboard' && party ? (
-          !isGPP ? <SeriesDashboardTab /> : useGpp27Dashboard ? <GPP27DashboardTab /> : <GPPDashboardTab />
+          // brand-checklists: only brand-series parties get the series dashboard;
+          // GPP and plain parties keep the original dashboard routing.
+          <DashboardForParty isBrandSeries={isBrandSeries} useGpp27={useGpp27Dashboard} />
         ) : activeTab === 'party-guide' && party ? (
           <DayOfTab party={party} />
         ) : activeTab === 'apps' && party ? (
@@ -662,3 +664,11 @@ export function HostPage() {
     </PizzaProvider>
   );
 }
+
+/** brand-checklists: which dashboard the Dashboard tab renders (see dashboardKind). */
+const DashboardForParty = ({ isBrandSeries, useGpp27 }: { isBrandSeries: boolean; useGpp27: boolean }) => {
+  const kind = dashboardKind(isBrandSeries, useGpp27);
+  if (kind === 'series') return <SeriesDashboardTab />;
+  if (kind === 'gpp27') return <GPP27DashboardTab />;
+  return <GPPDashboardTab />;
+};

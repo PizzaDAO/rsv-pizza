@@ -52,7 +52,7 @@ export const SeriesDashboardTab: React.FC = () => {
         </div>
       </div>
 
-      <HostChecklistCard />
+      <HostChecklistCard variant="series" />
     </div>
   );
 };

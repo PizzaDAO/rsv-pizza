@@ -1,10 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket,
-  CheckCircle, Circle, Loader2, Eye, EyeOff, Lock, ShieldCheck, Pizza, Camera, FileImage, Printer,
-  Zap, Monitor, Settings, LucideIcon,
-} from 'lucide-react';
+import { CheckCircle, Circle, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist, seedChecklist, toggleChecklistItem } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
@@ -12,60 +8,8 @@ import { HostsManager } from '../HostsManager';
 import { FindVenueModal } from './FindVenueModal';
 import { EstimatedAttendanceModal } from './EstimatedAttendanceModal';
 import { SocialPostModal } from './SocialPostModal';
-import { resolveChecklistAction, hostTabPath, sortByDueDate } from './checklistActions';
-
-// Map known GPP item names to Lucide icons.
-const ICON_MAP: Record<string, LucideIcon> = {
-  'Create Event': PartyPopper,
-  'Request Party Kit': Package,
-  'Build a Team': Users,
-  'Find a Venue': MapPin,
-  'Set Up Budget': DollarSign,
-  'Find Partners': Handshake,
-  'Select Pizzeria': MapPin,
-  'Prepare for the Party': ClipboardCheck,
-  'Post to Socials': Megaphone,
-  'Post about the party on socials': Megaphone,
-  'Throw the Party': Rocket,
-  'Get reviewed for funding': ShieldCheck,
-  'Estimated Attendance': Users,
-};
-
-// Fallback icons for items not in ICON_MAP (brand-series lists), by meaning.
-const RULE_ICONS: Record<string, LucideIcon> = {
-  event_created: PartyPopper,
-  underboss_reviewed: ShieldCheck,
-  team_built: Users,
-  venue_added: MapPin,
-  pizzerias_selected: Pizza,
-  attendance_estimated: Users,
-};
-const TAB_ICONS: Record<string, LucideIcon> = {
-  partners: Handshake,
-  'social-post': Megaphone,
-  promo: Megaphone,
-  photos: Camera,
-  flyer: FileImage,
-  print: Printer,
-  'party-guide': Zap,
-  displays: Monitor,
-  guests: Users,
-  pizza: Pizza,
-  details: Settings,
-};
-
-// Display-label overrides — the DB `name` stays the stable key (matched for
-// the icon and the `attendance_estimated` auto-rule); only the rendered text differs.
-const LABEL_OVERRIDES: Record<string, string> = {
-  'Estimated Attendance': 'Submit Estimated Attendance',
-};
-
-function iconFor(item: ChecklistItem): LucideIcon {
-  return ICON_MAP[item.name]
-    ?? (item.autoRule ? RULE_ICONS[item.autoRule] : undefined)
-    ?? (item.linkTab ? TAB_ICONS[item.linkTab] : undefined)
-    ?? ClipboardCheck;
-}
+import { resolveChecklistAction, hostTabPath, sortByDueDate, ChecklistVariant } from './checklistActions';
+import { checklistIcon, checklistLabel } from './checklistIcons';
 
 /**
  * The host-dashboard "Event Setup" checklist card. Extracted from
@@ -73,7 +17,12 @@ function iconFor(item: ChecklistItem): LucideIcon {
  * exact same list: same seeding, progress bar, auto-complete locks, manual
  * toggles, due dates, show/hide completed, and row actions.
  */
-export const HostChecklistCard: React.FC = () => {
+interface HostChecklistCardProps {
+  /** 'gpp' = original GPP dashboard behavior; 'series' = brand-series parties. */
+  variant: ChecklistVariant;
+}
+
+export const HostChecklistCard: React.FC<HostChecklistCardProps> = ({ variant }) => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
   const { party } = usePizza();
@@ -138,7 +87,7 @@ export const HostChecklistCard: React.FC = () => {
       const done = item.isAuto && item.autoRule
         ? (autoStates?.[item.autoRule as keyof AutoCompleteStates] ?? false)
         : item.completed;
-      const action = resolveChecklistAction(item);
+      const action = resolveChecklistAction(item, variant);
       const onClick: (() => void) | undefined =
         action?.kind === 'hosts' ? () => setHostsExpanded(prev => !prev)
         : action?.kind === 'venue-modal' ? () => setFindVenueOpen(true)
@@ -149,15 +98,15 @@ export const HostChecklistCard: React.FC = () => {
       return {
         id: item.id,
         isAuto: item.isAuto,
-        label: LABEL_OVERRIDES[item.name] ?? item.name,
+        label: checklistLabel(item),
         done,
         isHosts: action?.kind === 'hosts',
         onClick,
-        icon: iconFor(item),
+        icon: checklistIcon(item, variant),
         dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
       };
     }));
-  }, [party, autoStates, dbItems, goToTab]);
+  }, [party, autoStates, dbItems, goToTab, variant]);
 
   const completedCount = checklist.filter((c) => c.done).length;
   const totalCount = checklist.length;
