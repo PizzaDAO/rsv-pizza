@@ -69,6 +69,14 @@ export async function sendMagicLinkEmail(email: string, magicLinkUrl: string, co
  * normalized) and send the sign-in email. Email failures are logged, never thrown, matching
  * the old inline behaviour of /magic-link.
  */
+/**
+ * Wallet hand-off rows (POST /api/auth/handoff, #1252) share the magic_links table; their
+ * `code` is `ho…`, never 6 digits. They are not sign-in codes: never re-send one, and don't
+ * let them count toward or receive the sign-in-code budgets and signals.
+ */
+export const HANDOFF_CODE_PREFIX = 'ho';
+const NOT_HANDOFF = { NOT: [{ code: { startsWith: HANDOFF_CODE_PREFIX } }] };
+
 export async function issueLoginCode(
   email: string,
   site: SiteBrand,
@@ -81,11 +89,12 @@ export async function issueLoginCode(
   // can't multiply the victim's live codes by requesting from many IPs.
   const now = new Date();
   const recentMints = await prisma.magicLink.count({
-    where: { email, createdAt: { gte: new Date(now.getTime() - LIMIT_WINDOW_MS) } },
+    where: { email, createdAt: { gte: new Date(now.getTime() - LIMIT_WINDOW_MS) }, ...NOT_HANDOFF },
   });
   if (recentMints >= MINT_PER_EMAIL_WINDOW) {
+    // Only ever re-send a real 6-digit sign-in code, never a wallet hand-off row.
     const live = await prisma.magicLink.findFirst({
-      where: { email, used: false, lockedAt: null, expiresAt: { gt: now } },
+      where: { email, used: false, lockedAt: null, expiresAt: { gt: now }, ...NOT_HANDOFF },
       orderBy: { createdAt: 'desc' },
     });
     if (live) {
@@ -224,7 +233,7 @@ export async function takeCodeSend(email: string, ip: string | undefined): Promi
   let lastHour: number;
   try {
     lastHour = await prisma.magicLink.count({
-      where: { email, createdAt: { gte: new Date(now - 60 * 60 * 1000) } },
+      where: { email, createdAt: { gte: new Date(now - 60 * 60 * 1000) }, ...NOT_HANDOFF },
     });
   } catch (err) {
     rollback(sendLog, key, now);
@@ -295,6 +304,7 @@ export async function reserveVerifyAttempt(ip: string | undefined, email?: strin
           used: false,
           expiresAt: { gt: new Date(now) },
           attempts: { gte: EMAIL_UNDER_ATTACK_FAILS },
+          ...NOT_HANDOFF,
         },
       });
     } catch (err) {
@@ -315,7 +325,7 @@ export async function reserveVerifyAttempt(ip: string | undefined, email?: strin
     fail: async () => {
       if (!email) return;
       await prisma.magicLink.updateMany({
-        where: { email, used: false, expiresAt: { gt: new Date(now) } },
+        where: { email, used: false, expiresAt: { gt: new Date(now) }, ...NOT_HANDOFF },
         data: { attempts: { increment: 1 } },
       });
     },

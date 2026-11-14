@@ -135,6 +135,7 @@ function setup(opts: { party?: Partial<typeof PARTY>; existing?: Partial<typeof 
   mockPrisma.magicLink.findFirst.mockImplementation(({ where }: any) => {
     const live = [...links.values()]
       .filter((l) => l.email === where.email && !l.used && !l.lockedAt && l.expiresAt > new Date())
+      .filter((l) => !(where.NOT ?? []).some((n: any) => n.code?.startsWith && String(l.code).startsWith(n.code.startsWith)))
       .sort((a, b) => b.createdAt - a.createdAt);
     return Promise.resolve(live[0] ?? null);
   });
@@ -506,7 +507,11 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
     expect((await rsvpFrom('9.9.9.9')).body.recentlySent).toBe(true);
     expect(mockPrisma.magicLink.create).toHaveBeenCalledTimes(1);
     expect(mockPrisma.magicLink.count).toHaveBeenCalledWith({
-      where: { email: 'ivy@example.com', createdAt: { gte: expect.any(Date) } },
+      where: {
+        email: 'ivy@example.com',
+        createdAt: { gte: expect.any(Date) },
+        NOT: [{ code: { startsWith: 'ho' } }], // wallet hand-off rows (#1252) don't count
+      },
     });
   });
 
@@ -527,6 +532,32 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
     const sends = resendSends();
     expect(sends).toHaveLength(1);
     expect(sends[0].subject).toBe(`RSV.Pizza Code ${newest}`);
+  });
+
+  it('the mint cap never re-sends a wallet hand-off row (#1252), only a real 6-digit code', async () => {
+    setup();
+    // A live hand-off row for the same email, newer than everything else.
+    links.set('hoabc', {
+      id: 'ml-ho', token: 'handoff-token', code: 'hoabcx9999999999', email: 'ivy@example.com',
+      used: false, lockedAt: null, attempts: 0, user: null,
+      expiresAt: new Date(Date.now() + 120_000), createdAt: Date.now() + 1_000_000,
+    });
+    for (const ip of ['1.1.1.1', '2.2.2.2', '3.3.3.3']) {
+      mockPrisma.magicLink.count.mockResolvedValue(links.size - 1);
+      await magicFrom(ip);
+    }
+    const newest = lastCode();
+    mockPrisma.magicLink.count.mockResolvedValue(MINT_PER_EMAIL_WINDOW);
+    mockFetch.mockClear();
+    await rsvpFrom('10.0.0.1');
+    const sends = resendSends();
+    expect(sends).toHaveLength(1);
+    expect(sends[0].subject).toBe(`RSV.Pizza Code ${newest}`);
+    expect(sends[0].html).not.toContain('handoff-token');
+    expect(sends[0].html).not.toContain('hoabc');
+    expect(mockPrisma.magicLink.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ NOT: [{ code: { startsWith: 'ho' } }] }) }),
+    );
   });
 
   it('race: concurrent requests reserve synchronously, so no more than the budget get through', async () => {
