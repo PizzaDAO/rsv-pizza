@@ -60,7 +60,7 @@ export const BRAND_DUE_OFFSETS: Record<CreateFlowKey, Record<string, DueOffset>>
     'Get approved': { days: -42 },
     'Confirm venue and Wi-Fi/power': { days: -42 },
     'Publish tracks, prizes and rules': { days: -35 },
-    'Set up the submission platform': { days: -28 },
+    'Open project submissions': { days: -28 },
     'Add a co-host or volunteers': { days: -28 },
     'Post the day-by-day schedule': { days: -21 },
     'Line up judges and mentors': { days: -21 },

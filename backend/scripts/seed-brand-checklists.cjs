@@ -99,7 +99,7 @@ const BRAND_CHECKLISTS = {
     ['Get approved', 'underboss_reviewed', null], // existing
     ['Confirm venue and Wi-Fi/power', 'venue_added', 'venue'], // existing
     ['Publish tracks, prizes and rules', null, 'details'], // existing
-    ['Set up the submission platform', null, null],
+    ['Open project submissions', null, null],
     ['Post the day-by-day schedule', null, 'details'],
     ['Line up judges and mentors', null, null], // existing
     ['Add a co-host or volunteers', 'team_built', 'details'], // existing

@@ -4,7 +4,7 @@ import { HACKATHON_AUTO_RULES } from '../src/lib/hackathon/checklistRules.js';
 import { isValidSeriesLinkTab } from '../src/lib/checklistLinkTabs.js';
 
 const require = createRequire(import.meta.url);
-const { HACKATHON_ITEMS, LINK_TAB, planRow } = require('./seed-hackathon-checklist.cjs');
+const { HACKATHON_ITEMS, LINK_TAB, RENAMES, planRow } = require('./seed-hackathon-checklist.cjs');
 const { BRAND_CHECKLISTS } = require('./seed-brand-checklists.cjs');
 
 describe('seed-hackathon-checklist', () => {
@@ -48,5 +48,15 @@ describe('seed-hackathon-checklist', () => {
     expect(planRow({ name: 'Publish tracks, prizes and rules', link_tab: 'hackathon', auto_rule: null, completed: true })).toBeNull();
     expect(planRow({ name: 'Line up judges and mentors', link_tab: null, auto_rule: null, completed: false }))
       .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_judges_added' });
+  });
+
+  it('renames the old submission-platform item and keeps its link / auto rule planning', () => {
+    expect(RENAMES).toEqual({ 'Set up the submission platform': 'Open project submissions' });
+    // old-named rows are still planned (dry run sees the old name before the rename is applied)
+    expect(planRow({ name: 'Set up the submission platform', link_tab: null, auto_rule: null }))
+      .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_submissions_ready' });
+    expect(planRow({ name: 'Open project submissions', link_tab: 'hackathon', auto_rule: 'hackathon_submissions_ready' })).toBeNull();
+    // an existing link and auto rule are kept
+    expect(planRow({ name: 'Set up the submission platform', link_tab: 'hackathon', auto_rule: 'hackathon_submissions_ready' })).toBeNull();
   });
 });

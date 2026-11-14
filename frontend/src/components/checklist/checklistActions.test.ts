@@ -161,7 +161,7 @@ describe('hackathon checklist items (series)', () => {
   it('open the Hackathon app, on the sub-section the auto rule is about', () => {
     expect(resolveChecklistAction(item('Publish tracks, prizes and rules', 'hackathon_published', 'hackathon'), 'series'))
       .toEqual({ kind: 'tab', tab: 'hackathon', section: 'tracks' });
-    expect(resolveChecklistAction(item('Set up the submission platform', 'hackathon_submissions_ready', 'hackathon'), 'series'))
+    expect(resolveChecklistAction(item('Open project submissions', 'hackathon_submissions_ready', 'hackathon'), 'series'))
       .toEqual({ kind: 'tab', tab: 'hackathon', section: 'judging' });
     expect(resolveChecklistAction(item('Line up judges and mentors', 'hackathon_judges_added', 'hackathon'), 'series'))
       .toEqual({ kind: 'tab', tab: 'hackathon', section: 'judging' });

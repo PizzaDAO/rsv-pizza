@@ -49,7 +49,12 @@ function app() {
 function lastResend() {
   const call = mockFetch.mock.calls.find((c) => c[0] === 'https://api.resend.com/emails');
   expect(call).toBeDefined();
-  return JSON.parse(call![1].body as string);
+  const body = JSON.parse(call![1].body as string);
+  // The check-in QR is an inline PNG attachment (generated locally); keep the snapshot readable.
+  if (body.attachments) {
+    body.attachments = body.attachments.map((x: any) => ({ ...x, content: `<base64 png, ${Buffer.from(x.content, 'base64').subarray(1, 4).toString()}>` }));
+  }
+  return body;
 }
 
 const PARTY = {

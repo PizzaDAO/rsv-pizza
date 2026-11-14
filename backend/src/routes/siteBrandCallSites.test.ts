@@ -128,7 +128,11 @@ describe('branded call sites', () => {
     const body = lastResend();
     expect(body.from).toBe('Team1 Pizza <noreply@rsv.pizza>');
     expect(body.html).toContain('href="https://team1.rsv.pizza/my-t1"');
-    expect(body.html).toContain('https://team1.rsv.pizza/checkin/abc123/g1'.replace(/[/:]/g, (c) => encodeURIComponent(c)));
+    // The check-in QR is a locally generated inline attachment (no URL in the html).
+    expect(body.html).toContain('src="cid:checkin-qr"');
+    expect(body.html).not.toContain('qrserver');
+    expect(body.attachments).toHaveLength(1);
+    expect(body.attachments[0]).toMatchObject({ content_id: 'checkin-qr', content_type: 'image/png' });
     expect(body.html).not.toContain('https://rsv.pizza');
   });
 

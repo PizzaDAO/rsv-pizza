@@ -2,6 +2,14 @@
 
 exports[`no-series emails are byte-identical to pre-change output > RSVP confirmation (send-confirmation) 1`] = `
 {
+  "attachments": [
+    {
+      "content": "<base64 png, PNG>",
+      "content_id": "checkin-qr",
+      "content_type": "image/png",
+      "filename": "checkin-qr.png",
+    },
+  ],
   "from": "RSV.Pizza <noreply@rsv.pizza>",
   "html": "
     <!DOCTYPE html>
@@ -33,7 +41,7 @@ exports[`no-series emails are byte-identical to pre-change output > RSVP confirm
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
           <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
           <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Frsv.pizza%2Fcheckin%2Fabc123%2Fg1&bgcolor=f9f9f9&color=1a1a2e" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <img src="cid:checkin-qr" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
           <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: Gus</p>
         </div>
   
@@ -57,6 +65,14 @@ exports[`no-series emails are byte-identical to pre-change output > RSVP confirm
 
 exports[`no-series emails are byte-identical to pre-change output > approval email 1`] = `
 {
+  "attachments": [
+    {
+      "content": "<base64 png, PNG>",
+      "content_id": "checkin-qr",
+      "content_type": "image/png",
+      "filename": "checkin-qr.png",
+    },
+  ],
   "from": "RSV.Pizza <noreply@rsv.pizza>",
   "html": "
     <!DOCTYPE html>
@@ -87,7 +103,7 @@ exports[`no-series emails are byte-identical to pre-change output > approval ema
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
           <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
           <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Frsv.pizza%2Fcheckin%2Fabc123%2Fg1&bgcolor=f9f9f9&color=1a1a2e" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <img src="cid:checkin-qr" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
           <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: Gus</p>
         </div>
 
@@ -318,6 +334,14 @@ exports[`no-series emails are byte-identical to pre-change output > public API i
 
 exports[`no-series emails are byte-identical to pre-change output > waitlist promotion email 1`] = `
 {
+  "attachments": [
+    {
+      "content": "<base64 png, PNG>",
+      "content_id": "checkin-qr",
+      "content_type": "image/png",
+      "filename": "checkin-qr.png",
+    },
+  ],
   "from": "RSV.Pizza <noreply@rsv.pizza>",
   "html": "
     <!DOCTYPE html>
@@ -354,7 +378,7 @@ exports[`no-series emails are byte-identical to pre-change output > waitlist pro
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
           <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
           <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Frsv.pizza%2Fcheckin%2Fabc123%2Fg1&bgcolor=f9f9f9&color=1a1a2e" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <img src="cid:checkin-qr" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
           <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: Gus</p>
         </div>
 

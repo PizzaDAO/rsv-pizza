@@ -9,6 +9,7 @@ import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventIn
 import { brandUrl } from '../config/brand';
 import { getDisplayHackathon, type DisplayHackathonData } from '../lib/hackathonGalleryApi';
 import { HackathonDisplay, foregroundFor } from '../components/displays/HackathonDisplay';
+import { QRCode } from '../components/QRCode';
 
 /** Hackathon displays refresh their data every 30 s (plans/hackathon-platform.md §12: no realtime). */
 const HACKATHON_POLL_MS = 30_000;
@@ -207,7 +208,6 @@ export function DisplayPage() {
 function QRCodeDisplay({ config, rsvpUrl, party }: { config: QRCodeConfig; rsvpUrl: string; party: DisplayViewerData['party'] }) {
   const sizeMap = { small: 200, medium: 300, large: 400 };
   const size = sizeMap[config.size || 'large'];
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(rsvpUrl)}`;
 
   return (
     <div className="flex flex-col items-center gap-8">
@@ -223,7 +223,7 @@ function QRCodeDisplay({ config, rsvpUrl, party }: { config: QRCodeConfig; rsvpU
         <p className="text-white text-3xl font-semibold text-center">{config.message}</p>
       )}
       <div className="bg-white p-6 rounded-2xl">
-        <img src={qrSrc} alt="RSVP QR Code" width={size} height={size} />
+        <QRCode value={rsvpUrl} size={size} alt="RSVP QR Code" />
       </div>
       {config.showEventInfo && (
         <div className="text-center text-white/70 space-y-1">
