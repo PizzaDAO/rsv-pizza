@@ -110,3 +110,107 @@ export function hostHackathon(h: Row) {
 }
 
 export { publicTrack, publicPrize, publicCriterion, hostJudge };
+
+// ---------------------------------------------------------------- teams + submissions (PR 3)
+//
+// Two viewers, two shapes, both explicit allowlists:
+//   - team member (own team): members as name + avatar + role (no emails, user or guest ids),
+//     the invite code, and the full submission incl. drafts with signed image URLs.
+//   - host: everything above plus member emails + guest ids, for the moderation list / CSV.
+// The public gets nothing yet: publicHackathon above never includes teams or submissions, and
+// the gallery (PR 6) gets its own shape.
+
+/** Prisma include for a team with members and its (single) submission. */
+export const TEAM_INCLUDE = {
+  members: {
+    orderBy: { joinedAt: 'asc' as const },
+    include: {
+      user: { select: { name: true, email: true, profilePictureUrl: true } },
+      guest: { select: { name: true, email: true } },
+    },
+  },
+  submissions: { include: { tracks: { select: { trackId: true } } } },
+};
+
+function displayName(m: Row): string {
+  const n = String(m.user?.name || m.guest?.name || '').trim();
+  if (n) return n;
+  const email = String(m.user?.email || m.guest?.email || '');
+  return email.split('@')[0] || 'Member';
+}
+
+function teamMember(m: Row, viewerUserId: string | undefined) {
+  return {
+    id: m.id,
+    name: displayName(m),
+    avatarUrl: m.user?.profilePictureUrl ?? null,
+    role: m.role === 'captain' ? 'captain' : 'member',
+    isMe: !!viewerUserId && m.userId === viewerUserId,
+    joinedAt: iso(m.joinedAt),
+  };
+}
+
+function hostMember(m: Row) {
+  return {
+    ...teamMember(m, undefined),
+    email: m.user?.email ?? m.guest?.email ?? null,
+    guestId: m.guestId ?? null,
+  };
+}
+
+/** Every image path a submission references (for one batched signing call). */
+export function submissionImagePaths(s: Row | null | undefined): string[] {
+  if (!s) return [];
+  return [s.coverPath, ...(s.screenshotPaths ?? [])].filter((p): p is string => typeof p === 'string' && !!p);
+}
+
+export function teamSubmission(s: Row, urls: Record<string, string>) {
+  const img = (path: string) => ({ path, url: urls[path] ?? null });
+  return {
+    id: s.id,
+    name: s.name,
+    slug: s.slug,
+    tagline: s.tagline ?? null,
+    description: s.description ?? null,
+    repoUrl: s.repoUrl ?? null,
+    demoVideoUrl: s.demoVideoUrl ?? null,
+    deckUrl: s.deckUrl ?? null,
+    liveUrl: s.liveUrl ?? null,
+    trackIds: (s.tracks ?? []).map((t: Row) => t.trackId) as string[],
+    cover: s.coverPath ? img(s.coverPath) : null,
+    screenshots: (s.screenshotPaths ?? []).map(img),
+    status: s.status,
+    submittedAt: iso(s.submittedAt),
+    disqualifiedReason: s.status === 'disqualified' ? s.disqualifiedReason ?? null : null,
+    tableNumber: s.tableNumber ?? null,
+    createdAt: iso(s.createdAt),
+    updatedAt: iso(s.updatedAt),
+  };
+}
+
+/** The caller's own team. */
+export function myTeam(t: Row, viewerUserId: string | undefined, urls: Record<string, string>) {
+  const sub = (t.submissions ?? [])[0];
+  return {
+    id: t.id,
+    name: t.name,
+    inviteCode: t.inviteCode,
+    memberCount: (t.members ?? []).length,
+    members: (t.members ?? []).map((m: Row) => teamMember(m, viewerUserId)) as Array<ReturnType<typeof teamMember>>,
+    submission: sub ? teamSubmission(sub, urls) : null,
+  };
+}
+
+/** Host moderation list row. */
+export function hostTeam(t: Row, urls: Record<string, string>) {
+  const sub = (t.submissions ?? [])[0];
+  return {
+    id: t.id,
+    name: t.name,
+    inviteCode: t.inviteCode,
+    createdAt: iso(t.createdAt),
+    memberCount: (t.members ?? []).length,
+    members: (t.members ?? []).map(hostMember) as Array<ReturnType<typeof hostMember>>,
+    submission: sub ? teamSubmission(sub, urls) : null,
+  };
+}

@@ -160,7 +160,54 @@ export function parseCriterion(body: Body, partial: boolean): Record<string, unk
   return data;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// ---------------------------------------------------------------- teams + submissions (PR 3)
+
+export const TEAM_NAME_MAX = 80;
+export const SUBMISSION_LIMITS = { name: 80, tagline: 140, description: 10000, disqualifiedReason: 1000, tableNumber: 20 } as const;
+
+export function parseTeamName(v: unknown): string {
+  return reqText(v, 'Team name', TEAM_NAME_MAX);
+}
+
+/**
+ * PUT submission body (PATCH semantics). `name` is required on create. Links go through
+ * urls.normalizeProjectUrl (https only). trackIds: undefined = unchanged; the route checks they
+ * belong to this hackathon and caps them at max_tracks_per_submission.
+ */
+export function parseSubmission(
+  body: Body,
+  creating: boolean,
+  normalizeUrl: (v: unknown, field: string) => string | null,
+): { data: Record<string, unknown>; trackIds?: string[] } {
+  const data: Record<string, unknown> = {};
+  if (creating || has(body, 'name')) data.name = reqText(body.name, 'Project name', SUBMISSION_LIMITS.name);
+  if (has(body, 'tagline')) data.tagline = optText(body.tagline, 'Tagline', SUBMISSION_LIMITS.tagline);
+  if (has(body, 'description')) data.description = optText(body.description, 'Description', SUBMISSION_LIMITS.description);
+  if (has(body, 'repoUrl')) data.repoUrl = normalizeUrl(body.repoUrl, 'Repo link');
+  if (has(body, 'demoVideoUrl')) data.demoVideoUrl = normalizeUrl(body.demoVideoUrl, 'Demo video link');
+  if (has(body, 'deckUrl')) data.deckUrl = normalizeUrl(body.deckUrl, 'Deck link');
+  if (has(body, 'liveUrl')) data.liveUrl = normalizeUrl(body.liveUrl, 'Live app link');
+  let trackIds: string[] | undefined;
+  if (has(body, 'trackIds')) {
+    if (!Array.isArray(body.trackIds) || body.trackIds.length > LIMITS.tracks || !body.trackIds.every(isUuid)) {
+      throw bad('Invalid tracks');
+    }
+    trackIds = [...new Set(body.trackIds as string[])];
+  }
+  return { data, trackIds };
+}
+
+/** Host moderation PATCH body. */
+export function parseModeration(body: Body): { action?: 'disqualify' | 'restore'; reason?: string | null; tableNumber?: string | null } {
+  const out: { action?: 'disqualify' | 'restore'; reason?: string | null; tableNumber?: string | null } = {};
+  if (has(body, 'action')) out.action = oneOf(body.action, 'Action', ['disqualify', 'restore'] as const);
+  if (out.action === 'disqualify') out.reason = reqText(body.reason, 'Reason', SUBMISSION_LIMITS.disqualifiedReason);
+  if (has(body, 'tableNumber')) out.tableNumber = optText(body.tableNumber, 'Table number', SUBMISSION_LIMITS.tableNumber);
+  if (!out.action && !has(body, 'tableNumber')) throw bad('Nothing to change');
+  return out;
+}
+
+const EMAIL_RE =/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizeEmail(v: unknown): string {
   if (typeof v !== 'string') throw bad('Email is required');

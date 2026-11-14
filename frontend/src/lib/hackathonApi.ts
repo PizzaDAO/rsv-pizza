@@ -1,6 +1,7 @@
 // Hackathon platform (plans/hackathon-platform.md): host setup + public read.
 // Backend: backend/src/routes/hackathon.routes.ts, hackathon-public.routes.ts.
 import { apiRequest } from './api';
+import { supabase } from './supabase';
 
 export type HackathonEligibility = 'registered' | 'checked_in';
 export type GalleryVisibility = 'hidden' | 'after_deadline' | 'after_reveal';
@@ -145,6 +146,166 @@ export function localInputToIso(v: string): string | null {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+// ---------------------------------------------------------------- teams + submissions (PR 3)
+// Backend: backend/src/routes/hackathon-participant.routes.ts (+ host list/moderation/CSV in
+// hackathon.routes.ts). Images go straight to the private `hackathon-media` bucket with a
+// signed upload token; the API only ever returns short-lived signed read URLs.
+
+export type SubmissionStatus = 'draft' | 'submitted' | 'withdrawn' | 'disqualified';
+export type IneligibleReason =
+  | 'login' | 'not_available' | 'judge' | 'no_rsvp' | 'declined' | 'pending_approval' | 'waitlisted' | 'not_checked_in';
+
+export interface HackathonImage { path: string; url: string | null }
+
+export interface HackathonSubmission {
+  id: string;
+  name: string;
+  slug: string;
+  tagline: string | null;
+  description: string | null;
+  repoUrl: string | null;
+  demoVideoUrl: string | null;
+  deckUrl: string | null;
+  liveUrl: string | null;
+  trackIds: string[];
+  cover: HackathonImage | null;
+  screenshots: HackathonImage[];
+  status: SubmissionStatus;
+  submittedAt: string | null;
+  disqualifiedReason: string | null;
+  tableNumber: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface HackathonTeamMember {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  role: 'captain' | 'member';
+  isMe: boolean;
+  joinedAt: string | null;
+}
+
+export interface MyHackathonTeam {
+  id: string;
+  name: string;
+  inviteCode: string;
+  memberCount: number;
+  members: HackathonTeamMember[];
+  submission: HackathonSubmission | null;
+}
+
+export interface HostHackathonTeam extends Omit<MyHackathonTeam, 'members'> {
+  createdAt: string | null;
+  members: Array<HackathonTeamMember & { email: string | null; guestId: string | null }>;
+}
+
+export interface HackathonMe {
+  serverTime: string;
+  deadlinePassed: boolean;
+  loggedIn: boolean;
+  eligibility: { eligible: boolean; reason: IneligibleReason | null };
+  isJudge: boolean;
+  canManage: boolean;
+  team: MyHackathonTeam | null;
+}
+
+export type SubmissionInput = Partial<{
+  name: string;
+  tagline: string | null;
+  description: string | null;
+  repoUrl: string | null;
+  demoVideoUrl: string | null;
+  deckUrl: string | null;
+  liveUrl: string | null;
+  trackIds: string[];
+}>;
+
+export const HACKATHON_MEDIA_BUCKET = 'hackathon-media';
+export const HACKATHON_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+export const HACKATHON_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const HACKATHON_MAX_SCREENSHOTS = 6;
+
+type TeamRes = { team: MyHackathonTeam | null };
+const teamBase = (partyId: string, teamId: string) => `${base(partyId)}/teams/${teamId}`;
+
+export const hackathonParticipantApi = {
+  me: (partyId: string) => apiRequest<HackathonMe>(`${base(partyId)}/me`, { requireAuth: false }),
+  createTeam: (partyId: string, name: string) => apiRequest<TeamRes>(`${base(partyId)}/teams`, { method: 'POST', body: { name } }),
+  joinTeam: (partyId: string, code: string) => apiRequest<TeamRes>(`${base(partyId)}/teams/join`, { method: 'POST', body: { code } }),
+  leaveTeam: (partyId: string, teamId: string) => apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/leave`, { method: 'POST' }),
+  renameTeam: (partyId: string, teamId: string, name: string) => apiRequest<TeamRes>(teamBase(partyId, teamId), { method: 'PATCH', body: { name } }),
+  removeMember: (partyId: string, teamId: string, memberId: string) =>
+    apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/members/${memberId}`, { method: 'DELETE' }),
+  regenerateCode: (partyId: string, teamId: string) => apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/regenerate-code`, { method: 'POST' }),
+  saveSubmission: (partyId: string, teamId: string, body: SubmissionInput) =>
+    apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/submission`, { method: 'PUT', body }),
+  submit: (partyId: string, teamId: string) => apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/submission/submit`, { method: 'POST' }),
+  withdraw: (partyId: string, teamId: string) => apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/submission/withdraw`, { method: 'POST' }),
+  removeImage: (partyId: string, teamId: string, path: string) =>
+    apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/submission/images`, { method: 'DELETE', body: { path } }),
+
+  /** Signed upload, then attach (the server verifies the bytes and moves the file). */
+  async uploadImage(partyId: string, teamId: string, file: File, kind: 'cover' | 'screenshot'): Promise<TeamRes> {
+    const target = await apiRequest<{ path: string; token: string }>(`${teamBase(partyId, teamId)}/submission/upload-url`, {
+      method: 'POST',
+      body: { mimeType: file.type, fileSize: file.size, kind },
+    });
+    const up = await supabase.storage.from(HACKATHON_MEDIA_BUCKET).uploadToSignedUrl(target.path, target.token, file, { contentType: file.type });
+    if (up.error) throw new Error('The upload failed. Please try again.');
+    return apiRequest<TeamRes>(`${teamBase(partyId, teamId)}/submission/images`, { method: 'POST', body: { path: target.path, kind } });
+  },
+};
+
+export interface HostSubmissionsResponse {
+  teams: HostHackathonTeam[];
+  counts: { teams: number; draft: number; submitted: number; withdrawn: number; disqualified: number };
+}
+
+export const hackathonModerationApi = {
+  list: (partyId: string) => apiRequest<HostSubmissionsResponse>(`${base(partyId)}/submissions`),
+  moderate: (partyId: string, submissionId: string, body: { action?: 'disqualify' | 'restore'; reason?: string; tableNumber?: string | null }) =>
+    apiRequest<{ team: HostHackathonTeam | null }>(`${base(partyId)}/submissions/${submissionId}`, { method: 'PATCH', body }),
+
+  /** Downloads the CSV through the authenticated API (a plain link can't send the token). */
+  async exportCsv(partyId: string, kind: 'projects' | 'members'): Promise<void> {
+    const token = localStorage.getItem('authToken');
+    if (!token) throw new Error('Not authenticated');
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const res = await fetch(`${apiUrl}${base(partyId)}/export.csv?kind=${kind}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hackathon-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+};
+
+export function eligibilityMessage(reason: IneligibleReason | null): string {
+  switch (reason) {
+    case 'login': return "Log in with the email you RSVP'd with to join the hackathon.";
+    case 'judge': return "You're a judge for this hackathon, so you can't join a team.";
+    case 'no_rsvp': return "We couldn't find an RSVP for your email. RSVP first, or log in with the email you RSVP'd with.";
+    case 'declined': return "Your RSVP wasn't approved, so you can't join the hackathon.";
+    case 'pending_approval': return "Your RSVP is waiting for host approval. You can join a team once it's approved.";
+    case 'waitlisted': return "You're on the waitlist. You can join a team once you're off it.";
+    case 'not_checked_in': return 'Check in at the event to join a team.';
+    case 'not_available': return 'The hackathon is not open yet.';
+    default: return '';
+  }
+}
+
+export const STATUS_LABEL: Record<SubmissionStatus, string> = {
+  draft: 'Draft',
+  submitted: 'Submitted',
+  withdrawn: 'Withdrawn',
+  disqualified: 'Disqualified',
+};
 
 /** "$5,000", "2,500 USDC", or a formatted value + currency. */
 export function prizeAmount(p: Pick<HackathonPrize, 'amountText' | 'amountValue' | 'currency'>): string | null {

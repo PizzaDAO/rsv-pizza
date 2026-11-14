@@ -4,6 +4,7 @@ import { Trophy, Clock, Users, Tag, ChevronDown, ChevronUp, ListChecks } from 'l
 import { markdownRemarkPlugins } from '../../lib/safeMarkdown';
 import { MarkdownBoundary } from '../ErrorBoundary';
 import { getHackathon, prizeAmount, type PublicHackathon, type HackathonPrize } from '../../lib/hackathonApi';
+import { ParticipantPanel } from './ParticipantPanel';
 
 /** "2d 4h left" / "3h 12m left" / null when past. */
 export function timeLeft(iso: string | null, now = Date.now()): string | null {
@@ -44,8 +45,8 @@ function PrizeRow({ p }: { p: HackathonPrize }) {
 
 /**
  * Public, read-only hackathon info on the event page (plans/hackathon-platform.md §8, PR 2).
- * Rendered only when the event payload says a published hackathon exists. The participant CTA
- * (teams, submissions) arrives with PR 3.
+ * Rendered only when the event payload says a published hackathon exists. The participant
+ * panel (teams, project, PR 3) sits right under the deadline / team-size chips.
  */
 export function HackathonSection({ partyId, timezone, initial }: { partyId: string; timezone?: string | null; initial?: PublicHackathon | null }) {
   const [hackathon, setHackathon] = useState<PublicHackathon | null>(initial ?? null);
@@ -106,6 +107,8 @@ export function HackathonSection({ partyId, timezone, initial }: { partyId: stri
           </span>
         )}
       </div>
+
+      <ParticipantPanel partyId={partyId} hackathon={hackathon} />
 
       {overall.length > 0 && (
         <div className="rounded-xl border border-theme-stroke bg-theme-surface p-4 mb-3">
