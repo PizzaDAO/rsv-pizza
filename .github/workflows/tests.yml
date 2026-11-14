@@ -13,6 +13,11 @@ on:
       - 'frontend/**/*.test.ts'
       - 'frontend/**/*.test.tsx'
       - 'backend/**/*.test.ts'
+      # Dependency bumps (e.g. Dependabot PRs) must run CI too.
+      - 'package.json'
+      - 'package-lock.json'
+      - 'frontend/package.json'
+      - 'backend/package.json'
       - '.github/workflows/tests.yml'
 
 jobs:
