@@ -23,8 +23,6 @@ updates:
     ignore:
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "vite"
-        update-types: ["version-update:semver-major"]
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@stripe/stripe-js"
