@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { HackathonDisplay, foregroundFor } from './HackathonDisplay';
-import { resolveDisplayMode, videoEmbedUrl, awardLabel, type DisplayHackathonData } from '../../lib/hackathonGalleryApi';
+import { resolveDisplayMode, videoEmbedUrl, awardLabel, getDisplayHackathon, type DisplayHackathonData } from '../../lib/hackathonGalleryApi';
+import { closedCopy } from '../../pages/HackathonGalleryPage';
+import { SetupSection } from '../hackathon/SetupSection';
+import type { HostHackathon } from '../../lib/hackathonApi';
 
 const base: DisplayHackathonData = {
   submissionsOpenAt: null,
@@ -27,11 +30,27 @@ describe('hackathon display (PR 6)', () => {
     expect(resolveDisplayMode('auto', null)).toBe('countdown');
   });
 
-  it('countdown mode', () => {
+  it('countdown mode, with a QR generated locally (no third-party QR service)', async () => {
     render(<HackathonDisplay {...props} config={{ mode: 'auto' }} data={base} />);
     expect(screen.getByTestId('hk-display').getAttribute('data-mode')).toBe('countdown');
     expect(screen.getByText('Submissions close in')).toBeTruthy();
-    expect(screen.getByTestId('hk-display-qr')).toBeTruthy();
+    const img = (await screen.findByTestId('hk-display-qr')).querySelector('img')!;
+    expect(img.getAttribute('src')).toMatch(/^data:image\/png;base64,/);
+    expect(img.getAttribute('data-qr-url')).toBe('https://x/e'); // gallery closed -> event page
+  });
+
+  it('Setup warns when blind judging meets a gallery that opens at the deadline', () => {
+    const hk = (over: Partial<HostHackathon>): HostHackathon => ({
+      id: 'h1', partyId: 'p1', enabled: true, disabledAt: null, rules: null, submissionsOpenAt: null, submissionDeadline: null,
+      teamMinSize: 1, teamMaxSize: 5, maxTracksPerSubmission: 1, eligibility: 'registered', blindJudging: true, judgingStatus: 'not_started',
+      galleryVisibility: 'after_deadline', publishedAt: null, resultsRevealedAt: null, tracks: [], prizes: [], criteria: [], judges: [], ...over,
+    });
+    const p = { saving: false, onSave: vi.fn(async () => true), onDisable: vi.fn() };
+    const { unmount } = render(<SetupSection hackathon={hk({})} {...p} />);
+    expect(screen.getByTestId('blind-gallery-warning')).toBeTruthy();
+    unmount();
+    render(<SetupSection hackathon={hk({ galleryVisibility: 'after_reveal' })} {...p} />);
+    expect(screen.queryByTestId('blind-gallery-warning')).toBeNull();
   });
 
   it('gallery mode before the gallery opens shows a placeholder, never projects', () => {
@@ -78,6 +97,28 @@ describe('gallery helpers (PR 6)', () => {
     expect(videoEmbedUrl('http://youtu.be/dQw4w9WgXcQ')).toBeNull();
     expect(videoEmbedUrl('https://www.youtube.com/watch?v="><script>')).toBeNull();
     expect(videoEmbedUrl(null)).toBeNull();
+  });
+
+  it('videoEmbedUrl: unlisted Vimeo keeps a validated hash', () => {
+    expect(videoEmbedUrl('https://vimeo.com/123456789/abcdef1234')).toBe('https://player.vimeo.com/video/123456789?h=abcdef1234');
+    expect(videoEmbedUrl('https://player.vimeo.com/video/123456789?h=abcdef1234')).toBe('https://player.vimeo.com/video/123456789?h=abcdef1234');
+    expect(videoEmbedUrl('https://vimeo.com/123456789/not-a-hash!')).toBe('https://player.vimeo.com/video/123456789');
+    expect(videoEmbedUrl('https://player.vimeo.com/video/123456789?h=%22%3E%3Cscript')).toBe('https://player.vimeo.com/video/123456789');
+  });
+
+  it("closedCopy: password events ask to log in with the RSVP email", () => {
+    expect(closedCopy({ opensAfter: null, reason: 'login' })).toBe("Log in with the email you RSVP'd with to see projects.");
+    expect(closedCopy({ opensAfter: null })).toBe("The host hasn't published the project gallery.");
+    expect(closedCopy({ opensAfter: 'deadline' })).toMatch(/submissions close/);
+  });
+
+  it('getDisplayHackathon sends the display password like the viewer endpoint (?password=)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ hackathon: null }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await getDisplayHackathon('p1', 'main-tv', 'a b&c');
+    expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/api\/display\/view\/p1\/main-tv\/hackathon\?password=a%20b%26c$/);
+    await getDisplayHackathon('p1', 'main-tv');
+    expect(String(fetchSpy.mock.calls[1][0])).toMatch(/\/hackathon$/);
+    fetchSpy.mockRestore();
   });
 
   it('awardLabel shows the place only for multi-slot prizes', () => {

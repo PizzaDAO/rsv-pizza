@@ -70,7 +70,8 @@ export function useGalleryEvent(slug: string | undefined, suffix: (newSlug: stri
   return { event, missing };
 }
 
-export function closedCopy(g: Pick<GalleryResponse, 'opensAfter'>): string {
+export function closedCopy(g: Pick<GalleryResponse, 'opensAfter'> & { reason?: GalleryResponse['reason'] }): string {
+  if (g.reason === 'login') return "Log in with the email you RSVP'd with to see projects.";
   if (g.opensAfter === 'deadline') return 'Projects show up here once submissions close.';
   if (g.opensAfter === 'reveal') return 'Projects show up here once the winners are announced.';
   return "The host hasn't published the project gallery.";

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
+import { IconInput } from '../components/IconInput';
 import { getDisplayForViewer, getDisplayPhotos } from '../lib/api';
 import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo, HackathonDisplayConfig } from '../types';
 import { brandUrl } from '../config/brand';
@@ -22,13 +23,25 @@ export function DisplayPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [hackathon, setHackathon] = useState<DisplayHackathonData | null | undefined>(undefined);
+  // Password-protected displays: ?password= in the TV's URL, or typed once into the prompt
+  // (kept for this browser session so the 30 s polls and reloads keep working).
+  const [searchParams] = useSearchParams();
+  const pwKey = `display-pw:${partyId}/${slug}`;
+  const [password, setPassword] = useState<string | null>(() => {
+    const fromUrl = searchParams.get('password');
+    if (fromUrl) return fromUrl;
+    try { return sessionStorage.getItem(pwKey); } catch { return null; }
+  });
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [pwInput, setPwInput] = useState('');
 
   const loadDisplay = useCallback(async () => {
     if (!partyId || !slug) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await getDisplayForViewer(partyId, slug);
+      const result = await getDisplayForViewer(partyId, slug, password ?? undefined);
+      setNeedsPassword(false);
       if (result) {
         setData(result);
         if (result.photos) setPhotos(result.photos);
@@ -37,11 +50,16 @@ export function DisplayPage() {
         setError(t('display.notFound'));
       }
     } catch (err) {
-      setError(t('display.failedToLoad'));
+      if ((err as { code?: string })?.code === 'PASSWORD_REQUIRED') {
+        setNeedsPassword(true);
+        try { sessionStorage.removeItem(pwKey); } catch { /* ignore */ }
+      } else {
+        setError(t('display.failedToLoad'));
+      }
     } finally {
       setLoading(false);
     }
-  }, [partyId, slug]);
+  }, [partyId, slug, password]);
 
   useEffect(() => {
     loadDisplay();
@@ -73,14 +91,14 @@ export function DisplayPage() {
     if (!isHackathon || !partyId || !slug) return;
     const interval = setInterval(async () => {
       try {
-        const r = await getDisplayHackathon(partyId, slug);
+        const r = await getDisplayHackathon(partyId, slug, password);
         setHackathon(r.hackathon);
       } catch {
         /* keep showing what we have */
       }
     }, HACKATHON_POLL_MS);
     return () => clearInterval(interval);
-  }, [isHackathon, partyId, slug]);
+  }, [isHackathon, partyId, slug, password]);
 
   // Slideshow / photo rotation
   useEffect(() => {
@@ -99,6 +117,27 @@ export function DisplayPage() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+      </div>
+    );
+  }
+
+  if (needsPassword) {
+    const submit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const pw = pwInput.trim();
+      if (!pw) return;
+      try { sessionStorage.setItem(pwKey, pw); } catch { /* ignore */ }
+      setPassword(pw);
+    };
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center p-4" data-testid="display-password">
+        <form onSubmit={submit} className="card p-6 w-full max-w-sm space-y-4 text-center">
+          <Lock className="mx-auto text-theme-text-muted" size={28} />
+          <p className="text-theme-text font-semibold">{t('display.passwordRequired')}</p>
+          {password && <p className="text-sm text-red-400">{t('display.wrongPassword')}</p>}
+          <IconInput icon={Lock} type="password" value={pwInput} onChange={(e) => setPwInput(e.target.value)} placeholder={t('display.passwordPlaceholder')} autoFocus />
+          <button type="submit" className="btn-primary w-full" disabled={!pwInput.trim()}>{t('display.unlock')}</button>
+        </form>
       </div>
     );
   }

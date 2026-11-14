@@ -527,3 +527,53 @@ describe('hackathon display', () => {
     expect((await request(app()).get(`/api/display/view/${PARTY}/locked/hackathon?password=pw`)).status).toBe(200);
   });
 });
+
+// ------------------------------------------------------------------ review follow-ups
+
+describe('review follow-ups', () => {
+  it('display with a closed gallery after the reveal: winners without covers and nothing signed', async () => {
+    hackathon = baseHackathon({ galleryVisibility: 'hidden' });
+    await createDisplay({ name: 'Main TV', contentType: 'hackathon' });
+    const hk = (await request(app()).get(`/api/display/view/${PARTY}/main-tv/hackathon`)).body.hackathon;
+    expect(hk.winners).toHaveLength(2);
+    expect(hk.projects).toEqual([]);
+    expect(signer).not.toHaveBeenCalled();
+  });
+
+  it('locked display (password event, no display password): countdown target only, no tracks; a display password unlocks it', async () => {
+    party.password = 'hunter2';
+    await createDisplay({ name: 'Open TV', contentType: 'hackathon' });
+    const locked = (await request(app()).get(`/api/display/view/${PARTY}/open-tv/hackathon`)).body.hackathon;
+    expect(locked).toEqual({
+      locked: true, submissionsOpenAt: null, submissionDeadline: PAST.toISOString(), resultsRevealedAt: null,
+      galleryOpen: false, tracks: [], projects: [], winners: [],
+    });
+    expect(JSON.stringify(locked)).not.toContain('DeFi');
+    expect(signer).not.toHaveBeenCalled();
+
+    await createDisplay({ name: 'Locked TV', contentType: 'hackathon', password: 'tvpw' });
+    const viewer = await request(app()).get(`/api/display/view/${PARTY}/locked-tv?password=tvpw`);
+    expect(viewer.status).toBe(200);
+    expect(viewer.body.hackathon.locked).toBe(false);
+    expect(viewer.body.hackathon.tracks).toHaveLength(2);
+    expect((await request(app()).get(`/api/display/view/${PARTY}/locked-tv`)).status).toBe(401);
+    expect((await request(app()).get(`/api/display/view/${PARTY}/locked-tv?password=nope`)).status).toBe(401);
+  });
+
+  it("gallery reason: 'login' for a password event the viewer can't see; nothing for pre-launch hidden events", async () => {
+    party.password = 'hunter2';
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon/gallery`)).body.reason).toBe('login');
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon/gallery`).set('Authorization', auth('rando'))).body.reason).toBe('login');
+    party.password = null;
+    eventHidden.mockResolvedValue(true);
+    const hidden = await request(app()).get(`/api/parties/${PARTY}/hackathon/gallery`);
+    expect(hidden.body.available).toBe(false);
+    expect(hidden.body.reason).toBeNull();
+  });
+
+  it('Vary: Authorization on gallery and project responses', async () => {
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon/gallery`)).headers.vary).toMatch(/Authorization/);
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon/projects/zeta-swap`)).headers.vary).toMatch(/Authorization/);
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon/projects/nope`)).headers.vary).toMatch(/Authorization/);
+  });
+});

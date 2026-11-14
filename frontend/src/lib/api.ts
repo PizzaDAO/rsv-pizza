@@ -3022,6 +3022,8 @@ export async function getDisplayForViewer(
       requireAuth: false,
     });
   } catch (error) {
+    // Password-protected display: let the viewer page prompt for it (DisplayPage).
+    if ((error as { code?: string })?.code === 'PASSWORD_REQUIRED') throw error;
     console.error('Error fetching display for viewer:', error);
     return null;
   }

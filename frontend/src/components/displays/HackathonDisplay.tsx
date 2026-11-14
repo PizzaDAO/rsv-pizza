@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import QRCode from 'qrcode';
 import { Hash, Medal, Tag, Trophy, Users } from 'lucide-react';
 import {
   awardLabel,
@@ -42,11 +43,23 @@ function useRotation(count: number, seconds: number) {
   return count ? i % count : 0;
 }
 
+/**
+ * QR generated in the browser (the `qrcode` package), so the gallery / event URL is never sent
+ * to a third-party QR service.
+ */
 function Qr({ url, label, fg }: { url: string; label: string; fg: string }) {
-  const src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=${encodeURIComponent(url)}`;
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(url, { margin: 0, width: 320, errorCorrectionLevel: 'M' })
+      .then((d) => { if (!cancelled) setSrc(d); })
+      .catch(() => { if (!cancelled) setSrc(null); });
+    return () => { cancelled = true; };
+  }, [url]);
+  if (!src) return null;
   return (
     <div className="flex flex-col items-center gap-3" data-testid="hk-display-qr">
-      <div className="bg-white p-3 rounded-2xl"><img src={src} alt="" width={160} height={160} /></div>
+      <div className="bg-white p-3 rounded-2xl"><img src={src} alt="" width={160} height={160} data-qr-url={url} /></div>
       <p className="text-xl font-medium text-center max-w-[220px]" style={{ color: fg }}>{label}</p>
     </div>
   );
@@ -221,7 +234,8 @@ export function HackathonDisplay({
   const { fg, muted, faint } = colors;
   if (!data) return <Empty text="The hackathon isn't public yet" fg={fg} muted={muted} />;
 
-  const mode = resolveDisplayMode(config.mode, data);
+  // Locked (password event, display without its own password): the countdown is all it may show.
+  const mode = data.locked ? 'countdown' : resolveDisplayMode(config.mode, data);
   const showQr = config.showQr !== false;
   const qr = data.galleryOpen ? { url: galleryUrl, label: 'Browse all projects' } : { url: eventUrl, label: 'Join the hackathon' };
 

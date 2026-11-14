@@ -150,6 +150,13 @@ export function SetupSection({ hackathon, saving, onSave, onDisable }: Props) {
               { value: 'hidden', label: 'Hidden' },
             ]}
           />
+          {form.blindJudging && form.galleryVisibility === 'after_deadline' && (
+          <p className="text-xs text-amber-500 mt-1" data-testid="blind-gallery-warning">
+            Blind judging is on, but the gallery goes public at the deadline: team names and project links will be
+            visible to anyone, judges included, before judging ends. Choose "after winners are revealed" to keep
+            judging blind.
+          </p>
+        )}
         </div>
       </SectionCard>
 

@@ -252,18 +252,27 @@ export function resolveDisplayMode(mode: HackathonDisplayMode, s: { galleryOpen:
  * itself is only checked client-side, so there's no unlock proof to accept here.
  */
 export async function viewerCanSeeEvent(partyId: string, viewerEmail: string | undefined): Promise<boolean> {
+  return (await viewerEventAccess(partyId, viewerEmail)) === 'ok';
+}
+
+/**
+ * Same check with the reason: 'password' = a password event this viewer isn't a (logged-in,
+ * non-declined) guest of, so the UI can say "log in with the email you RSVP'd with". A
+ * pre-launch hidden or missing event is just 'hidden' (says nothing about the event).
+ */
+export async function viewerEventAccess(partyId: string, viewerEmail: string | undefined): Promise<'ok' | 'hidden' | 'password'> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
     select: { eventType: true, eventTags: true, date: true, region: true, city: true, password: true },
   });
-  if (!party) return false;
-  if (await isEventHiddenFrom(party, viewerEmail)) return false;
+  if (!party) return 'hidden';
+  if (await isEventHiddenFrom(party, viewerEmail)) return 'hidden';
   if (party.password) {
-    if (!viewerEmail) return false;
+    if (!viewerEmail) return 'password';
     const guests = await findGuestsByEmail(partyId, viewerEmail);
-    return guests.some((g) => g.approved !== false);
+    return guests.some((g) => g.approved !== false) ? 'ok' : 'password';
   }
-  return true;
+  return 'ok';
 }
 
 /** Hackathon row with what the gallery needs (tracks + prizes for names / order). */
@@ -298,7 +307,7 @@ const quantitiesOf = (h: LoadedHackathon) => new Map(h.prizes.map((p) => [p.id, 
  * Submitted projects as cards (+ winners after the reveal). Images are signed only for the
  * projects returned, and only paths under that project's own storage prefix.
  */
-export async function buildGallery(h: LoadedHackathon, opts: { limit?: number; withWinners?: boolean } = {}) {
+export async function buildGallery(h: LoadedHackathon, opts: { limit?: number; withWinners?: boolean; signCovers?: boolean } = {}) {
   const subs = await prisma.hackathonSubmission.findMany({
     where: { hackathonId: h.id, status: PUBLIC_STATUS },
     select: GALLERY_SUBMISSION_SELECT,
@@ -313,7 +322,9 @@ export async function buildGallery(h: LoadedHackathon, opts: { limit?: number; w
   const withWinners = !!opts.withWinners && !!h.resultsRevealedAt;
   const winnerSubs = withWinners ? winners.map((w) => bySlug.get(w.projectSlug as string)).filter((s): s is Row => !!s) : [];
   const shown = [...new Set([...ordered, ...winnerSubs])];
-  const urls = await signImagePathsCached(
+  // signCovers: false = nothing is shown with an image (e.g. TV winners while the gallery is
+  // closed), so nothing is signed.
+  const urls = opts.signCovers === false ? {} : await signImagePathsCached(
     [...new Set(shown.filter((s) => s.coverPath && isFinalPathFor(s.coverPath, s.hackathonId, s.id)).map((s) => s.coverPath as string))],
   );
   const quantities = quantitiesOf(h);
@@ -369,16 +380,36 @@ export async function buildDisplayHackathon(partyId: string, opts: { displayHasP
   if (!party || (await isEventHiddenFrom(party, undefined))) return null;
   const unlocked = !party.password || opts.displayHasPassword;
   const meta = galleryMeta(h, now);
-  const galleryOpen = meta.galleryOpen && unlocked;
-  const revealed = !!h.resultsRevealedAt && unlocked;
+  if (!unlocked) {
+    // Password event on a display without its own password: what an anonymous viewer of the
+    // event page gets (GET /hackathon -> null), except the countdown target, so the TV can
+    // still count down. No tracks, no projects, no winners.
+    return {
+      locked: true,
+      submissionsOpenAt: iso(h.submissionsOpenAt),
+      submissionDeadline: meta.submissionDeadline,
+      resultsRevealedAt: null,
+      galleryOpen: false,
+      tracks: [],
+      projects: [],
+      winners: [],
+    };
+  }
+  const galleryOpen = meta.galleryOpen;
+  const revealed = !!h.resultsRevealedAt;
   let projects: ReturnType<typeof projectCard>[] = [];
   let winners: GalleryWinner[] = [];
-  if (galleryOpen || revealed) {
-    const g = await buildGallery(h, { limit: galleryOpen ? DISPLAY_MAX_PROJECTS : GALLERY_MAX_PROJECTS, withWinners: revealed });
-    projects = galleryOpen ? g.projects : [];
-    winners = galleryOpen ? g.winners : g.winners.map((w) => ({ ...w, cover: null }));
+  if (galleryOpen) {
+    const g = await buildGallery(h, { limit: DISPLAY_MAX_PROJECTS, withWinners: revealed });
+    projects = g.projects;
+    winners = g.winners;
+  } else if (revealed) {
+    // Gallery closed but results revealed: winners only (public on the event page anyway), no
+    // project grid and no covers, so nothing is signed.
+    winners = (await buildGallery(h, { limit: 0, withWinners: true, signCovers: false })).winners;
   }
   return {
+    locked: false,
     submissionsOpenAt: iso(h.submissionsOpenAt),
     submissionDeadline: meta.submissionDeadline,
     resultsRevealedAt: revealed ? meta.resultsRevealedAt : null,

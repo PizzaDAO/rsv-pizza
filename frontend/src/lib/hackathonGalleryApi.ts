@@ -46,6 +46,8 @@ export interface GalleryResponse extends GalleryMeta {
   available: boolean;
   /** Host viewing before the public can. */
   preview: boolean;
+  /** 'login': a password event; log in with the email you RSVP'd with. */
+  reason?: 'login' | null;
   canManage?: boolean;
   tracks: Array<Pick<HackathonTrack, 'id' | 'name' | 'description' | 'sponsorName'>>;
   projects: GalleryProject[];
@@ -84,6 +86,8 @@ export interface DisplayWinner extends ProjectAward, Pick<PublicWinner, 'project
 }
 
 export interface DisplayHackathonData {
+  /** Password event on a display without its own password: countdown only. */
+  locked?: boolean;
   submissionsOpenAt: string | null;
   submissionDeadline: string | null;
   resultsRevealedAt: string | null;
@@ -93,8 +97,10 @@ export interface DisplayHackathonData {
   winners: DisplayWinner[];
 }
 
-export async function getDisplayHackathon(partyId: string, slug: string) {
-  return apiRequest<{ hackathon: DisplayHackathonData | null }>(`/api/display/view/${partyId}/${encodeURIComponent(slug)}/hackathon`, { requireAuth: false });
+/** Same ?password= the display viewer endpoint reads (display.routes.ts). */
+export async function getDisplayHackathon(partyId: string, slug: string, password?: string | null) {
+  const qs = password ? `?password=${encodeURIComponent(password)}` : '';
+  return apiRequest<{ hackathon: DisplayHackathonData | null }>(`/api/display/view/${partyId}/${encodeURIComponent(slug)}/hackathon${qs}`, { requireAuth: false });
 }
 
 /** Mirrors lib/hackathon/gallery.ts resolveDisplayMode. */
@@ -140,8 +146,12 @@ export function videoEmbedUrl(raw: string | null): string | null {
   }
   if (host === 'vimeo.com' || host === 'player.vimeo.com') {
     const parts = u.pathname.split('/').filter(Boolean);
-    const v = id(parts[0] === 'video' ? parts[1] : parts[0], /^\d{4,12}$/);
-    return v ? `https://player.vimeo.com/video/${v}` : null;
+    const rest = parts[0] === 'video' ? parts.slice(1) : parts;
+    const v = id(rest[0], /^\d{4,12}$/);
+    if (!v) return null;
+    // Unlisted: vimeo.com/<id>/<hash> or player.vimeo.com/video/<id>?h=<hash>.
+    const hash = id(rest[1] ?? u.searchParams.get('h'), /^[a-f0-9]{6,20}$/);
+    return `https://player.vimeo.com/video/${v}${hash ? `?h=${hash}` : ''}`;
   }
   if (host === 'loom.com') {
     const parts = u.pathname.split('/').filter(Boolean);

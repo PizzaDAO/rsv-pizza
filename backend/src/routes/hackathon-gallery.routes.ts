@@ -25,7 +25,7 @@ import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { isUuid } from '../lib/guestToken.js';
 import { isHackathonHost } from '../lib/hackathon/access.js';
-import { buildGallery, buildProject, galleryMeta, isGalleryOpen, loadGalleryHackathon, loadProject, PUBLIC_STATUS, viewerCanSeeEvent } from '../lib/hackathon/gallery.js';
+import { buildGallery, buildProject, galleryMeta, isGalleryOpen, loadGalleryHackathon, loadProject, PUBLIC_STATUS, viewerCanSeeEvent, viewerEventAccess } from '../lib/hackathon/gallery.js';
 
 const router = Router();
 
@@ -43,6 +43,12 @@ export const galleryLimiter = rateLimit({
 const PUBLIC_CACHE = 'private, max-age=60';
 const NO_STORE = 'private, no-store';
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** Responses depend on the caller (host / team / guest): never reuse one across tokens. */
+router.use('/:partyId/hackathon', (_req, res, next) => {
+  res.vary('Authorization');
+  next();
+});
 
 router.get('/:partyId/hackathon/gallery', galleryLimiter, optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -63,9 +69,12 @@ router.get('/:partyId/hackathon/gallery', galleryLimiter, optionalAuth, async (r
       return res.json({ available: true, preview: !meta.galleryOpen, canManage: true, ...meta, ...(await buildGallery(h)) });
     }
 
-    const canSee = await viewerCanSeeEvent(partyId, req.userEmail);
+    const access = await viewerEventAccess(partyId, req.userEmail);
     res.set('Cache-Control', PUBLIC_CACHE);
-    if (!canSee) return res.json({ available: false, preview: false, galleryOpen: false, opensAfter: null, tracks: [], projects: [] });
+    if (access !== 'ok') {
+      // 'login': a password event; the viewer must log in with the email they RSVP'd with.
+      return res.json({ available: false, preview: false, galleryOpen: false, opensAfter: null, reason: access === 'password' ? 'login' : null, tracks: [], projects: [] });
+    }
     if (!meta.galleryOpen) {
       return res.json({ available: false, preview: false, ...meta, tracks: [], projects: [] });
     }
