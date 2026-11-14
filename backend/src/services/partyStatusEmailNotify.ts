@@ -66,7 +66,7 @@ export function buildBrandedStatusEmail(
   return {
     subject: `Update on your ${site.name} event`,
     html: `<p>Hey ${esc(ctx.hostName)},</p>
-<p>Your ${brandName} event <b>${esc(ctx.eventName)}</b> wasn't approved. If you'd like to discuss or resubmit, just reply to this email.</p>
+<p>Your ${brandName} event <b>${esc(ctx.eventName)}</b> wasn't approved. You can review or update it from your <a href="${manageUrl}">host dashboard</a> on ${brandName}.</p>
 <p>Best,<br>The ${brandName} team</p>`,
   };
 }

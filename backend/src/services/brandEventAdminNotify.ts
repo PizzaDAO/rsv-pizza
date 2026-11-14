@@ -26,8 +26,8 @@ export function buildAdminNotifyEmail(opts: {
   return {
     subject: `New ${opts.brandName} event pending approval: ${opts.eventName}`,
     html: `<p>A new event was created on <b>${esc(opts.brandName)}</b> and is waiting for approval.</p>
-<p><b>${esc(opts.eventName)}</b><br>Host: ${esc(opts.hostLabel)}<br>Event page: <a href="${opts.eventUrl}">${opts.eventUrl}</a></p>
-<p><a href="${opts.adminUrl}">Review and approve it on the admin dashboard</a></p>`,
+<p><b>${esc(opts.eventName)}</b><br>Host: ${esc(opts.hostLabel)}<br>Event page: <a href="${esc(opts.eventUrl)}">${esc(opts.eventUrl)}</a></p>
+<p><a href="${esc(opts.adminUrl)}">Review and approve it on the admin dashboard</a></p>`,
   };
 }
 

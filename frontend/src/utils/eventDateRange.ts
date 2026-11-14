@@ -15,7 +15,20 @@ export function formatEventDateRange(
   const longDate = start.toLocaleDateString(locale, {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: tz,
   });
-  if (!end || Number.isNaN(end.getTime()) || dayKey(end) === dayKey(start)) {
+  // Minutes after local midnight (event tz) at which the event ends.
+  const endMinutes = end && !Number.isNaN(end.getTime())
+    ? (() => {
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', hour: 'numeric', minute: 'numeric' }).formatToParts(end);
+        const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+        return get('hour') * 60 + get('minute');
+      })()
+    : 0;
+  // A range only when the end is on a later local day AND after 06:00: events that run past
+  // midnight (a 7pm party ending at 1am) stay single-day; an overnight hackathon ending at 10am shows both days.
+  if (
+    !end || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime() ||
+    dayKey(end) <= dayKey(start) || endMinutes <= 6 * 60
+  ) {
     return { dateLine: longDate, multiDay: false };
   }
   const short = (d: Date, withYear: boolean) =>
