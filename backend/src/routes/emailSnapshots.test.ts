@@ -19,6 +19,7 @@ const mockPrisma = vi.hoisted(() => ({
   hostSurveyResponse: { findUnique: vi.fn(), upsert: vi.fn() },
   eventSeries: { findMany: vi.fn(), findFirst: vi.fn() },
 }));
+process.env.JWT_SECRET ??= 'test-secret-rsvp-overwrite-fix-0123456789';
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 vi.mock('../services/webhook.service.js', () => ({ triggerWebhook: vi.fn() }));
 
@@ -31,6 +32,7 @@ import { buildSurveyEmail } from './survey.routes.js';
 import { buildInviteEmail } from './v1/guests.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { errorHandler } from '../middleware/error.js';
+import { signGuestToken } from '../lib/guestToken.js';
 import { buildReminderHtml, buildReminderText, renderUnsubscribePage } from './reminder.routes.js';
 import { _resetSiteBrandCache } from '../lib/siteBrand.js';
 
@@ -100,9 +102,11 @@ describe('no-series emails are byte-identical to pre-change output', () => {
 
   it('RSVP confirmation (send-confirmation)', async () => {
     mockPrisma.party.findUnique.mockResolvedValue(PARTY);
+    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1', name: 'Gus', email: 'guest@example.com' });
     const res = await request(app())
       .post('/api/rsvp/abc123/send-confirmation')
-      .send({ guestId: 'g1', guestEmail: 'guest@example.com', guestName: 'Gus' });
+      // rsvp-overwrite-fix: needs the guest token; the email goes to the stored address.
+      .send({ guestId: 'g1', guestToken: signGuestToken('g1') });
     expect(res.status).toBe(200);
     expect(lastResend()).toMatchSnapshot();
   });

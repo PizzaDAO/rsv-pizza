@@ -1,3 +1,4 @@
+import { verifyGuestToken } from '../lib/guestToken.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
@@ -58,6 +59,7 @@ const mockPrisma = vi.hoisted(() => ({
   }),
 }));
 
+process.env.JWT_SECRET ??= 'test-secret-rsvp-overwrite-fix-0123456789';
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
 // Mock webhook service
@@ -1050,6 +1052,8 @@ describe('Party Routes', () => {
         .set('Authorization', `Bearer ${makeToken(OTHER_USER_ID, 'Other@Example.com')}`);
       expect(res.status).toBe(200);
       expect(res.body.guest).toMatchObject({ id: 'g1' });
+      // rsvp-overwrite-fix: the logged-in owner gets their guest capability token.
+      expect(verifyGuestToken('g1', res.body.guest.guestToken)).toBe(true);
       const arg = mockPrisma.guest.findFirst.mock.calls[0][0];
       expect(arg.where.partyId).toBe(PARTY_ID);
       expect(arg.where.email).toBe('other@example.com');

@@ -6,8 +6,12 @@ import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 import { siteForParty } from '../lib/siteBrand.js';
 import { verifySecret } from '../lib/secretHash.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { randomUUID } from 'crypto';
+import { signGuestToken, verifyGuestToken, guestTokenFromRequest } from '../lib/guestToken.js';
 
 const router = Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * bounce-rate-heuristic: parse Resend's email-send response and persist the
@@ -292,7 +296,11 @@ router.get('/:inviteCode/guest/:email', optionalAuth, async (req: AuthRequest, r
 });
 
 // POST /api/rsvp/:inviteCode/guest - Submit guest preferences (public)
-router.post('/:inviteCode/guest', async (req: Request, res: Response, next: NextFunction) => {
+// rsvp-overwrite-fix: an existing RSVP can only be changed by its owner (JWT email == RSVP
+// email). Anyone else submitting a taken email gets a response identical to a new RSVP and
+// nothing is written. Every success carries `guestToken`, the per-guest capability that
+// guest-scoped endpoints (raffle, quiz, discount, NFT) now require instead of a bare id.
+router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
     const {
@@ -469,109 +477,15 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
     // Determine if guest should be waitlisted
     const isAtCapacity = party.maxGuests ? confirmedGuestCount >= party.maxGuests : false;
 
-    // response hint only — does not block the save
-    const existingWalletGuest = normalizedAddress
-      ? await prisma.guest.findFirst({
-          where: { partyId: party.id, ethereumAddress: normalizedAddress },
-          select: { id: true, name: true },
-        })
-      : null;
+    // rsvp-overwrite-fix: the walletShared heads-up (another guest's name for a shared
+    // wallet) is gone. Even a boolean would tell an anonymous caller "wallet W is on event
+    // E's guest list", so no wallet lookup happens here any more.
 
-    // Check for duplicate email if email is provided
-    if (email?.trim()) {
-      const existingGuest = await prisma.guest.findFirst({
-        where: {
-          partyId: party.id,
-          email: email.trim().toLowerCase(),
-        },
-      });
-
-      if (existingGuest) {
-        // mushroom-31723: if the host has rejected this guest (approved=false),
-        // do NOT silently reactivate them. Return the generic "already RSVPd"
-        // response without mutating the row.
-        if (existingGuest.approved === false) {
-          return res.status(200).json({
-            success: true,
-            updated: false,
-            guest: {
-              id: existingGuest.id,
-              name: existingGuest.name,
-            },
-            message: 'Your RSVP has been updated!',
-          });
-        }
-
-        // Determine new status for INVITED guests completing RSVP
-        let newStatus = existingGuest.status;
-        let newWaitlistPosition: number | null = null;
-        if (existingGuest.status === 'INVITED') {
-          if (isAtCapacity) {
-            newStatus = 'WAITLISTED';
-            const maxPos = await prisma.guest.aggregate({
-              where: { partyId: party.id, status: 'WAITLISTED', OR: [{ approved: true }, { approved: null }] },
-              _max: { waitlistPosition: true },
-            });
-            newWaitlistPosition = (maxPos._max.waitlistPosition || 0) + 1;
-          } else {
-            newStatus = party.requireApproval ? 'PENDING' : 'CONFIRMED';
-          }
-        }
-
-        // Update the existing guest record
-        const updatedGuest = await prisma.guest.update({
-          where: { id: existingGuest.id },
-          data: {
-            name: name.trim(),
-            ethereumAddress: normalizedAddress || null,
-            ...(normalizedAddress ? { walletSource: 'manual' } : {}),
-            roles: roles || [],
-            mailingListOptIn: mailingListOptIn || false,
-            swcOptIn: swcOptIn || false,
-            swcCaOptIn: swcCaOptIn || false,
-            swcAuOptIn: swcAuOptIn || false,
-            swcEuOptIn: swcEuOptIn || false,
-            swcUkOptIn: swcUkOptIn || false,
-            swcBrOptIn: swcBrOptIn || false,
-            ethconfOptIn: ethconfOptIn || false,
-            optinAbVariant: safeOptinAbVariant,
-            dietaryRestrictions: dietaryRestrictions || [],
-            likedToppings: likedToppings || [],
-            dislikedToppings: dislikedToppings || [],
-            likedBeverages: likedBeverages || [],
-            dislikedBeverages: dislikedBeverages || [],
-            pizzeriaRankings: pizzeriaRankings || [],
-            suggestedPizzerias: suggestedPizzerias || [],
-            status: newStatus,
-            ...(newWaitlistPosition !== null ? { waitlistPosition: newWaitlistPosition } : {}),
-            submittedVia: existingGuest.status === 'INVITED' ? 'rsvp' : existingGuest.submittedVia,
-            // romana-30802: only overwrite session ID if the current request
-            // carries one — otherwise preserve whatever's already on the row.
-            ...(safeVisitorSessionId ? { visitorSessionId: safeVisitorSessionId } : {}),
-          },
-        });
-
-        // Trigger webhook for guest update (using party owner's webhooks)
-        await triggerWebhook('guest.updated', { guest: updatedGuest, partyId: party.id }, party.userId!);
-
-        return res.status(200).json({
-          success: true,
-          updated: true,
-          guest: {
-            id: updatedGuest.id,
-            name: updatedGuest.name,
-          },
-          ...(existingWalletGuest && existingWalletGuest.id !== updatedGuest.id
-            ? { walletShared: { withName: existingWalletGuest.name } }
-            : {}),
-          message: 'Your RSVP has been updated!',
-        });
-      }
-    }
-
-    // If at capacity, get next waitlist position (excluding rejected — mushroom-31723)
+    // What a brand-new RSVP would get right now. Used for real creates, for completing a
+    // host invite, and for the decoy response below, so all three look the same.
     let waitlistPosition: number | null = null;
     if (isAtCapacity) {
+      // Next waitlist position (excluding rejected — mushroom-31723)
       const maxPosition = await prisma.guest.aggregate({
         where: {
           partyId: party.id,
@@ -582,13 +496,144 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       });
       waitlistPosition = (maxPosition._max.waitlistPosition || 0) + 1;
     }
-
-    // Determine guest status
     let guestStatus: 'CONFIRMED' | 'PENDING' | 'WAITLISTED' = 'CONFIRMED';
     if (isAtCapacity) {
       guestStatus = 'WAITLISTED';
     } else if (party.requireApproval) {
       guestStatus = 'PENDING';
+    }
+    let message = 'Your preferences have been saved!';
+    if (isAtCapacity) {
+      message = `You're #${waitlistPosition} on the waitlist! We'll notify you if a spot opens up.`;
+    } else if (party.requireApproval) {
+      message = 'Your RSVP has been submitted and is pending approval from the host.';
+    }
+
+    // The one response shape every public "new RSVP" gets (201). The duplicate-email decoy
+    // and an invite completion use it too, so the caller can't tell them apart.
+    const requireApproval = party.requireApproval;
+    const newRsvpResponse = (guestId: string) => ({
+      success: true,
+      guest: {
+        id: guestId,
+        name: name.trim(),
+        status: guestStatus,
+        waitlistPosition,
+      },
+      guestToken: signGuestToken(guestId),
+      requireApproval,
+      waitlisted: isAtCapacity,
+      waitlistPosition,
+      message,
+    });
+
+    const updateData = (existing: { status: string; submittedVia: string }) => ({
+      name: name.trim(),
+      ethereumAddress: normalizedAddress || null,
+      ...(normalizedAddress ? { walletSource: 'manual' } : {}),
+      roles: roles || [],
+      mailingListOptIn: mailingListOptIn || false,
+      swcOptIn: swcOptIn || false,
+      swcCaOptIn: swcCaOptIn || false,
+      swcAuOptIn: swcAuOptIn || false,
+      swcEuOptIn: swcEuOptIn || false,
+      swcUkOptIn: swcUkOptIn || false,
+      swcBrOptIn: swcBrOptIn || false,
+      ethconfOptIn: ethconfOptIn || false,
+      optinAbVariant: safeOptinAbVariant,
+      dietaryRestrictions: dietaryRestrictions || [],
+      likedToppings: likedToppings || [],
+      dislikedToppings: dislikedToppings || [],
+      likedBeverages: likedBeverages || [],
+      dislikedBeverages: dislikedBeverages || [],
+      pizzeriaRankings: pizzeriaRankings || [],
+      suggestedPizzerias: suggestedPizzerias || [],
+      // INVITED guests completing their RSVP get the status a new RSVP would get.
+      ...(existing.status === 'INVITED'
+        ? { status: guestStatus, ...(waitlistPosition !== null ? { waitlistPosition } : {}) }
+        : {}),
+      submittedVia: existing.status === 'INVITED' ? 'rsvp' : existing.submittedVia,
+      // romana-30802: only overwrite session ID if the current request
+      // carries one — otherwise preserve whatever's already on the row.
+      ...(safeVisitorSessionId ? { visitorSessionId: safeVisitorSessionId } : {}),
+    });
+
+    // Check for duplicate email if email is provided
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (normalizedEmail) {
+      const existingGuest = await prisma.guest.findFirst({
+        where: {
+          partyId: party.id,
+          email: normalizedEmail,
+        },
+      });
+
+      if (existingGuest) {
+        // rsvp-overwrite-fix: only the owner of the email (verified JWT) may change an
+        // existing RSVP. This used to be open to anyone who typed the address, and the
+        // 200 `updated` reply plus the returned guest id made it an RSVP oracle and a
+        // capability leak.
+        const callerEmail = req.userEmail?.trim().toLowerCase();
+        const isOwner = !!callerEmail && callerEmail === normalizedEmail;
+
+        if (isOwner) {
+          // mushroom-31723: if the host has rejected this guest (approved=false),
+          // do NOT silently reactivate them. Return the generic "already RSVPd"
+          // response without mutating the row.
+          if (existingGuest.approved === false) {
+            return res.status(200).json({
+              success: true,
+              updated: false,
+              guest: {
+                id: existingGuest.id,
+                name: existingGuest.name,
+              },
+              guestToken: signGuestToken(existingGuest.id),
+              message: 'Your RSVP has been updated!',
+            });
+          }
+
+          const updatedGuest = await prisma.guest.update({
+            where: { id: existingGuest.id },
+            data: updateData(existingGuest),
+          });
+
+          // Trigger webhook for guest update (using party owner's webhooks)
+          await triggerWebhook('guest.updated', { guest: updatedGuest, partyId: party.id }, party.userId!);
+
+          return res.status(200).json({
+            success: true,
+            updated: true,
+            guest: {
+              id: updatedGuest.id,
+              name: updatedGuest.name,
+            },
+            guestToken: signGuestToken(updatedGuest.id),
+            message: 'Your RSVP has been updated!',
+          });
+        }
+
+        // Not the owner. A host invite (status INVITED) holds no RSVP yet, only the
+        // address the host typed, so completing it is the same as a brand-new RSVP with
+        // that email (which anyone can always make). It keeps invite links working for
+        // logged-out invitees, and it answers exactly like a new RSVP.
+        if (existingGuest.status === 'INVITED' && existingGuest.approved !== false) {
+          const completed = await prisma.guest.update({
+            where: { id: existingGuest.id },
+            data: updateData(existingGuest),
+          });
+          await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
+          return res.status(201).json(newRsvpResponse(completed.id));
+        }
+
+        // A real RSVP already exists for this email and the caller can't prove it's
+        // theirs: change NOTHING and answer exactly like a new RSVP would. The guest id
+        // is a fresh random UUID (its token is valid-looking but matches no guest, so it
+        // grants nothing); no field of the existing guest is read into the response.
+        // TODO(rsvp-overwrite-fix): optionally email the address a "manage your RSVP"
+        // link here. Not enabled: that would be a new send and needs Snax's OK.
+        return res.status(201).json(newRsvpResponse(randomUUID()));
+      }
     }
 
     // Create guest
@@ -690,43 +735,28 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       }
     }
 
-    // Build response message
-    let message = 'Your preferences have been saved!';
-    if (isAtCapacity) {
-      message = `You're #${waitlistPosition} on the waitlist! We'll notify you if a spot opens up.`;
-    } else if (party.requireApproval) {
-      message = 'Your RSVP has been submitted and is pending approval from the host.';
-    }
-
-    res.status(201).json({
-      success: true,
-      guest: {
-        id: guest.id,
-        name: guest.name,
-        status: guestStatus,
-        waitlistPosition,
-      },
-      requireApproval: party.requireApproval,
-      waitlisted: isAtCapacity,
-      waitlistPosition,
-      ...(existingWalletGuest && existingWalletGuest.id !== guest.id
-        ? { walletShared: { withName: existingWalletGuest.name } }
-        : {}),
-      message,
-    });
+    res.status(201).json(newRsvpResponse(guest.id));
   } catch (error) {
     next(error);
   }
 });
 
-// POST /api/rsvp/:inviteCode/send-confirmation - Send confirmation email for an RSVP
-router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/rsvp/:inviteCode/send-confirmation - Re-send the confirmation email for an RSVP
+// rsvp-overwrite-fix: this used to email ANY address/name supplied in the body and stamp the
+// Resend id onto ANY guest id (an open relay plus bounce-tracking corruption). Now the
+// caller must hold that guest's token (or be logged in as the guest), and the email goes
+// only to the address stored on the guest row. No frontend caller today.
+router.post('/:inviteCode/send-confirmation', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
-    const { guestId, guestEmail, guestName } = req.body;
+    const { guestId } = req.body ?? {};
 
-    if (!guestEmail || !guestName) {
-      throw new AppError('Guest email and name are required', 400, 'VALIDATION_ERROR');
+    if (!guestId || typeof guestId !== 'string') {
+      throw new AppError('guestId is required', 400, 'VALIDATION_ERROR');
+    }
+    const tokenOk = verifyGuestToken(guestId, guestTokenFromRequest(req));
+    if (!tokenOk && !req.userEmail) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
     }
 
     // Get party details (try invite code first, then custom URL)
@@ -787,11 +817,26 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    // Send confirmation email
+    // A valid token means we minted this id; otherwise refuse ids Postgres can't parse.
+    const guestRow = tokenOk || UUID_RE.test(guestId)
+      ? await prisma.guest.findFirst({
+          where: { id: guestId, partyId: party.id },
+          select: { id: true, name: true, email: true },
+        })
+      : null;
+    const callerEmail = req.userEmail?.trim().toLowerCase();
+    const allowed =
+      !!guestRow?.email &&
+      (tokenOk || (!!callerEmail && callerEmail === guestRow.email.trim().toLowerCase()));
+    if (!guestRow || !guestRow.email || !allowed) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
+
+    // Send confirmation email (to the stored address only)
     await sendRSVPConfirmationEmail({
-      guestEmail,
-      guestName,
-      guestId,
+      guestEmail: guestRow.email,
+      guestName: guestRow.name,
+      guestId: guestRow.id,
       partyName: party.name,
       partyDate: party.date,
       partyTimezone: party.timezone,

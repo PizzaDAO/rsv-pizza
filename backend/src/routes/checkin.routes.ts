@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { callerOwnsGuest } from '../lib/guestToken.js';
 import { AppError } from '../middleware/error.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
@@ -146,6 +147,19 @@ async function findPartyByCode(inviteCode: string) {
 }
 
 // POST /api/checkin/:inviteCode/self-host — Host/co-host self-check-in (bootstrap)
+
+// rsvp-overwrite-fix: the venue discount is the guest's own (one-time). The guest proves it
+// with their token or login; hosts/co-hosts keep access for support.
+async function canActAsGuestForDiscount(
+  req: AuthRequest,
+  partyId: string,
+  guest: { id: string; email: string | null },
+): Promise<boolean> {
+  if (callerOwnsGuest(req, guest)) return true;
+  if (!req.userId && !req.userEmail) return false;
+  return canUserCheckIn(partyId, req.userId, req.userEmail);
+}
+
 router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
@@ -607,8 +621,12 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
   }
 });
 
-// GET /api/checkin/:inviteCode/:guestId/discount — Get discount claim status (no auth required)
-router.get('/:inviteCode/:guestId/discount', async (req, res: Response, next: NextFunction) => {
+// GET /api/checkin/:inviteCode/:guestId/discount — Get discount claim status
+// rsvp-overwrite-fix: was fully public, so any leaked guest id could read the guest's name
+// and burn their one-time discount. Now: the guest's token (?t= / X-Guest-Token / body
+// guestToken), a login as the guest, or a host/co-host of the event. Anything else gets the
+// same 404 as an unknown guest.
+router.get('/:inviteCode/:guestId/discount', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode, guestId } = req.params;
 
@@ -626,6 +644,7 @@ router.get('/:inviteCode/:guestId/discount', async (req, res: Response, next: Ne
       select: {
         id: true,
         name: true,
+        email: true,
         checkedInAt: true,
         discountClaimedAt: true,
         party: {
@@ -637,7 +656,7 @@ router.get('/:inviteCode/:guestId/discount', async (req, res: Response, next: Ne
       },
     });
 
-    if (!guest) {
+    if (!guest || !(await canActAsGuestForDiscount(req, party.id, guest))) {
       throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
     }
 
@@ -659,8 +678,12 @@ router.get('/:inviteCode/:guestId/discount', async (req, res: Response, next: Ne
   }
 });
 
-// POST /api/checkin/:inviteCode/:guestId/discount — Claim post-event discount (no auth required)
-router.post('/:inviteCode/:guestId/discount', async (req, res: Response, next: NextFunction) => {
+// POST /api/checkin/:inviteCode/:guestId/discount — Claim post-event discount
+// rsvp-overwrite-fix: was fully public, so any leaked guest id could read the guest's name
+// and burn their one-time discount. Now: the guest's token (?t= / X-Guest-Token / body
+// guestToken), a login as the guest, or a host/co-host of the event. Anything else gets the
+// same 404 as an unknown guest.
+router.post('/:inviteCode/:guestId/discount', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode, guestId } = req.params;
 
@@ -678,6 +701,7 @@ router.post('/:inviteCode/:guestId/discount', async (req, res: Response, next: N
       select: {
         id: true,
         name: true,
+        email: true,
         checkedInAt: true,
         discountClaimedAt: true,
         party: {
@@ -689,7 +713,7 @@ router.post('/:inviteCode/:guestId/discount', async (req, res: Response, next: N
       },
     });
 
-    if (!guest) {
+    if (!guest || !(await canActAsGuestForDiscount(req, party.id, guest))) {
       throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
     }
 

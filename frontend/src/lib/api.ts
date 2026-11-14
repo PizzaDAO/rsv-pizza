@@ -3163,12 +3163,14 @@ export async function deleteRafflePrize(partyId: string, raffleId: string, prize
 export async function enterRaffle(
   partyId: string,
   raffleId: string,
-  guestId: string
+  guestId: string,
+  guestToken?: string | null
 ): Promise<{ entry: RaffleEntry } | null> {
   try {
+    // rsvp-overwrite-fix: the backend needs the guest token or a login as the guest.
     return await apiRequest<{ entry: RaffleEntry }>(`/api/parties/${partyId}/raffles/${raffleId}/enter`, {
       method: 'POST',
-      body: { guestId },
+      body: guestToken ? { guestId, guestToken } : { guestId },
       requireAuth: false,
     });
   } catch (error) {
@@ -4707,16 +4709,21 @@ export interface DiscountClaimResponse {
   claimedAt: string;
 }
 
-/** Get discount eligibility status for a guest (no auth required) */
-export async function getDiscountStatus(inviteCode: string, guestId: string): Promise<DiscountStatusResponse> {
-  return apiRequest<DiscountStatusResponse>(`/api/checkin/${inviteCode}/${guestId}/discount`, {
+// rsvp-overwrite-fix: the discount endpoints need the guest's token (`?t=`), a login as the
+// guest, or a host login. apiRequest sends the login when there is one.
+const discountPath = (inviteCode: string, guestId: string, guestToken?: string | null) =>
+  `/api/checkin/${inviteCode}/${guestId}/discount${guestToken ? `?t=${encodeURIComponent(guestToken)}` : ''}`;
+
+/** Get discount eligibility status for a guest (guest token, guest login, or host login) */
+export async function getDiscountStatus(inviteCode: string, guestId: string, guestToken?: string | null): Promise<DiscountStatusResponse> {
+  return apiRequest<DiscountStatusResponse>(discountPath(inviteCode, guestId, guestToken), {
     requireAuth: false,
   });
 }
 
-/** Claim post-event discount for a checked-in guest (no auth required) */
-export async function claimDiscount(inviteCode: string, guestId: string): Promise<DiscountClaimResponse> {
-  return apiRequest<DiscountClaimResponse>(`/api/checkin/${inviteCode}/${guestId}/discount`, {
+/** Claim post-event discount for a checked-in guest (guest token, guest login, or host login) */
+export async function claimDiscount(inviteCode: string, guestId: string, guestToken?: string | null): Promise<DiscountClaimResponse> {
+  return apiRequest<DiscountClaimResponse>(discountPath(inviteCode, guestId, guestToken), {
     method: 'POST',
     requireAuth: false,
   });

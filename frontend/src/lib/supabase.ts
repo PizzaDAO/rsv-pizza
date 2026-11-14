@@ -1739,7 +1739,7 @@ export async function addGuestToParty(
   ethconfOptIn?: boolean,
   optinAbVariant?: 'control' | 'variant' | null,
   visitorSessionId?: string,
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null; walletShared: { withName: string } | null }> {
+): Promise<{ guest: DbGuest; guestToken: string | null; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     throw new Error('Invite code is required to submit RSVP');
@@ -1750,9 +1750,14 @@ export async function addGuestToParty(
   const normalizedWallet = ethereumAddress?.trim().toLowerCase() || null;
 
   try {
+    // rsvp-overwrite-fix: send the login (if any). The backend only lets a logged-in owner
+    // change an existing RSVP; a logged-out re-submit of a taken email changes nothing.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const authToken = localStorage.getItem('authToken');
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         name,
         email: email || null,
@@ -1822,16 +1827,14 @@ export async function addGuestToParty(
 
     return {
       guest,
+      // rsvp-overwrite-fix: per-guest capability for raffle/quiz/discount/NFT calls. Only
+      // the RSVPer gets it; keep it in memory, never in localStorage or URLs.
+      guestToken: typeof data.guestToken === 'string' ? data.guestToken : null,
       alreadyRegistered: data.alreadyRegistered || false,
       requireApproval: data.requireApproval || false,
       updated: data.updated || false,
       waitlisted: data.waitlisted || false,
       waitlistPosition: data.waitlistPosition || null,
-      // pancetta-58472: backend may signal that this wallet is also on another
-      // event's guest list. Saved anyway; surfaced as a heads-up on success.
-      walletShared: data.walletShared && typeof data.walletShared.withName === 'string'
-        ? { withName: data.walletShared.withName }
-        : null,
     };
   } catch (error) {
     console.error('Error adding guest:', error);
@@ -1857,6 +1860,8 @@ export interface ExistingGuestData {
   status: DbGuestStatus;
   checkedInAt: string | null;
   checkedInBy: string | null;
+  /** rsvp-overwrite-fix: capability token, only present on the owner's own row (my-guest). */
+  guestToken?: string | null;
 }
 
 function mapExistingGuest(guest: any): ExistingGuestData {
@@ -1878,6 +1883,7 @@ function mapExistingGuest(guest: any): ExistingGuestData {
     status: guest.status || 'CONFIRMED',
     checkedInAt: guest.checkedInAt || null,
     checkedInBy: guest.checkedInBy || null,
+    guestToken: typeof guest.guestToken === 'string' ? guest.guestToken : null,
   };
 }
 

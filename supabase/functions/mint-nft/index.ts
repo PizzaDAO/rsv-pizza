@@ -82,8 +82,13 @@ interface MintRequest {
 }
 
 // buffalo-35201: events that require approval must not mint until the host approves.
+// rsvp-overwrite-fix: guest ids leaked via the anon guests grant, and this used to mint to
+// ANY recipient for any (partyId, guestId) pair, on our gas. The recipient must now be the
+// wallet stored on that guest row (what the RSVP saved, or what mintOnApproval sends), so a
+// leaked id can at most deliver the guest's own NFT to the guest's own wallet (once; the
+// hasToken check below makes repeats a no-op).
 // Returns an error message when minting must be refused, or null when allowed.
-async function checkMintAllowed(partyId: string, guestId: string): Promise<{ status: number; error: string } | null> {
+async function checkMintAllowed(partyId: string, guestId: string, recipient: string): Promise<{ status: number; error: string } | null> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return { status: 500, error: 'NFT minting not configured (missing database credentials)' };
   }
@@ -109,6 +114,11 @@ async function checkMintAllowed(partyId: string, guestId: string): Promise<{ sta
   if (party.require_approval && guest.approved !== true) {
     return { status: 403, error: 'Guest has not been approved by the host yet' };
   }
+  const stored = typeof guest.ethereum_address === 'string' ? guest.ethereum_address.trim().toLowerCase() : '';
+  if (!stored || stored !== String(recipient || '').trim().toLowerCase()) {
+    // Same answer as an unknown guest, so this can't be used to test a guest's wallet.
+    return { status: 404, error: 'Guest or event not found' };
+  }
   return null;
 }
 
@@ -132,7 +142,7 @@ serve(async (req) => {
     const request: MintRequest = await req.json();
     const { recipient, partyId } = request;
 
-    const denied = await checkMintAllowed(partyId, request.guestId);
+    const denied = await checkMintAllowed(partyId, request.guestId, recipient);
     if (denied) {
       return new Response(
         JSON.stringify({ error: denied.error }),

@@ -39,14 +39,13 @@ export interface RSVPEventData {
 
 export interface RSVPSubmitResult {
   guest: { id: string } | null;
+  // rsvp-overwrite-fix: per-guest capability for raffle/quiz/discount/NFT calls.
+  guestToken: string | null;
   alreadyRegistered: boolean;
   requireApproval: boolean;
   updated: boolean;
   waitlisted: boolean;
   waitlistPosition: number | null;
-  // pancetta-58472: backend hint that this wallet is also on another event's
-  // guest list (saved anyway, surfaced as inline heads-up).
-  walletShared: { withName: string } | null;
 }
 
 export interface UseRSVPFormOptions {
@@ -164,9 +163,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [waitlisted, setWaitlisted] = useState(false);
   const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
   const [guestId, setGuestId] = useState<string | null>(null);
-  // pancetta-58472: heads-up shown on success when backend reports this wallet
-  // is on another event's guest list. Saved anyway; non-blocking.
-  const [walletShared, setWalletShared] = useState<{ withName: string } | null>(null);
+  const [guestToken, setGuestToken] = useState<string | null>(null);
 
   // Pizzeria state
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
@@ -277,7 +274,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setWaitlisted(false);
     setWaitlistPosition(null);
     setGuestId(null);
-    setWalletShared(null);
+    setGuestToken(null);
     setStep(1);
     setError(null);
     setSwcOptIn(false);
@@ -557,17 +554,17 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         setWaitlisted(result.waitlisted);
         setWaitlistPosition(result.waitlistPosition);
         setGuestId(result.guest?.id || null);
-        setWalletShared(result.walletShared ?? null);
+        setGuestToken(result.guestToken);
         setSubmitted(true);
 
         onSuccess?.({
           guest: result.guest ? { id: result.guest.id } : null,
+          guestToken: result.guestToken,
           alreadyRegistered: result.alreadyRegistered,
           requireApproval: result.requireApproval,
           updated: isEditing || result.updated,
           waitlisted: result.waitlisted,
           waitlistPosition: result.waitlistPosition,
-          walletShared: result.walletShared ?? null,
         });
       } else {
         setError('Failed to submit. Please try again.');
@@ -676,8 +673,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setWaitlistPosition,
     guestId,
     setGuestId,
-    walletShared,
-    setWalletShared,
+    guestToken,
 
     // Pizzeria state
     nearbyPizzerias,

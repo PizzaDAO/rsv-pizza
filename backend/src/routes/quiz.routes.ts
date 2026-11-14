@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { callerOwnsGuest } from '../lib/guestToken.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { AppError } from '../middleware/error.js';
 
@@ -323,7 +324,9 @@ quizPublicRouter.post('/:slug/quiz/check', async (req: Request, res: Response, n
 });
 
 // POST /api/events/:slug/quiz/answers - Submit answers, returns results
-quizPublicRouter.post('/:slug/quiz/answers', async (req: Request, res: Response, next: NextFunction) => {
+// rsvp-overwrite-fix: requires the guest's token (`guestToken` / X-Guest-Token) or a login
+// as the guest; a bare guest id (leaked via the anon guests grant) is not enough.
+quizPublicRouter.post('/:slug/quiz/answers', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const { guestId, answers } = req.body;
@@ -356,7 +359,7 @@ quizPublicRouter.post('/:slug/quiz/answers', async (req: Request, res: Response,
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, partyId: party.id },
     });
-    if (!guest) {
+    if (!guest || !callerOwnsGuest(req, guest)) {
       throw new AppError('Guest not found for this event', 404, 'GUEST_NOT_FOUND');
     }
 
