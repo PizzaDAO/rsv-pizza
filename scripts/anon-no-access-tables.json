@@ -1,0 +1,4 @@
+{
+  "_comment": "C1 (guests-anon-exposure): public tables on which anon AND authenticated must hold NO privilege at all (no SELECT/INSERT/UPDATE on any column, no DELETE/TRUNCATE). Enforced by scripts/check-rls-anon-exposure.js. A table listed here that does not exist fails the check. Removing an entry needs a security review.",
+  "tables": ["guests", "user_preferences"]
+}

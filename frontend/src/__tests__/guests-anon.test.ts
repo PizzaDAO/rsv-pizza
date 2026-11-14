@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createRequire } from 'module';
 import { GUESTS_BROADCAST_EVENT, GUESTS_TOPIC_PREFIX } from '../lib/supabase';
 
 const REPO = path.resolve(__dirname, '../../..');
@@ -63,5 +64,175 @@ describe('guests broadcast contract', () => {
     const sql = fs.readFileSync(path.join(dir, m, 'migration.sql'), 'utf8');
     expect(sql).toContain(GUESTS_BROADCAST_EVENT);
     expect(sql).toContain(`'${GUESTS_TOPIC_PREFIX}`);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// PR2 guests-anon-lockdown: Migration B, its runner, and the CI guards C1/C3/C4.
+// ---------------------------------------------------------------------------------------------
+const read = (p: string) => fs.readFileSync(path.join(REPO, p), 'utf8');
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const MIGRATION_B = 'backend/prisma/migrations/20261113_guests_anon_lockdown/migration.sql';
+const RUNNER_B = 'backend/scripts/apply-lockdown-guests.cjs';
+
+describe('Migration B (guests anon lockdown)', () => {
+  const sql = read(MIGRATION_B).replace(/--[^\n]*/g, '');
+  const runner = read(RUNNER_B);
+
+  it('revokes everything on both tables from anon and authenticated, and grants nothing', () => {
+    expect(sql).toMatch(/REVOKE ALL ON public\.guests FROM anon, authenticated;/);
+    expect(sql).toMatch(/REVOKE ALL ON public\.user_preferences FROM anon, authenticated;/);
+    expect(sql).not.toMatch(/\bGRANT\b/i);
+  });
+
+  it('drops guests from the realtime publication', () => {
+    expect(sql).toMatch(/ALTER PUBLICATION supabase_realtime DROP TABLE public\.guests;/);
+  });
+
+  it('drops exactly the policies the runner can recreate on --rollback', () => {
+    const dropped = [...sql.matchAll(/DROP POLICY IF EXISTS "([^"]+)" ON public\.(\w+);/g)].map((m) => `${m[2]}:${m[1]}`).sort();
+    const restorable = [...runner.matchAll(/\{ table: '(\w+)', name: '([^']+)', cmd:/g)].map((m) => `${m[1]}:${m[2]}`).sort();
+    expect(dropped.length).toBe(7);
+    expect(dropped).toEqual(restorable);
+    // the "false" write-deny policies on guests stay
+    expect(sql).not.toMatch(/No public (insert|update|delete) on guests/);
+  });
+
+  it('the runner executes the migration file and never uses a session-level SET', () => {
+    expect(runner).toContain('20261113_guests_anon_lockdown/migration.sql');
+    const code = stripComments(runner);
+    expect(code).not.toMatch(/\bSET\s+(?!LOCAL\b)(ROLE|lock_timeout|statement_timeout|search_path|session)/i);
+    expect(code).not.toMatch(/\bRESET\b/i);
+    expect(code).toMatch(/SET LOCAL statement_timeout/);
+    expect(code).toMatch(/SET LOCAL lock_timeout/);
+    expect(code).toMatch(/SET LOCAL ROLE \$\{role\}/);
+  });
+
+  const runnerMod = createRequire(import.meta.url)(path.join(REPO, RUNNER_B));
+
+  it('rollback GRANTs recreate MAINTAIN and the column-level grants (exact inverse)', () => {
+    const stmts: string[] = runnerMod.grantSql(runnerMod.BASELINE_ACL);
+    for (const role of ['anon', 'authenticated']) {
+      for (const t of ['guests', 'user_preferences']) {
+        const g = stmts.find((x) => x.startsWith('GRANT ') && !x.includes('(') && x.endsWith(`ON public.${t} TO ${role}`));
+        expect(g).toBeDefined();
+        for (const p of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']) expect(g).toContain(p);
+      }
+      const col = stmts.find((x) => x.startsWith('GRANT SELECT (') && x.endsWith(`ON public.guests TO ${role}`));
+      expect(col).toBeDefined();
+      expect((col!.match(/"/g) || []).length / 2).toBe(12);
+      expect(col).toContain('"email_status"');
+      expect(stmts.find((x) => x.includes('(') && x.includes('user_preferences'))).toBeUndefined();
+    }
+  });
+
+  it('the probe DO block switches roles with SET LOCAL only and restores the original role', () => {
+    const block: string = runnerMod.probeBlock(['id', 'name'], 'postgres');
+    expect(block).not.toMatch(/\bRESET\b/i);
+    expect(block).toContain(`EXECUTE 'SET LOCAL ROLE anon'`);
+    expect(block).toContain(`EXECUTE 'SET LOCAL ROLE authenticated'`);
+    expect((block.match(/SET LOCAL ROLE "postgres"/g) || []).length).toBe(2);
+    expect(block).toMatch(/set_config\('lockdown_sim\.results', res, true\)/);
+    expect(block).not.toMatch(/\bSET\s+(?!LOCAL\b)ROLE/i);
+  });
+
+  it('parses probe results (denied = SQLSTATE 42501)', () => {
+    const r = runnerMod.parseProbeResults('anon\tx\tdenied\t42501\nanon\ty\tok\tok\nanon\tz\tdenied\t42P01\n');
+    expect(r.map((x: { pass: boolean }) => x.pass)).toEqual([true, true, false]);
+  });
+
+  it('does not re-lock experiment_flags (D9 is done by the parties lockdown runner)', () => {
+    expect(sql).not.toMatch(/experiment_flags/);
+    expect(read('backend/scripts/apply-lockdown-parties-columns.cjs')).toMatch(/REVOKE SELECT ON public\.experiment_flags/);
+  });
+});
+
+describe('CI guards C1/C3/C4 config', () => {
+  const noAccess = JSON.parse(read('scripts/anon-no-access-tables.json'));
+  const colAllow = JSON.parse(read('scripts/anon-column-allowlist.json'));
+  const pubAllow = JSON.parse(read('scripts/realtime-publication-allowlist.json'));
+
+  it('guests and user_preferences are no-access tables', () => {
+    expect(noAccess.tables).toEqual(expect.arrayContaining(['guests', 'user_preferences']));
+  });
+
+  it('nothing on guests / user_preferences is allowlisted, and guests is never published', () => {
+    expect(Object.keys(colAllow.allow).filter((k) => /^(guests|user_preferences)\./.test(k))).toEqual([]);
+    expect(pubAllow.tables).not.toContain('guests');
+    expect(pubAllow.tables).not.toContain('public.guests');
+  });
+
+  it('the workflow runs on changes to the guard config files', () => {
+    const wf = read('.github/workflows/rls-anon-exposure.yml');
+    expect(wf).toContain("'scripts/anon-*.json'");
+    expect(wf).toContain("'scripts/realtime-publication-allowlist.json'");
+    expect(wf).toContain("'frontend/src/lib/supabase.ts'");
+  });
+});
+
+describe('CI guards C1/C3/C4 logic (fake catalog)', () => {
+  const guards = createRequire(import.meta.url)(path.join(REPO, 'scripts/check-rls-anon-exposure.js'));
+
+  type Row = Record<string, unknown>;
+  function fakeCatalog(opts: { privs: boolean; permissive: string[]; published: string[]; anonCols: Record<string, string[]> }) {
+    return async (sql: string, params: unknown[] = []): Promise<Row[]> => {
+      if (sql.includes('to_regclass')) return [{ ok: ['guests', 'user_preferences'].includes(params[0] as string) }];
+      if (sql.includes('has_any_column_privilege')) {
+        const v = opts.privs;
+        return [{ sel: v, ins: v, upd: v, del: v, trunc: v }];
+      }
+      if (sql.includes('FROM pg_policies')) return opts.permissive.map((t) => ({ t, qual: 'true' }));
+      if (sql.includes('pg_publication_tables')) return opts.published.map((t) => ({ fq: `public.${t}`, s: 'public', t }));
+      if (sql.includes('pg_attribute')) return (opts.anonCols[params[0] as string] || []).map((col) => ({ col }));
+      throw new Error('unexpected query: ' + sql.slice(0, 80));
+    };
+  }
+
+  it('fails on the pre-lockdown state (grants, permissive policy, published guests)', async () => {
+    const q = fakeCatalog({
+      privs: true,
+      permissive: ['guests', 'user_preferences', 'slug_aliases'],
+      published: ['guests'],
+      anonCols: { guests: ['id', 'name', 'email', 'survey_token'], user_preferences: ['email'], slug_aliases: ['old_slug'] },
+    });
+    const out = await guards.guestsClassChecks(q);
+    const text = out.fail.join('\n');
+    expect(text).toMatch(/C1 anon still holds SELECT\/INSERT\/UPDATE\/DELETE\/TRUNCATE on guests/);
+    expect(text).toMatch(/C3 guests: .*email, survey_token/);
+    expect(text).toMatch(/C3 user_preferences: .*email/);
+    expect(text).not.toMatch(/slug_aliases/);
+    expect(text).toMatch(/C4 public\.guests is in the supabase_realtime publication/);
+  });
+
+  it('passes on the post-lockdown state', async () => {
+    const q = fakeCatalog({ privs: false, permissive: ['slug_aliases'], published: [], anonCols: { slug_aliases: ['old_slug', 'new_slug'] } });
+    const out = await guards.guestsClassChecks(q);
+    expect(out.fail).toEqual([]);
+    expect(out.info.join('\n')).toMatch(/C1 .*2 table/);
+  });
+
+  it('a missing no-access table fails (no silent typos)', async () => {
+    const q = fakeCatalog({ privs: false, permissive: [], published: [], anonCols: {} });
+    const out = await guards.checkNoAccessTables(q, ['guestz']);
+    expect(out.fail[0]).toMatch(/guestz: table does not exist/);
+  });
+
+  it('the sensitive-name rule covers the guests leak columns, camelCase, and has no substring false positives', () => {
+    for (const c of ['email', 'ethereum_address', 'survey_token', 'privy_user_id', 'visitor_session_id', 'email_resend_id', 'userEmail', 'nft_token_id', 'tax_id']) {
+      expect(guards.isSensitiveColumn(c)).toBe(true);
+    }
+    for (const c of ['id', 'name', 'party_id', 'old_slug', 'enabled', 'protein', 'tokenizer', 'beings', 'sessionize']) {
+      expect(guards.isSensitiveColumn(c)).toBe(false);
+    }
+  });
+
+  it('C3 only excludes quals that compare auth.uid()/auth.jwt() to a column', () => {
+    const scoped = ['(auth.uid() = "userId")', '((auth.uid())::text = user_id)', '(user_id = auth.uid())',
+      "((auth.jwt() ->> 'email'::text) = email)", '((auth.uid() = owner) AND (published = true))'];
+    const permissive = ['true', null, "(auth.role() = 'service_role'::text)", '(auth.uid() IS NULL)',
+      '((auth.uid())::text IN ( SELECT (g.id)::text AS id FROM guests g))', '((auth.uid() = owner) OR true)',
+      "(auth.uid() = 'abc'::uuid)", '(auth.uid() = true)'];
+    for (const q of scoped) expect(guards.isSelfScopedQual(q)).toBe(true);
+    for (const q of permissive) expect(guards.isSelfScopedQual(q)).toBe(false);
   });
 });

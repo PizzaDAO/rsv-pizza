@@ -2,6 +2,9 @@ name: RLS Anon-Exposure Check
 
 # Live-state guard for the tax_forms / #1061 leak class: fails if any public table
 # is RLS-off AND anon-SELECTable (readable by anyone with the public anon key).
+# Also: parties column allowlist (C2), and the guests-anon-exposure guards: C1 no-access
+# tables (guests, user_preferences), C3 RLS-on tables with a permissive anon policy over
+# sensitive-looking columns, C4 supabase_realtime publication allowlist.
 # Runs weekly (catches drift from manual SQL / dashboard / restores, not just PRs)
 # and on PRs that touch migrations. Read-only. See scripts/check-rls-anon-exposure.js.
 on:
@@ -13,8 +16,9 @@ on:
       - 'backend/prisma/migrations/**'
       - 'scripts/check-rls-anon-exposure.js'
       - 'scripts/rls-anon-allowlist.json'
-      - 'scripts/anon-sensitive-columns.json'
+      - 'scripts/anon-*.json'
       - 'scripts/parties-anon-columns.json'
+      - 'scripts/realtime-publication-allowlist.json'
       - 'frontend/src/lib/supabase.ts'
       - '.github/workflows/rls-anon-exposure.yml'
   workflow_dispatch:

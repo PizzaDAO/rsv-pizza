@@ -1,0 +1,4 @@
+{
+  "_comment": "C3/C4 (guests-anon-exposure): anon-readable columns whose NAME looks sensitive (email/phone/wallet/token/session/...) on a table anon can read rows from (RLS-on + permissive anon/public SELECT policy, or published to supabase_realtime). Each entry is \"table.column\": \"why it is safe\". Prefer revoking the column instead. Tables in anon-sensitive-columns.json (parties, experiment_flags) are checked exactly by C2 and skipped here.",
+  "allow": {}
+}
