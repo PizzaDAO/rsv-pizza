@@ -214,3 +214,73 @@ export function hostTeam(t: Row, urls: Record<string, string>) {
     submission: sub ? teamSubmission(sub, urls) : null,
   };
 }
+
+// ---------------------------------------------------------------- judging (PR 4)
+//
+// Judge shapes (explicit allowlists). Never: member emails, user / guest ids, other judges'
+// scores or comments, the team invite code, drafts or disqualified projects (the queue query
+// only loads `submitted`).
+//
+// Blind judging (hackathons.blind_judging, plans §3.3): the server leaves out
+//   - team name, member names and avatars: for as long as the hackathon is blind (they're
+//     never needed to score, and showing them after a score would un-blind re-edits);
+//   - repo / demo video / deck / live links: until THIS judge has saved a score for the project.
+// Project name, tagline, description and screenshots stay (the host UI explains that blinding
+// is best-effort).
+
+export interface JudgeViewCtx {
+  blind: boolean;
+  urls: Record<string, string>;
+  /** This judge's own score row for the project, if any. */
+  myScore: Row | null;
+  /** Current-rubric total for myScore (recomputed so weight edits show immediately). */
+  myTotal: number | null;
+}
+
+function judgeTeam(s: Row, blind: boolean) {
+  if (blind || !s.team) return null;
+  return {
+    name: s.team.name as string,
+    members: (s.team.members ?? []).map((m: Row) => ({ name: displayName(m), avatarUrl: m.user?.profilePictureUrl ?? null })) as Array<{ name: string; avatarUrl: string | null }>,
+  };
+}
+
+export function judgeQueueItem(s: Row, ctx: JudgeViewCtx) {
+  const team = judgeTeam(s, ctx.blind);
+  return {
+    id: s.id as string,
+    name: s.name as string,
+    tagline: (s.tagline ?? null) as string | null,
+    trackIds: (s.tracks ?? []).map((t: Row) => t.trackId) as string[],
+    tableNumber: (s.tableNumber ?? null) as string | null,
+    cover: s.coverPath ? { path: s.coverPath as string, url: ctx.urls[s.coverPath] ?? null } : null,
+    teamName: team?.name ?? null,
+    scored: !!ctx.myScore,
+    myTotal: ctx.myScore ? ctx.myTotal : null,
+    scoredAt: ctx.myScore ? iso(ctx.myScore.updatedAt) : null,
+  };
+}
+
+export function judgeSubmission(s: Row, ctx: JudgeViewCtx) {
+  const img = (path: string) => ({ path, url: ctx.urls[path] ?? null });
+  const linksLocked = ctx.blind && !ctx.myScore;
+  return {
+    ...judgeQueueItem(s, ctx),
+    description: (s.description ?? null) as string | null,
+    screenshots: (s.screenshotPaths ?? []).map(img) as Array<{ path: string; url: string | null }>,
+    linksLocked,
+    links: linksLocked
+      ? null
+      : { repoUrl: s.repoUrl ?? null, demoVideoUrl: s.demoVideoUrl ?? null, deckUrl: s.deckUrl ?? null, liveUrl: s.liveUrl ?? null },
+    team: judgeTeam(s, ctx.blind),
+    myScore: ctx.myScore
+      ? {
+          criterionScores: (ctx.myScore.criterionScores ?? {}) as Record<string, number>,
+          total: ctx.myTotal,
+          privateComment: (ctx.myScore.privateComment ?? null) as string | null,
+          teamFeedback: (ctx.myScore.teamFeedback ?? null) as string | null,
+          updatedAt: iso(ctx.myScore.updatedAt),
+        }
+      : null,
+  };
+}

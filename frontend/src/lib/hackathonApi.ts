@@ -286,6 +286,156 @@ export const hackathonModerationApi = {
   },
 };
 
+// ---------------------------------------------------------------- judging (PR 4)
+// Backend: backend/src/routes/hackathon-judge.routes.ts + hackathon.routes.ts (judging,
+// leaderboard). Blind mode is enforced server-side: teamName / team / links come back null.
+
+export type JudgingStatus = 'not_started' | 'open' | 'closed';
+
+export interface JudgeQueueItem {
+  id: string;
+  name: string;
+  tagline: string | null;
+  trackIds: string[];
+  tableNumber: string | null;
+  cover: HackathonImage | null;
+  /** null while blind judging is on. */
+  teamName: string | null;
+  scored: boolean;
+  myTotal: number | null;
+  scoredAt: string | null;
+}
+
+export interface JudgeMyScore {
+  criterionScores: Record<string, number>;
+  total: number | null;
+  privateComment: string | null;
+  teamFeedback: string | null;
+  updatedAt: string | null;
+}
+
+export interface JudgeSubmission extends JudgeQueueItem {
+  description: string | null;
+  screenshots: HackathonImage[];
+  /** Blind mode: true until this judge saves a score. */
+  linksLocked: boolean;
+  links: { repoUrl: string | null; demoVideoUrl: string | null; deckUrl: string | null; liveUrl: string | null } | null;
+  team: { name: string; members: Array<{ name: string; avatarUrl: string | null }> } | null;
+  myScore: JudgeMyScore | null;
+}
+
+export interface JudgeQueueResponse {
+  judge: { name: string | null; trackIds: string[] };
+  judgingStatus: JudgingStatus;
+  blindJudging: boolean;
+  criteria: HackathonCriterion[];
+  tracks: HackathonTrack[];
+  queue: JudgeQueueItem[];
+  progress: { scored: number; total: number };
+}
+
+export interface JudgeSubmissionResponse {
+  judgingStatus: JudgingStatus;
+  blindJudging: boolean;
+  submission: JudgeSubmission;
+}
+
+export interface ScoreInput {
+  scores: Record<string, number>;
+  privateComment?: string | null;
+  teamFeedback?: string | null;
+}
+
+const judgeBase = (partyId: string) => `/api/hackathon-judge/${partyId}`;
+
+export const hackathonJudgeApi = {
+  queue: (partyId: string) => apiRequest<JudgeQueueResponse>(`${judgeBase(partyId)}/queue`),
+  submission: (partyId: string, id: string) => apiRequest<JudgeSubmissionResponse>(`${judgeBase(partyId)}/submissions/${id}`),
+  score: (partyId: string, id: string, body: ScoreInput) =>
+    apiRequest<JudgeSubmissionResponse>(`${judgeBase(partyId)}/submissions/${id}/score`, { method: 'PUT', body }),
+};
+
+/** Same math as backend lib/hackathon/scoring.ts computeTotal (live preview in the form). */
+export function weightedTotal(scores: Record<string, number>, criteria: Pick<HackathonCriterion, 'id' | 'weight' | 'maxScore'>[]): number | null {
+  let num = 0;
+  let den = 0;
+  for (const c of criteria) {
+    const s = scores[c.id];
+    if (typeof s !== 'number' || c.maxScore <= 0) continue;
+    num += c.weight * (Math.min(Math.max(s, 0), c.maxScore) / c.maxScore);
+    den += c.weight;
+  }
+  return den === 0 ? null : Math.round((10000 * num) / den) / 100;
+}
+
+export interface LeaderboardRow {
+  submissionId: string;
+  average: number | null;
+  scoreCount: number;
+  min: number | null;
+  max: number | null;
+  criterionAverages: Record<string, number | null>;
+  rank: number | null;
+  tied: boolean;
+}
+
+export interface LeaderboardScore {
+  judgeId: string;
+  judgeName: string | null;
+  judgeEmail: string | null;
+  /** false = removed judge (listed, not averaged). */
+  counted: boolean;
+  total: number | null;
+  criterionScores: Record<string, number>;
+  privateComment: string | null;
+  teamFeedback: string | null;
+  updatedAt: string | null;
+}
+
+export interface LeaderboardProject {
+  id: string;
+  name: string;
+  tagline: string | null;
+  teamName: string | null;
+  trackIds: string[];
+  tableNumber: string | null;
+  scores: LeaderboardScore[];
+}
+
+export interface JudgeProgress {
+  id: string;
+  name: string | null;
+  email: string;
+  status: 'active' | 'removed';
+  trackIds: string[];
+  linked: boolean;
+  assigned: number;
+  scored: number;
+  lastScoredAt: string | null;
+}
+
+export interface LeaderboardResponse {
+  judgingStatus: JudgingStatus;
+  blindJudging: boolean;
+  criteria: HackathonCriterion[];
+  tracks: HackathonTrack[];
+  overall: LeaderboardRow[];
+  byTrack: Array<{ trackId: string; rows: LeaderboardRow[] }>;
+  projects: Record<string, LeaderboardProject>;
+  judges: JudgeProgress[];
+}
+
+export const hackathonJudgingHostApi = {
+  setJudging: (partyId: string, status: 'open' | 'closed') =>
+    apiRequest<HostRes>(`${base(partyId)}/judging`, { method: 'POST', body: { status } }),
+  leaderboard: (partyId: string) => apiRequest<LeaderboardResponse>(`${base(partyId)}/leaderboard`),
+};
+
+/** Copyable judge link (plans §10: no judge-invite email; the host shares it). */
+export function judgeLink(inviteCode: string): string {
+  return `${window.location.origin}/judge/${inviteCode}`;
+}
+
 export function eligibilityMessage(reason: IneligibleReason | null): string {
   switch (reason) {
     case 'login': return "Log in with the email you RSVP'd with to join the hackathon.";

@@ -22,7 +22,10 @@ describe('seed-hackathon-checklist', () => {
   it('fills empty / seed-default links and missing auto rules', () => {
     expect(planRow({ name: 'Publish tracks, prizes and rules', link_tab: 'details', auto_rule: null }))
       .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_published' });
-    expect(planRow({ name: 'Run demos and judging', link_tab: null, auto_rule: null })).toEqual({ linkTab: 'hackathon' });
+    expect(planRow({ name: 'Run demos and judging', link_tab: null, auto_rule: null }))
+      .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_judging_closed' });
+    // PR 4 re-run over rows PR 2 already linked: only the new auto rule is added.
+    expect(planRow({ name: 'Run demos and judging', link_tab: 'hackathon', auto_rule: null })).toEqual({ autoRule: 'hackathon_judging_closed' });
     expect(planRow({ name: 'Post winners and photos', link_tab: 'photos', auto_rule: null })).toEqual({ linkTab: 'hackathon' });
   });
 

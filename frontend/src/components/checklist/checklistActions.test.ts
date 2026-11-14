@@ -167,6 +167,8 @@ describe('hackathon checklist items (series)', () => {
       .toEqual({ kind: 'tab', tab: 'hackathon', section: 'judging' });
     expect(resolveChecklistAction(item('Run demos and judging', null, 'hackathon'), 'series'))
       .toEqual({ kind: 'tab', tab: 'hackathon' });
+    expect(resolveChecklistAction(item('Run demos and judging', 'hackathon_judging_closed', 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon', section: 'leaderboard' });
   });
 
   it('hostTabPath carries the section as a query param', () => {

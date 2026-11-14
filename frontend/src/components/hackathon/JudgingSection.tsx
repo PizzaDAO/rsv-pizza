@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, ListChecks, AlignLeft, Scale, Gauge, Mail, User, Gavel } from 'lucide-react';
+import { Plus, Pencil, Trash2, ListChecks, AlignLeft, Scale, Gauge, Mail, User, Gavel, Link2, Check, PlayCircle, StopCircle, BarChart3 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import {
+  judgeLink,
   type HostHackathon,
   type HackathonCriterion,
   type CriterionInput,
@@ -14,7 +15,11 @@ interface Props {
   hackathon: HostHackathon;
   busy: boolean;
   run: (fn: () => Promise<unknown>) => Promise<boolean>;
+  /** Party invite code for the copyable /judge/:inviteCode link. */
+  inviteCode?: string;
+  onViewLeaderboard?: () => void;
   api: {
+    setJudging: (status: 'open' | 'closed') => Promise<unknown>;
     addCriterion: (b: CriterionInput) => Promise<unknown>;
     updateCriterion: (id: string, b: CriterionInput) => Promise<unknown>;
     deleteCriterion: (id: string) => Promise<unknown>;
@@ -26,7 +31,14 @@ interface Props {
 
 const emptyCrit = { name: '', description: '', weight: '1', maxScore: '5' };
 
-export function JudgingSection({ hackathon, busy, run, api }: Props) {
+const JUDGING_COPY = {
+  not_started: { label: 'Not open yet', text: 'Judges can look at their projects but not score yet. Open judging when demos start.' },
+  open: { label: 'Open', text: 'Judges can score and edit their scores until you close judging.' },
+  closed: { label: 'Closed', text: 'Scores are final. Reopen if a judge needs to fix something.' },
+} as const;
+
+export function JudgingSection({ hackathon, busy, run, inviteCode, onViewLeaderboard, api }: Props) {
+  const [copied, setCopied] = useState(false);
   const [crit, setCrit] = useState(emptyCrit);
   const [editingCrit, setEditingCrit] = useState<string | null>(null);
   const [judge, setJudge] = useState({ email: '', name: '' });
@@ -58,13 +70,71 @@ export function JudgingSection({ hackathon, busy, run, api }: Props) {
 
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
   const activeJudges = hackathon.judges.filter((j) => j.status === 'active');
+  const status = hackathon.judgingStatus;
+  const link = inviteCode ? judgeLink(inviteCode) : null;
+
+  const copyLink = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copy the judge link', link);
+    }
+  };
+
+  const toggleJudging = () => {
+    if (status === 'open') {
+      if (confirm('Close judging? Judges will no longer be able to change their scores. You can reopen it later.')) void run(() => api.setJudging('closed'));
+    } else {
+      void run(() => api.setJudging('open'));
+    }
+  };
 
   return (
     <div className="space-y-4">
       <SectionCard
+        title="Judging"
+        subtitle={JUDGING_COPY[status].text}
+        action={<span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full border ${status === 'open' ? 'border-theme-success text-theme-success' : 'border-theme-stroke text-theme-text-muted'}`} data-testid="hackathon-judging-status">{JUDGING_COPY[status].label}</span>}
+      >
+        {link && (
+          <div className="rounded-xl border border-theme-stroke bg-theme-surface p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-theme-text-muted">Judge link: share it with your judges. They log in with the email you added below.</p>
+              <p className="text-sm text-theme-text break-all mt-0.5" data-testid="hackathon-judge-link">{link}</p>
+            </div>
+            <button type="button" className="btn-secondary text-sm inline-flex items-center justify-center gap-2 shrink-0 min-h-[44px]" onClick={() => void copyLink()} data-testid="hackathon-copy-judge-link">
+              {copied ? <Check size={14} /> : <Link2 size={14} />} {copied ? 'Copied' : 'Copy judge link'}
+            </button>
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row gap-2 mt-4">
+          <button type="button" disabled={busy || (status !== 'open' && hackathon.criteria.length === 0)} onClick={toggleJudging}
+            className={`${status === 'open' ? 'btn-secondary' : 'btn-primary'} inline-flex items-center justify-center gap-2 min-h-[44px]`} data-testid="hackathon-toggle-judging">
+            {status === 'open' ? <StopCircle size={16} /> : <PlayCircle size={16} />}
+            {status === 'open' ? 'Close judging' : status === 'closed' ? 'Reopen judging' : 'Open judging'}
+          </button>
+          {onViewLeaderboard && (
+            <button type="button" className="btn-secondary inline-flex items-center justify-center gap-2 min-h-[44px]" onClick={onViewLeaderboard}>
+              <BarChart3 size={16} /> Leaderboard
+            </button>
+          )}
+        </div>
+        {status !== 'open' && hackathon.criteria.length === 0 && <Hint>Add at least one rubric criterion before opening judging.</Hint>}
+        {hackathon.blindJudging && (
+          <Hint>Blind judging is on: judges don't see team or member names, and links unlock after they score. It's best-effort: a project's name, screenshots or links can still give a team away.</Hint>
+        )}
+      </SectionCard>
+
+      <SectionCard
         title="Rubric"
         subtitle="Judges score each criterion. A project's score is the weighted average, out of 100."
       >
+        {hackathon.judgingStatus !== 'not_started' && (
+          <p className="text-xs text-theme-text-muted mb-3">Once judges have scored, criteria can't be added or removed and max scores are fixed. Weights can still change: every score is re-totaled.</p>
+        )}
         {hackathon.criteria.length === 0 ? (
           <p className="text-sm text-theme-text-muted mb-4">No criteria yet. Add at least one, e.g. Impact, Technical depth, Design, Demo.</p>
         ) : (
