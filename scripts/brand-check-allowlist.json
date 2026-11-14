@@ -1,5 +1,5 @@
 {
-  "_comment": "File path prefixes (relative to repo root) exempt from the new-hardcoded-brand check (scripts/check-no-hardcoded-brand.js). The brand config modules legitimately hold the RSV.Pizza defaults; supabase.ts keeps the project-id fallback; i18n holds source strings. Do NOT add feature files here to silence the check — route brand chrome through config/brand instead. Exception: the white-label site-brand tests and the no-series email snapshot assert the literal rsv.pizza defaults by design.",
+  "_comment": "File path prefixes (relative to repo root) exempt from the new-hardcoded-brand check (scripts/check-no-hardcoded-brand.js). The brand config modules legitimately hold the RSV.Pizza defaults; supabase.ts keeps the project-id fallback; i18n holds source strings. Do NOT add feature files here to silence the check \u2014 route brand chrome through config/brand instead. Exception: the white-label site-brand tests and the no-series email snapshot assert the literal rsv.pizza defaults by design.",
   "allow": [
     "frontend/src/config/brand.ts",
     "backend/src/config/brand.ts",
@@ -8,6 +8,7 @@
     "backend/src/lib/siteBrand.test.ts",
     "backend/src/routes/emailSnapshots.test.ts",
     "backend/src/routes/siteBrandCallSites.test.ts",
-    "backend/src/routes/__snapshots__/emailSnapshots.test.ts.snap"
+    "backend/src/routes/__snapshots__/emailSnapshots.test.ts.snap",
+    "backend/src/services/brandEventNotify.test.ts"
   ]
 }
