@@ -49,6 +49,20 @@ export interface HackathonJudge {
   createdAt: string | null;
 }
 
+/** One revealed winner on the event page (PR 5). No recipient / payout data, ever. */
+export interface PublicWinner {
+  prizeId: string;
+  prizeName: string;
+  prizeAmount: string | null;
+  prizeKind: PrizeKind;
+  trackId: string | null;
+  trackName: string | null;
+  place: number | null;
+  projectName: string;
+  projectTagline: string | null;
+  teamName: string | null;
+}
+
 /** Event-page shape (published only). */
 export interface PublicHackathon {
   rules: string | null;
@@ -62,6 +76,9 @@ export interface PublicHackathon {
   tracks: HackathonTrack[];
   prizes: HackathonPrize[];
   criteria: HackathonCriterion[];
+  /** PR 5: set once the host reveals results; winners is [] before that. */
+  resultsRevealedAt?: string | null;
+  winners?: PublicWinner[];
 }
 
 /** Host / co-host / admin shape. */
@@ -210,6 +227,29 @@ export interface HackathonMe {
   isJudge: boolean;
   canManage: boolean;
   team: MyHackathonTeam | null;
+  /** PR 5: after the reveal, the team's own awards + judge feedback (text only). */
+  results?: TeamResults | null;
+}
+
+export type PayoutStatus = 'unpaid' | 'pending' | 'paid' | 'not_applicable';
+
+export interface TeamAward {
+  prizeName: string;
+  prizeAmount: string | null;
+  place: number | null;
+  payoutStatus: PayoutStatus;
+  isRecipient: boolean;
+  recipientName: string | null;
+  /** Only filled in for the recipient. */
+  recipientWallet: string | null;
+  payoutReference: string | null;
+  paidAt: string | null;
+}
+
+export interface TeamResults {
+  revealedAt: string;
+  awards: TeamAward[];
+  feedback: string[];
 }
 
 export type SubmissionInput = Partial<{
@@ -270,7 +310,7 @@ export const hackathonModerationApi = {
     apiRequest<{ team: HostHackathonTeam | null }>(`${base(partyId)}/submissions/${submissionId}`, { method: 'PATCH', body }),
 
   /** Downloads the CSV through the authenticated API (a plain link can't send the token). */
-  async exportCsv(partyId: string, kind: 'projects' | 'members'): Promise<void> {
+  async exportCsv(partyId: string, kind: 'projects' | 'members' | 'awards'): Promise<void> {
     const token = localStorage.getItem('authToken');
     if (!token) throw new Error('Not authenticated');
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -462,4 +502,91 @@ export function prizeAmount(p: Pick<HackathonPrize, 'amountText' | 'amountValue'
   if (p.amountText) return p.amountText;
   if (p.amountValue != null) return `${p.amountValue.toLocaleString()}${p.currency ? ` ${p.currency}` : ''}`;
   return null;
+}
+
+// ---------------------------------------------------------------- winners + payouts (PR 5)
+// Backend: backend/src/routes/hackathon-awards.routes.ts (host only). Payout tracking is
+// bookkeeping only: no money moves from here.
+
+export interface HostAward {
+  id: string;
+  prizeId: string;
+  submissionId: string;
+  place: number | null;
+  awardedAt: string | null;
+  projectName: string | null;
+  projectStatus: SubmissionStatus | null;
+  teamId: string | null;
+  teamName: string | null;
+  payoutStatus: PayoutStatus;
+  recipient: { name: string | null; email: string | null } | null;
+  /** Team member row of the recipient (for the picker), when still on the team. */
+  recipientMemberId: string | null;
+  recipientWallet: string | null;
+  payoutReference: string | null;
+  paidAt: string | null;
+  payoutNotes: string | null;
+  updatedAt: string | null;
+}
+
+export interface AwardCandidate {
+  id: string;
+  name: string;
+  tagline: string | null;
+  teamName: string | null;
+  trackIds: string[];
+  members: Array<{ id: string; name: string; email: string | null; role: 'captain' | 'member' }>;
+}
+
+export interface RankEntry { submissionId: string; rank: number | null; tied: boolean; average: number | null; scoreCount: number }
+
+export interface AwardsResponse {
+  judgingStatus: JudgingStatus;
+  resultsRevealedAt: string | null;
+  tracks: HackathonTrack[];
+  prizes: HackathonPrize[];
+  awards: HostAward[];
+  candidates: AwardCandidate[];
+  /** prizeId -> suggested submission ids, from the leaderboard (judged prizes only). */
+  suggestions: Record<string, string[]>;
+  ranking: { overall: RankEntry[]; byTrack: Array<{ trackId: string; rows: RankEntry[] }> };
+}
+
+export type PayoutInput = Partial<{
+  status: PayoutStatus;
+  recipientMemberId: string | null;
+  recipientWallet: string | null;
+  payoutReference: string | null;
+  paidAt: string | null;
+  payoutNotes: string | null;
+}>;
+
+export const hackathonAwardsApi = {
+  list: (partyId: string) => apiRequest<AwardsResponse>(`${base(partyId)}/awards`),
+  create: (partyId: string, prizeId: string, submissionId: string) =>
+    apiRequest<AwardsResponse>(`${base(partyId)}/awards`, { method: 'POST', body: { prizeId, submissionId } }),
+  updatePayout: (partyId: string, awardId: string, body: PayoutInput) =>
+    apiRequest<AwardsResponse>(`${base(partyId)}/awards/${awardId}/payout`, { method: 'PATCH', body }),
+  remove: (partyId: string, awardId: string) => apiRequest<AwardsResponse>(`${base(partyId)}/awards/${awardId}`, { method: 'DELETE' }),
+  reveal: (partyId: string) => apiRequest<HostRes>(`${base(partyId)}/reveal`, { method: 'POST' }),
+  unreveal: (partyId: string) => apiRequest<HostRes>(`${base(partyId)}/unreveal`, { method: 'POST' }),
+};
+
+export const PAYOUT_LABEL: Record<PayoutStatus, string> = {
+  unpaid: 'Unpaid',
+  pending: 'Pending',
+  paid: 'Paid',
+  not_applicable: 'Not applicable',
+};
+
+/** Mirrors backend awards.hasRecordedPayout: such an award can't be removed. */
+export function hasRecordedPayout(a: Pick<HostAward, 'payoutStatus' | 'paidAt' | 'payoutReference'>): boolean {
+  return a.payoutStatus === 'paid' || a.payoutStatus === 'pending' || !!a.paidAt || !!a.payoutReference;
+}
+
+/** "1st", "2nd", "3rd", "11th", "22nd"... */
+export function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }

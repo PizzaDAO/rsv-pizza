@@ -144,7 +144,8 @@ export function LeaderboardSection({ partyId, hackathon, onJudgingChanged }: {
         title="Leaderboard"
         subtitle={data ? `${data.overall.length} project${data.overall.length === 1 ? '' : 's'} · ${totalScores} score${totalScores === 1 ? '' : 's'}. Average of judges' totals, out of 100; ties are shown as ties.` : 'Loading...'}
         action={
-          <button type="button" disabled={busy || (status !== 'open' && hackathon.criteria.length === 0)} onClick={() => void toggle()}
+          <button type="button" disabled={busy || (status !== 'open' && hackathon.criteria.length === 0) || (status === 'closed' && !!hackathon.resultsRevealedAt)} onClick={() => void toggle()}
+            title={status === 'closed' && hackathon.resultsRevealedAt ? 'Results are revealed. Hide them in Winners & Payouts to reopen judging.' : undefined}
             className={`${status === 'open' ? 'btn-secondary' : 'btn-primary'} text-sm inline-flex items-center gap-2 shrink-0`}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : status === 'open' ? <StopCircle size={14} /> : <PlayCircle size={14} />}
             {status === 'open' ? 'Close judging' : status === 'closed' ? 'Reopen' : 'Open judging'}

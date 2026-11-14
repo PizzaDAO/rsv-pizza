@@ -5,6 +5,7 @@ import { markdownRemarkPlugins } from '../../lib/safeMarkdown';
 import { MarkdownBoundary } from '../ErrorBoundary';
 import { getHackathon, prizeAmount, type PublicHackathon, type HackathonPrize } from '../../lib/hackathonApi';
 import { ParticipantPanel } from './ParticipantPanel';
+import { WinnersStrip } from './WinnersStrip';
 
 /** "2d 4h left" / "3h 12m left" / null when past. */
 export function timeLeft(iso: string | null, now = Date.now()): string | null {
@@ -84,6 +85,10 @@ export function HackathonSection({ partyId, timezone, initial }: { partyId: stri
         <Trophy size={20} className="text-theme-accent" />
         <h2 id="hackathon-heading" className="text-lg font-semibold text-theme-text">Hackathon</h2>
       </div>
+
+      {hackathon.resultsRevealedAt && hackathon.winners && hackathon.winners.length > 0 && (
+        <WinnersStrip winners={hackathon.winners} quantities={Object.fromEntries(hackathon.prizes.map((p) => [p.id, p.quantity]))} />
+      )}
 
       <div className="flex flex-wrap gap-2 mb-4">
         {hackathon.submissionDeadline && (

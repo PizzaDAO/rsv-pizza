@@ -169,6 +169,10 @@ describe('hackathon checklist items (series)', () => {
       .toEqual({ kind: 'tab', tab: 'hackathon' });
     expect(resolveChecklistAction(item('Run demos and judging', 'hackathon_judging_closed', 'hackathon'), 'series'))
       .toEqual({ kind: 'tab', tab: 'hackathon', section: 'leaderboard' });
+    expect(resolveChecklistAction(item('Post winners and photos', 'hackathon_results_revealed', 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon', section: 'winners' });
+    expect(resolveChecklistAction(item('Send prizes to winners', 'hackathon_prizes_paid', 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon', section: 'winners' });
   });
 
   it('hostTabPath carries the section as a query param', () => {

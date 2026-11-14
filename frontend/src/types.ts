@@ -1277,6 +1277,8 @@ export interface AutoCompleteStates {
   hackathon_submissions_ready?: boolean;
   hackathon_judges_added?: boolean;
   hackathon_judging_closed?: boolean;
+  hackathon_results_revealed?: boolean;
+  hackathon_prizes_paid?: boolean;
 }
 
 export interface ChecklistData {
