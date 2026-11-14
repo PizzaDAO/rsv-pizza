@@ -101,13 +101,32 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     const hk = !usesHackathonRules ? null : await prisma.hackathon.findUnique({
       where: { partyId },
       select: {
+        id: true,
         publishedAt: true,
         disabledAt: true,
         submissionDeadline: true,
         judgingStatus: true,
-        _count: { select: { tracks: true, prizes: true, criteria: true, judges: { where: { status: 'active' } } } },
+        resultsRevealedAt: true,
+        _count: {
+          select: {
+            tracks: true,
+            prizes: true,
+            criteria: true,
+            judges: { where: { status: 'active' } },
+          },
+        },
       },
     });
+
+    // PR 5: award / payout counts (awards hang off prizes, not the hackathon row; only when
+    // the checklist uses the prizes-paid rule).
+    const usesPrizesPaid = !!hk && items.some((i) => i.autoRule === 'hackathon_prizes_paid');
+    const [awardCount, openPayouts] = usesPrizesPaid
+      ? await Promise.all([
+          prisma.hackathonAward.count({ where: { hackathonId: hk!.id } }),
+          prisma.hackathonAward.count({ where: { hackathonId: hk!.id, payoutStatus: { in: ['unpaid', 'pending'] } } }),
+        ])
+      : [0, 1];
 
     const autoCompleteStates = {
       ...hackathonAutoStates(hk ? {
@@ -119,6 +138,9 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
         criterionCount: hk._count.criteria,
         activeJudgeCount: hk._count.judges,
         judgingStatus: hk.judgingStatus,
+        resultsRevealedAt: hk.resultsRevealedAt,
+        awardCount,
+        openPayoutCount: openPayouts,
       } : null),
       event_created: true,
       party_kit_submitted: !!partyKit,

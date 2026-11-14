@@ -131,9 +131,13 @@ describe('GET /:partyId/hackathon (public read)', () => {
     expect(res.body.canManage).toBe(false);
     const h = res.body.hackathon;
     expect(Object.keys(h).sort()).toEqual([
-      'criteria', 'eligibility', 'maxTracksPerSubmission', 'prizes', 'publishedAt', 'rules',
-      'submissionDeadline', 'submissionsOpenAt', 'teamMaxSize', 'teamMinSize', 'tracks',
+      'criteria', 'eligibility', 'maxTracksPerSubmission', 'prizes', 'publishedAt', 'resultsRevealedAt', 'rules',
+      'submissionDeadline', 'submissionsOpenAt', 'teamMaxSize', 'teamMinSize', 'tracks', 'winners',
     ]);
+    // PR 5: nothing revealed yet -> no winners, and the awards table isn't even queried.
+    expect(h.resultsRevealedAt).toBeNull();
+    expect(h.winners).toEqual([]);
+    expect(mockPrisma.hackathonAward.findMany).not.toHaveBeenCalled();
     expect(h.tracks[0]).toEqual({ id: TRACK, name: 'DeFi', description: 'Money legos', sponsorName: 'Acme', sortOrder: 0 });
     expect(h.prizes[0].amountValue).toBe(5000);
     expect(Object.keys(h.prizes[0])).not.toContain('hackathonId');

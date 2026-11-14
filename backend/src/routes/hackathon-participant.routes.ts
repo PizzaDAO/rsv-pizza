@@ -56,6 +56,7 @@ import {
   validateImageRequest,
 } from '../lib/hackathon/media.js';
 import { TEAM_INCLUDE, hostTeam, myTeam, submissionImagePaths } from '../lib/hackathon/serialize.js';
+import { AWARD_INCLUDE, teamAwards, teamFeedback } from '../lib/hackathon/awards.js';
 
 const router = Router();
 
@@ -110,8 +111,9 @@ const H_SELECT = {
   teamMinSize: true,
   teamMaxSize: true,
   maxTracksPerSubmission: true,
+  resultsRevealedAt: true,
 } as const;
-type H = { id: string; partyId: string; publishedAt: Date | null; disabledAt: Date | null; eligibility: string; submissionsOpenAt: Date | null; submissionDeadline: Date | null; teamMinSize: number; teamMaxSize: number; maxTracksPerSubmission: number };
+type H = { id: string; partyId: string; publishedAt: Date | null; disabledAt: Date | null; eligibility: string; submissionsOpenAt: Date | null; submissionDeadline: Date | null; teamMinSize: number; teamMaxSize: number; maxTracksPerSubmission: number; resultsRevealedAt?: Date | null };
 
 export function deadlinePassed(h: Pick<H, 'submissionDeadline'>, now = new Date()): boolean {
   return !!h.submissionDeadline && now.getTime() > h.submissionDeadline.getTime();
@@ -233,11 +235,37 @@ router.get('/:partyId/hackathon/me', optionalAuth, async (req: AuthRequest, res:
       isJudge: elig.isJudge,
       canManage: isHost,
       team,
+      results: team?.submission ? await teamResults(h, team.submission.id, req.userId) : null,
     });
   } catch (error) {
     next(error);
   }
 });
+
+/**
+ * PR 5 (plans §16 Q8): after the reveal, the team sees its own awards (payout status; the
+ * recipient also sees their wallet / reference / paid date) and the judges' team feedback:
+ * text only, from active judges, non-empty. Never judge names / emails, scores, private
+ * comments or dates. null before the reveal.
+ */
+async function teamResults(h: H, submissionId: string, userId: string | undefined) {
+  if (!h.resultsRevealedAt) return null;
+  const [awards, scores] = await Promise.all([
+    prisma.hackathonAward.findMany({ where: { hackathonId: h.id, submissionId }, include: AWARD_INCLUDE, orderBy: { awardedAt: 'asc' } }),
+    prisma.hackathonScore.findMany({
+      where: { hackathonId: h.id, submissionId, teamFeedback: { not: null }, judge: { status: 'active' } },
+      select: { teamFeedback: true },
+      // Random-uuid order: stable, and says nothing about which judge wrote what or when.
+      orderBy: { id: 'asc' },
+      take: 200,
+    }),
+  ]);
+  return {
+    revealedAt: h.resultsRevealedAt.toISOString(),
+    awards: teamAwards(awards, userId),
+    feedback: teamFeedback(scores),
+  };
+}
 
 // ---------------------------------------------------------------- create / join
 
@@ -572,6 +600,10 @@ router.post('/:partyId/hackathon/teams/:teamId/submission/withdraw', requireAuth
       if (!sub) throw notFound('No project yet');
       assertEditable(tc, sub.status);
       if (sub.status !== 'submitted') throw conflict('Only a submitted project can be withdrawn.', 'NOT_SUBMITTED');
+      // PR 5: a project that won a prize stays in (the host removes awards first).
+      if ((await tx.hackathonAward.count({ where: { submissionId: sub.id } })) > 0) {
+        throw conflict('Your project has won a prize, so it can no longer be withdrawn. Contact the host.', 'HAS_AWARDS');
+      }
       await tx.hackathonSubmission.update({ where: { id: sub.id }, data: { status: 'withdrawn' } });
     });
     await sendTeam(res, tc, req.userId);
