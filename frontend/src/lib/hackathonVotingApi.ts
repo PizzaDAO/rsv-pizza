@@ -75,6 +75,8 @@ export interface HostVoting {
     byTrack: Array<{ trackId: string; rows: TallyRow[] }>;
     suggestions: Record<string, string[]>;
   };
+  /** Writes only: e.g. turning voting on switched an 'after_reveal' gallery to 'after_deadline'. */
+  notice?: string | null;
 }
 
 export type VotingSettingsInput = Partial<Pick<HostVotingSettings, 'enabled' | 'scope' | 'eligibility' | 'opensAt' | 'closesAt'>>;

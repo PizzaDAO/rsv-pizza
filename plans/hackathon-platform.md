@@ -604,9 +604,15 @@ configurable (default 1-5), blind judging optional and default off.
   window; host writes take FOR UPDATE on both before counting votes (scope lock), so in-flight
   votes commit first. (Locking the settings row before the hackathon row deadlocks against the
   vote INSERT's FK key-share lock: 40P01, reproduced on Postgres 17.)
-- Votes only for `submitted` projects while the gallery is open (`gallery_visibility`): with the
-  default `after_reveal`, voting starts after the reveal (a People's Choice award added after the
-  reveal shows up automatically). The host Voting section explains this.
+- Votes only for `submitted` projects while the gallery is open (`gallery_visibility`).
+- Gallery auto-switch (owner decision): when a host write turns voting ON (enabled false / no
+  settings row -> true, via the settings form or "Open voting now") and `gallery_visibility` is
+  `after_reveal`, it is set to `after_deadline` in the same transaction (lock order hackathons ->
+  hackathon_voting) and the response carries a `notice` the Voting section shows: "Gallery now
+  opens at the submission deadline so attendees can vote before winners are announced."
+  `hidden` and `after_deadline` are never touched, and later voting writes don't switch it again
+  (if the host sets `after_reveal` back in Setup, the Voting section warns that voting then only
+  starts after the reveal).
 - Tallies: hidden from everyone (host included) until `closes_at` passes; the host sees only total
   votes / voters and votes per ip_hash bucket while open. The public never gets counts; People's
   Choice winners reach the public only through the awards reveal. Self-votes (by user id, account
@@ -616,9 +622,6 @@ configurable (default 1-5), blind judging optional and default off.
 - Rate limits: 20 vote writes / hour / user. Authenticated (verified JWT) vote writes, voting
   reads and gallery / project page reads skip the per-IP limiters (global and gallery; venue
   Wi-Fi) and use per-user buckets; anonymous reads stay per-IP. The TV display stays per-IP.
-- Pending owner decision (not implemented): when a host enables voting while
-  `gallery_visibility = 'after_reveal'`, auto-switch the gallery to `after_deadline` with a
-  notice. Today the Voting section only warns.
 
 ## Sources (competitor scan)
 

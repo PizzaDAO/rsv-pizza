@@ -18,6 +18,8 @@
  *                                               ip_hash bucket; per-project tallies + People's
  *                                               Choice suggestions ONLY once voting is closed.
  *   PUT    /:partyId/hackathon/voting           {enabled, scope, eligibility, opensAt, closesAt}
+ *     (turning voting on switches an 'after_reveal' gallery to 'after_deadline' and answers
+ *     with `notice`; see hostWrite)
  *   POST   /:partyId/hackathon/voting/open      open now
  *   POST   /:partyId/hackathon/voting/close     close now
  *   Host writes hold FOR UPDATE on the hackathon row, then FOR UPDATE on the settings row (so
@@ -292,10 +294,12 @@ export async function hostVotingPayload(h: VH, now = new Date()) {
   };
 }
 
-async function sendHost(res: Response, partyId: string) {
+async function sendHost(res: Response, partyId: string, notice: string | null = null) {
   res.set('Cache-Control', NO_STORE);
-  res.json(await hostVotingPayload(await hostHackathon(partyId)));
+  res.json({ ...(await hostVotingPayload(await hostHackathon(partyId))), notice });
 }
+
+export const GALLERY_SWITCH_NOTICE = 'Gallery now opens at the submission deadline so attendees can vote before winners are announced.';
 
 router.get('/:partyId/hackathon/voting/host', requireAuth, hostOnly, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -305,10 +309,19 @@ router.get('/:partyId/hackathon/voting/host', requireAuth, hostOnly, async (req:
   }
 });
 
-/** Host write: lock the hackathon row, compute the next settings, save. */
-async function hostWrite(partyId: string, next: (current: VotingSettings, voteCount: number, now: Date) => VotingSettings) {
+/**
+ * Host write: lock the hackathon row, then the settings row, compute the next settings, save.
+ * Returns a notice for the host UI, or null.
+ *
+ * Gallery auto-switch (owner decision): when this write turns voting ON (enabled false / no row
+ * -> true) and the gallery is 'after_reveal', the gallery is switched to 'after_deadline' in
+ * the same transaction (the hackathon row is already locked FOR UPDATE; lock order stays
+ * hackathons -> hackathon_voting), since votes need a visible gallery and People's Choice is
+ * awarded before the reveal. 'hidden' and 'after_deadline' are left alone.
+ */
+async function hostWrite(partyId: string, next: (current: VotingSettings, voteCount: number, now: Date) => VotingSettings): Promise<string | null> {
   const h = await hostHackathon(partyId);
-  await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     await store.lockHackathonRow(tx, h.id);
     // Wait for in-flight votes (they hold FOR SHARE on this row) before counting, so the scope
     // lock can't be raced by a vote that commits after our count.
@@ -324,14 +337,22 @@ async function hostWrite(partyId: string, next: (current: VotingSettings, voteCo
       throw conflict('Remove the People\'s Choice award before reopening voting.', 'PEOPLES_CHOICE_AWARDED');
     }
     await store.saveVoting(tx, h.id, updated);
+    if (updated.enabled && !current.enabled) {
+      const row = await tx.hackathon.findUnique({ where: { id: h.id }, select: { galleryVisibility: true } });
+      if (row?.galleryVisibility === 'after_reveal') {
+        await tx.hackathon.update({ where: { id: h.id }, data: { galleryVisibility: 'after_deadline' } });
+        return GALLERY_SWITCH_NOTICE;
+      }
+    }
+    return null;
   }, { timeout: 10000, maxWait: 5000 });
 }
 
 router.put('/:partyId/hackathon/voting', requireAuth, hostWriteLimiter, hostOnly, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const body = (req.body ?? {}) as Record<string, unknown>;
-    await hostWrite(req.params.partyId, (cur, count) => parseVotingSettings(body, cur, count));
-    await sendHost(res, req.params.partyId);
+    const notice = await hostWrite(req.params.partyId, (cur, count) => parseVotingSettings(body, cur, count));
+    await sendHost(res, req.params.partyId, notice);
   } catch (error) {
     next(error);
   }
@@ -339,8 +360,8 @@ router.put('/:partyId/hackathon/voting', requireAuth, hostWriteLimiter, hostOnly
 
 router.post('/:partyId/hackathon/voting/open', requireAuth, hostWriteLimiter, hostOnly, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    await hostWrite(req.params.partyId, (cur, _count, now) => ({ ...cur, ...manualOpen(cur, now) }));
-    await sendHost(res, req.params.partyId);
+    const notice = await hostWrite(req.params.partyId, (cur, _count, now) => ({ ...cur, ...manualOpen(cur, now) }));
+    await sendHost(res, req.params.partyId, notice);
   } catch (error) {
     next(error);
   }

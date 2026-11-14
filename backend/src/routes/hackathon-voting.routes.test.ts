@@ -182,7 +182,13 @@ beforeEach(() => {
   seed();
   installStore();
   server = app();
-  const tx = { hackathonVote: { count: vi.fn(async () => { state.order.push('count'); return state.votes.length; }) } };
+  const tx = {
+    hackathonVote: { count: vi.fn(async () => { state.order.push('count'); return state.votes.length; }) },
+    hackathon: {
+      findUnique: vi.fn(async () => ({ galleryVisibility: state.h.galleryVisibility })),
+      update: vi.fn(async ({ data }: Row) => { Object.assign(state.h, data); return state.h; }),
+    },
+  };
   mockPrisma.$transaction = vi.fn(async (fn: any) => fn(tx));
   // hosts: host (tab) and cohost (no tab)
   canEdit.mockImplementation(async (_p: string, _u?: string, email?: string) => email === 'host@example.com' || email === 'cohost@example.com');
@@ -458,5 +464,42 @@ describe('host voting routes', () => {
     r = await host('post', '/voting/open');
     expect(r.status).toBe(200);
     expect(r.body.settings.status).toBe('open');
+  });
+
+  it("turning voting on switches an 'after_reveal' gallery to 'after_deadline' and returns a notice", async () => {
+    state.voting = null;
+    state.h.galleryVisibility = 'after_reveal';
+    const r = await host('put', '/voting').send({ enabled: true });
+    expect(r.status).toBe(200);
+    expect(r.body.notice).toBe('Gallery now opens at the submission deadline so attendees can vote before winners are announced.');
+    expect(state.h.galleryVisibility).toBe('after_deadline');
+    expect(r.body.galleryVisibility).toBe('after_deadline');
+    // later writes while already on: no notice, nothing touched
+    state.h.galleryVisibility = 'after_reveal'; // the host changed it back in Setup
+    const again = await host('put', '/voting').send({ eligibility: 'registered' });
+    expect(again.body.notice).toBeNull();
+    expect(state.h.galleryVisibility).toBe('after_reveal');
+  });
+
+  it("'Open voting now' from off also switches; 'hidden' and 'after_deadline' are left alone", async () => {
+    state.voting = { enabled: false, scope: 'event', eligibility: 'checked_in', opensAt: null, closesAt: null };
+    state.h.galleryVisibility = 'after_reveal';
+    let r = await host('post', '/voting/open');
+    expect([r.status, r.body.notice, state.h.galleryVisibility]).toEqual([200, expect.stringContaining('Gallery now opens'), 'after_deadline']);
+    for (const vis of ['hidden', 'after_deadline']) {
+      state.voting = null;
+      state.h.galleryVisibility = vis;
+      r = await host('put', '/voting').send({ enabled: true });
+      expect(r.status).toBe(200);
+      expect(r.body.notice).toBeNull();
+      expect(state.h.galleryVisibility).toBe(vis);
+    }
+  });
+
+  it('turning voting off or closing never touches the gallery', async () => {
+    state.h.galleryVisibility = 'after_reveal';
+    expect((await host('put', '/voting').send({ enabled: false })).body.notice).toBeNull();
+    expect((await host('post', '/voting/close')).body.notice).toBeNull();
+    expect(state.h.galleryVisibility).toBe('after_reveal');
   });
 });

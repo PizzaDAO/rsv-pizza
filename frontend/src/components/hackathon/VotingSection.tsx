@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CalendarClock, Clock, Loader2, Lock, Medal, PlayCircle, StopCircle, Users, Vote } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Clock, Info, Loader2, Lock, Medal, PlayCircle, StopCircle, Users, Vote } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ChoicePills, ErrorBanner, Hint, SectionCard } from './shared';
@@ -32,11 +32,15 @@ const toForm = (d: HostVoting): Form => ({
   closesAt: isoToLocalInput(d.settings.closesAt),
 });
 
-/** Why voters can't see projects yet (voting needs a visible gallery). */
+/**
+ * Why voters can't see projects yet (voting needs a visible gallery). Turning voting on switches
+ * an 'after_reveal' gallery to 'after_deadline' (server, with a notice), so the 'after_reveal'
+ * case only shows when the host set it back in Setup afterwards.
+ */
 export function galleryWarning(d: Pick<HostVoting, 'galleryOpen' | 'galleryVisibility'>): string | null {
   if (d.galleryOpen) return null;
   if (d.galleryVisibility === 'hidden') return 'The project gallery is hidden, so nobody can vote. Set the gallery to show after the deadline in Setup.';
-  if (d.galleryVisibility === 'after_reveal') return 'The gallery opens when you reveal the results, so voting only starts after that. To vote before the reveal, set the gallery to show after the deadline in Setup.';
+  if (d.galleryVisibility === 'after_reveal') return 'The gallery is set to open when you reveal the results, so voting only starts after the winners are announced. To vote before the reveal, set the gallery to show after the deadline in Setup.';
   return 'The gallery opens at the submission deadline. Votes are accepted from then on.';
 }
 
@@ -79,9 +83,11 @@ export function VotingSection({ partyId, onOpenWinners, onOpenSetup }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<string>('overall');
+  const [notice, setNotice] = useState<string | null>(null);
 
   const apply = useCallback((d: HostVoting, resetForm: boolean) => {
     setData(d);
+    if (d.notice) setNotice(d.notice);
     if (resetForm) { setForm(toForm(d)); setDirty(false); }
   }, []);
 
@@ -169,6 +175,16 @@ export function VotingSection({ partyId, onOpenWinners, onOpenSetup }: {
             <Lock size={14} className="mt-0.5 shrink-0" />
             Results stay hidden from everyone, you included, until voting closes.
           </p>
+        )}
+        {notice && (
+          <div className="flex items-start gap-2 rounded-lg border border-theme-accent bg-theme-surface px-3 py-2 mt-3 text-sm text-theme-text" role="status" data-testid="voting-notice">
+            <Info size={14} className="mt-0.5 shrink-0 text-theme-accent" />
+            <span className="flex-1">{notice}</span>
+            <button type="button" className="text-xs underline shrink-0" onClick={() => setNotice(null)}>Dismiss</button>
+          </div>
+        )}
+        {!data.settings.enabled && st !== 'closed' && data.galleryVisibility === 'after_reveal' && (
+          <Hint>Turning voting on also makes the gallery open at the submission deadline, so attendees can vote before winners are announced.</Hint>
         )}
         {warning && (
           <p className="flex items-start gap-2 text-sm text-theme-text-secondary mt-3" data-testid="voting-gallery-warning">
