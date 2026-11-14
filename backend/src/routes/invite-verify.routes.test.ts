@@ -185,9 +185,9 @@ describe('invite links carry the invitee token', () => {
       { name: 'P', date: null, address: null, inviteCode: 'abc123', customUrl: 'my-party', timezone: null },
       { name: 'Ivy', email: 'ivy@example.com', id: EXISTING_ID },
       undefined,
-      'https://rsv.pizza',
+      'https://rsv.pizza', // brand-check-ignore-line (asserts the default brand)
     );
-    expect(html).toContain(`href="https://rsv.pizza/my-party?t=${signGuestToken(EXISTING_ID)}"`);
+    expect(html).toContain(`href="https://rsv.pizza/my-party?t=${signGuestToken(EXISTING_ID)}"`); // brand-check-ignore-line
     // Nothing third-party sees it: no QR service in the invite email.
     expect(html).not.toContain('qrserver');
   });
@@ -197,7 +197,7 @@ describe('invite links carry the invitee token', () => {
       { name: 'P', date: null, address: null, inviteCode: 'abc123', customUrl: null, timezone: null },
       { name: 'Ivy', email: 'ivy@example.com' },
     );
-    expect(html).toContain('href="https://rsv.pizza/abc123"');
+    expect(html).toContain('href="https://rsv.pizza/abc123"'); // brand-check-ignore-line
     expect(html).not.toContain('?t=');
   });
 
@@ -382,7 +382,7 @@ describe('POST /api/rsvp/:inviteCode/guest: completing a host invite', () => {
     const sends = resendSends();
     expect(sends).toHaveLength(1);
     expect(sends[0].to).toEqual(['ivy@example.com']);
-    expect(sends[0].subject).toBe(`RSV.Pizza Code ${lastCode()}`);
+    expect(sends[0].subject).toBe(`RSV.Pizza Code ${lastCode()}`); // brand-check-ignore-line
     expect(sends[0].html).toContain('YOUR SIGN-IN CODE');
   });
 
@@ -531,7 +531,7 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
     expect(mockPrisma.magicLink.create).toHaveBeenCalledTimes(MINT_PER_EMAIL_WINDOW);
     const sends = resendSends();
     expect(sends).toHaveLength(1);
-    expect(sends[0].subject).toBe(`RSV.Pizza Code ${newest}`);
+    expect(sends[0].subject).toBe(`RSV.Pizza Code ${newest}`); // brand-check-ignore-line
   });
 
   it('the mint cap never re-sends a wallet hand-off row (#1252), only a real 6-digit code', async () => {
@@ -552,7 +552,7 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
     await rsvpFrom('10.0.0.1');
     const sends = resendSends();
     expect(sends).toHaveLength(1);
-    expect(sends[0].subject).toBe(`RSV.Pizza Code ${newest}`);
+    expect(sends[0].subject).toBe(`RSV.Pizza Code ${newest}`); // brand-check-ignore-line
     expect(sends[0].html).not.toContain('handoff-token');
     expect(sends[0].html).not.toContain('hoabc');
     expect(mockPrisma.magicLink.findFirst).toHaveBeenCalledWith(
