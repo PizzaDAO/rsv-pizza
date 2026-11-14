@@ -8,7 +8,7 @@ vi.mock('qrcode', () => ({
 
 describe('QRCode', () => {
   it('renders a local data-URL image at the requested size, with no network QR service', async () => {
-    render(<QRCode value="https://rsv.pizza/checkin/abc/g1" size={250} alt="Check-in QR code" />);
+    render(<QRCode value="https://example.com/checkin/abc/g1" size={250} alt="Check-in QR code" />);
     const img = await waitFor(() => screen.getByAltText('Check-in QR code'));
     expect(img.getAttribute('src')).toBe('data:image/png;base64,AAAA');
     expect(img.getAttribute('width')).toBe('250');
