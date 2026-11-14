@@ -42,6 +42,7 @@ export const OPEN_FILES = new Set([
   '/brands/doge/logo.png',
   '/brands/doge/favicon.png',
   '/brands/doge/og.png',
+  '/brands/doge/frame.png',
 ]);
 
 /** Paths that bypass the gate: hashed build assets and an explicit file allowlist. */

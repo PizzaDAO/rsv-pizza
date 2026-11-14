@@ -738,33 +738,185 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   --color-scheme: dark;
 }
 
-/* Doge Day (Own The Doge brand site). Palette from ownthedoge.com: brand dark brown
- * #302d25, cream #f4ebd7, Doge gold #F2A73A. Dark theme: cream text on dark brown, gold
- * accent. Gold is too light for the global white button text, so primary buttons use the
- * brand brown on gold (>= 6:1); gold text on the dark backgrounds is ~8:1. */
+/* Doge Day (Own The Doge brand site). Light cream theme modelled on ownthedoge.com:
+ * cream page #F4EBD7, dark brown-black text/borders #302D25, hot pink #FF4BF4 for
+ * highlights, lavender #BE91D0 for the primary CTA, heavy rounded headings (Nunito 900,
+ * loaded only for this theme from App.tsx). Primary buttons are dark brown with cream
+ * text (13:1); pink is only used decoratively, never as small text on cream. */
 .doge-theme {
-  --bg-main: #24211b;
-  --bg-card: rgba(244, 235, 215, 0.07);
-  --bg-card-hover: rgba(244, 235, 215, 0.11);
-  --bg-surface: rgba(244, 235, 215, 0.05);
-  --bg-surface-hover: rgba(244, 235, 215, 0.09);
-  --bg-overlay: rgba(36, 33, 27, 0.78);
-  --bg-input: rgba(244, 235, 215, 0.07);
-  --bg-input-focus: rgba(244, 235, 215, 0.1);
-  --bg-header: #302d25;
-  --text-primary: #f4ebd7;
-  --text-secondary: rgba(244, 235, 215, 0.8);
-  --text-muted: rgba(244, 235, 215, 0.64);
-  --text-faint: rgba(244, 235, 215, 0.3);
-  --stroke: rgba(244, 235, 215, 0.16);
-  --stroke-hover: rgba(244, 235, 215, 0.26);
-  --stroke-strong: rgba(244, 235, 215, 0.36);
-  --accent: #F2A73A;
-  --accent-hover: #F7BE5E;
-  --error: #FF6B6B;
-  --color-scheme: dark;
+  --doge-ink: #302D25;
+  --doge-cream: #F4EBD7;
+  --doge-cream-light: #FCF4E1;
+  --doge-pink: #FF4BF4;
+  --doge-lavender: #BE91D0;
+  --doge-font: 'Nunito', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  --bg-main: #F4EBD7;
+  --bg-card: #FCF4E1;
+  --bg-card-hover: #FFF6E3;
+  --bg-surface: #FCF4E1;
+  --bg-surface-hover: #FFF6E3;
+  --bg-overlay: rgba(48, 45, 37, 0.55);
+  --bg-input: #FCF4E1;
+  --bg-input-focus: #FFF6E3;
+  --bg-header: #F4EBD7;
+  --text-primary: #302D25;
+  --text-secondary: rgba(48, 45, 37, 0.85);
+  --text-muted: rgba(48, 45, 37, 0.7);
+  --text-faint: rgba(48, 45, 37, 0.5);
+  --text-inverted: #F4EBD7;
+  --stroke: rgba(48, 45, 37, 0.35);
+  --stroke-hover: rgba(48, 45, 37, 0.6);
+  --stroke-strong: #302D25;
+  --accent: #302D25;
+  --accent-hover: #4a463b;
+  --success: #1f7a45;
+  --warning: #8a5a00;
+  --error: #b3261e;
+  --color-scheme: light;
+  color-scheme: light;
+  background: #F4EBD7;
 }
-.doge-theme .btn-primary { color: #302d25; }
+/* Page frame: thin dark lines down both sides, like the reference site. */
+.doge-theme #root {
+  min-height: 100vh;
+  border-left: 2px solid var(--doge-ink);
+  border-right: 2px solid var(--doge-ink);
+}
+/* Headings + numerals: heavy rounded type, tight. */
+.doge-theme h1, .doge-theme h2, .doge-theme h3,
+.doge-theme .btn-primary, .doge-theme .btn-secondary,
+.doge-theme [role="timer"] .tabular-nums {
+  font-family: var(--doge-font);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.doge-theme h1 { line-height: 1.05; }
+.doge-theme h1, .doge-theme h2 { text-wrap: balance; }
+/* Header: cream bar, thin dark border, wordmark in heavy rounded type. */
+.doge-theme .site-header {
+  background: var(--doge-cream) !important;
+  border-bottom: 2px solid var(--doge-ink) !important;
+  backdrop-filter: none !important;
+}
+.doge-theme .site-header a span {
+  font-family: var(--doge-font) !important;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+/* Cards: cream surfaces with thin dark borders, no glass blur. */
+.doge-theme .card {
+  background: var(--doge-cream-light) !important;
+  border: 1.5px solid var(--doge-ink) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.doge-theme .card:hover { border-color: var(--doge-ink) !important; }
+/* Countdown tiles (SeriesLandingPage EventCountdown). */
+.doge-theme [role="timer"] > div {
+  background: var(--doge-cream-light);
+  border: 1.5px solid var(--doge-ink);
+  border-radius: 16px;
+}
+.doge-theme [role="timer"] .tabular-nums { font-size: 2.25rem; line-height: 1.1; }
+.doge-theme [role="timer"] .uppercase { font-weight: 800; }
+.doge-theme [data-testid="event-countdown"] > p { font-weight: 800; }
+/* Buttons */
+.doge-theme .btn-primary {
+  background-color: var(--doge-ink);
+  color: var(--doge-cream);
+  border: 2px solid var(--doge-ink);
+  border-radius: 14px;
+}
+.doge-theme .btn-primary:hover:not(:disabled) {
+  background-color: var(--doge-lavender);
+  color: var(--doge-ink);
+}
+/* The landing page CTA is the "Shop"-style lavender block. */
+.doge-theme .text-center > a.btn-primary {
+  background-color: var(--doge-lavender);
+  color: var(--doge-ink);
+  padding: 14px 32px;
+  font-size: 1.05rem;
+}
+.doge-theme .text-center > a.btn-primary:hover:not(:disabled) { background-color: var(--doge-pink); }
+.doge-theme .btn-secondary {
+  background: transparent;
+  border: 2px solid var(--doge-ink);
+  color: var(--doge-ink);
+  border-radius: 14px;
+}
+.doge-theme .btn-secondary:hover { background: var(--doge-cream-light); }
+/* Hard-coded white utilities (written for dark themes) -> ink on cream. */
+.doge-theme .text-white, .doge-theme .text-white\/90 { color: var(--doge-ink); }
+.doge-theme .text-white\/80, .doge-theme .text-white\/70 { color: rgba(48, 45, 37, 0.85); }
+.doge-theme .text-white\/60, .doge-theme .text-white\/50 { color: rgba(48, 45, 37, 0.72); }
+.doge-theme .text-white\/40, .doge-theme .text-white\/30 { color: rgba(48, 45, 37, 0.6); }
+.doge-theme .text-white\/20 { color: rgba(48, 45, 37, 0.5); }
+.doge-theme .hover\:text-white:hover { color: var(--doge-ink); }
+.doge-theme .hover\:text-white\/60:hover { color: rgba(48, 45, 37, 0.85); }
+.doge-theme .border-white\/10, .doge-theme .border-white\/20 { border-color: rgba(48, 45, 37, 0.3); }
+.doge-theme .bg-white\/5, .doge-theme .bg-white\/6, .doge-theme .bg-white\/10 { background: rgba(48, 45, 37, 0.05); }
+.doge-theme .bg-white\/20 { background: rgba(48, 45, 37, 0.1); }
+.doge-theme .hover\:bg-white\/5:hover, .doge-theme .hover\:bg-white\/10:hover { background: rgba(48, 45, 37, 0.08); }
+.doge-theme .hover\:bg-white\/20:hover { background: rgba(48, 45, 37, 0.12); }
+/* Filled colour buttons keep light text. */
+.doge-theme .bg-red-500, .doge-theme .bg-red-500 .text-white { color: #fff; }
+.doge-theme .btn-primary .text-white { color: inherit; }
+/* Inputs */
+.doge-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.doge-theme textarea, .doge-theme select {
+  background: var(--doge-cream-light) !important;
+  border: 1.5px solid rgba(48, 45, 37, 0.55) !important;
+  color: var(--doge-ink) !important;
+}
+.doge-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.doge-theme textarea:focus, .doge-theme select:focus {
+  border-color: var(--doge-ink) !important;
+  background: #FFF6E3 !important;
+  box-shadow: 0 0 0 3px rgba(255, 75, 244, 0.35);
+}
+.doge-theme input::placeholder, .doge-theme textarea::placeholder { color: rgba(48, 45, 37, 0.62) !important; }
+.doge-theme input[type="time"], .doge-theme input[type="date"],
+.doge-theme input[type="datetime-local"] { color-scheme: light !important; }
+/* Links in running text get the hot pink underline (decorative; text stays ink). */
+.doge-theme a:not(.btn-primary):not(.btn-secondary) { text-decoration-color: var(--doge-pink); }
+/* Google Places dropdown (appended to <body>, outside #root). */
+.doge-theme .pac-container {
+  background-color: #FCF4E1 !important;
+  border: 1.5px solid var(--doge-ink) !important;
+  box-shadow: 0 8px 24px rgba(48, 45, 37, 0.2) !important;
+}
+.doge-theme .pac-item { background-color: #FCF4E1 !important; border-color: rgba(48, 45, 37, 0.15) !important; color: var(--doge-ink) !important; }
+.doge-theme .pac-item:hover { background-color: #F4EBD7 !important; }
+.doge-theme .pac-item-query { color: var(--doge-ink) !important; }
+/* Doge hero: the gold-framed Doge from the brand kit, centered under the title. */
+.doge-theme .doge-hero { border-radius: 8px; }
+/* Wordmark is the logo image; drop the duplicate text name beside it. */
+.doge-theme .site-header a span { display: none; }
+/* Dark-theme footer logo is white; render it ink on cream. */
+.doge-theme footer img { filter: brightness(0) opacity(0.75); }
+/* Landing/event titles: heavier and tighter, like the reference's Black weight. */
+.doge-theme h1 { -webkit-text-stroke: 0.04em currentColor; }
+.doge-theme main > header > h1 { font-size: clamp(2.5rem, 7vw, 4.25rem); }
+@media (max-width: 480px) {
+  .doge-theme [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .doge-theme [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .doge-theme [role="timer"] .tabular-nums { font-size: 1.875rem; }
+}
+/* Brand-red utilities -> Doge palette (red stays only for real error boxes). */
+.doge-theme .text-\[\#ff393a\] { color: var(--doge-ink); }
+.doge-theme [class*="border-[#ff393a]/30"][class*="text-[#ff393a]"] { color: #b3261e; }
+.doge-theme .bg-\[\#ff393a\] { background-color: var(--doge-pink); color: var(--doge-ink); }
+.doge-theme .bg-\[\#ff393a\] .text-white, .doge-theme .bg-\[\#ff393a\].text-white { color: var(--doge-ink); }
+.doge-theme .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #F2A73A, #F7D58A); }
+.doge-theme .from-\[\#ff393a\] svg { color: rgba(48, 45, 37, 0.45); }
+.doge-theme .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--doge-pink); }
+/* Modals */
+.doge-theme .fixed.inset-0 .card, .doge-theme .fixed.inset-0 .bg-theme-header {
+  background: #FCF4E1 !important;
+  border: 2px solid var(--doge-ink) !important;
+  box-shadow: 0 16px 48px rgba(48, 45, 37, 0.3) !important;
+}
 
 /* ─── Adding New Themes ───
  *
