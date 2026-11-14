@@ -22,7 +22,7 @@ export type ChecklistAction =
   | { kind: 'venue-modal' }
   | { kind: 'attendance-modal' }
   | { kind: 'social-modal' }
-  | { kind: 'tab'; tab: string };
+  | { kind: 'tab'; tab: string; section?: string };
 
 export type ChecklistVariant = 'gpp' | 'series';
 
@@ -53,16 +53,27 @@ export function resolveChecklistAction(item: ActionItem, variant: ChecklistVaria
   if (item.linkTab === 'venue' && item.autoRule === 'venue_added') return { kind: 'venue-modal' };
   if (item.linkTab === 'attendance') return { kind: 'attendance-modal' };
   if (item.linkTab === 'social-post') return { kind: 'social-modal' };
+  if (item.linkTab === 'hackathon') {
+    const section = item.autoRule ? HACKATHON_RULE_SECTIONS[item.autoRule] : undefined;
+    return { kind: 'tab', tab: 'hackathon', ...(section ? { section } : {}) };
+  }
   return tabAction(item.linkTab);
 }
+
+/** Hackathon app sub-section each hackathon auto rule opens (HackathonTab ?section=). */
+const HACKATHON_RULE_SECTIONS: Record<string, string> = {
+  hackathon_published: 'tracks',
+  hackathon_submissions_ready: 'judging',
+  hackathon_judges_added: 'judging',
+};
 
 /**
  * Path for a host tab. Settings is always `/host/:code/details` — `/host/:code`
  * is the party's DEFAULT tab, which is the dashboard for GPP and brand-series
  * parties, so it can't be assumed to mean Settings.
  */
-export function hostTabPath(inviteCode: string, tab: string): string {
-  return `/host/${inviteCode}/${tab}`;
+export function hostTabPath(inviteCode: string, tab: string, section?: string): string {
+  return `/host/${inviteCode}/${tab}${section ? `?section=${encodeURIComponent(section)}` : ''}`;
 }
 
 /** Sort by due date ascending, undated last (stable for equal keys). */

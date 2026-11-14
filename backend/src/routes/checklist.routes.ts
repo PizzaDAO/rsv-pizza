@@ -4,6 +4,7 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { withBrandDueDates } from '../lib/brandChecklistDueDates.js';
+import { hackathonAutoStates } from '../lib/hackathon/checklistRules.js';
 
 const router = Router();
 
@@ -94,7 +95,27 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
 
     const pizzeriasSelected = Array.isArray(party?.selectedPizzerias) && (party!.selectedPizzerias as unknown[]).length > 0;
 
+    // Hackathon platform: setup rules (published / submissions ready / judges added).
+    const hk = await prisma.hackathon.findUnique({
+      where: { partyId },
+      select: {
+        publishedAt: true,
+        disabledAt: true,
+        submissionDeadline: true,
+        _count: { select: { tracks: true, prizes: true, criteria: true, judges: { where: { status: 'active' } } } },
+      },
+    });
+
     const autoCompleteStates = {
+      ...hackathonAutoStates(hk ? {
+        publishedAt: hk.publishedAt,
+        disabledAt: hk.disabledAt,
+        submissionDeadline: hk.submissionDeadline,
+        trackCount: hk._count.tracks,
+        prizeCount: hk._count.prizes,
+        criterionCount: hk._count.criteria,
+        activeJudgeCount: hk._count.judges,
+      } : null),
       event_created: true,
       party_kit_submitted: !!partyKit,
       venue_added: !!party?.address && !party.addressIsCityDefault,

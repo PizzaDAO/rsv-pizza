@@ -21,7 +21,7 @@ describe('createPresets', () => {
     expect(CREATE_PRESETS.global_day).toMatchObject({ dateMode: 'fixed', nameLocked: true, pinnedApps: ['checklist', 'venue'] });
     expect(CREATE_PRESETS.meetup).toMatchObject({ dateMode: 'single', defaultStart: '18:30', defaultEnd: '21:00' });
     expect(CREATE_PRESETS.hackathon).toMatchObject({ nameTemplate: null, requireMaxGuests: true, maxSpanDays: 14, defaults: { requireApproval: true } });
-    expect(CREATE_PRESETS.hackathon.pinnedApps).toEqual(['checklist', 'venue', 'staffing', 'displays']);
+    expect(CREATE_PRESETS.hackathon.pinnedApps).toEqual(['checklist', 'hackathon', 'venue', 'staffing', 'displays']);
   });
 
   it('renderNameTemplate tokens', () => {

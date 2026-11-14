@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, lazy, Suspense } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -49,9 +49,11 @@ import { hostDefaultTab, isBrandSeriesParty, dashboardKind } from '../lib/hostDe
 import { PayoutsTab } from '../components/payouts';
 import { DayOfTab } from '../components/day-of';
 
-type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'survey' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
+const HackathonTab = lazy(() => import('../components/hackathon/HackathonTab'));
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'survey', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
+type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'survey' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'hackathon' | 'apps';
+
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'survey', 'gpp', 'promo', 'flyer', 'print', 'payments', 'hackathon', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
@@ -582,6 +584,12 @@ function HostPageContent() {
 
               {activeTab === 'raffle' && party && (
                 <RaffleWidget partyId={party.id} />
+              )}
+
+              {activeTab === 'hackathon' && party && (
+                <Suspense fallback={<div className="card p-6 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" /></div>}>
+                  <HackathonTab partyId={party.id} />
+                </Suspense>
               )}
 
               {activeTab === 'budget' && party && (

@@ -43,6 +43,7 @@ import { uploadPhoto } from '../lib/api';
 import { uploadEventPhoto } from '../lib/supabase';
 import { BRAND, brandUrl } from '../config/brand';
 import { captureInviteToken } from '../lib/inviteToken';
+import { HackathonSection } from '../components/hackathon/HackathonSection';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -1521,6 +1522,9 @@ export function EventPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Hackathon: tracks, prizes, rules, deadline (published hackathons only) */}
+                {event.hasHackathon && <HackathonSection partyId={event.id} timezone={event.timezone} />}
 
                 {/* Mobile: Location Section */}
                 {event.address && (

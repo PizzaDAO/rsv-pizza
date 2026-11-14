@@ -22,6 +22,7 @@ import {
   Printer,
   LayoutGrid,
   MessageSquare,
+  Trophy,
 } from 'lucide-react';
 import { CoHost } from '../types';
 
@@ -47,6 +48,7 @@ export type TabId =
   | 'flyer'
   | 'print'
   | 'payments'
+  | 'hackathon'
   | 'apps';
 
 export interface HostTab {
@@ -82,6 +84,7 @@ export const ALL_HOST_TABS: HostTab[] = [
   { id: 'flyer', label: 'Flyer', icon: FileImage },
   { id: 'print', label: 'Print', icon: Printer },
   { id: 'payments', label: 'Payments', icon: Coins },
+  { id: 'hackathon', label: 'Hackathon', icon: Trophy },
   { id: 'apps', label: 'Apps', icon: LayoutGrid },
 ];
 

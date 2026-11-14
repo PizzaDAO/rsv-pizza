@@ -365,9 +365,30 @@ router.delete('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyReq
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // Hackathon platform: hackathons.party_id is RESTRICT. A setup-only hackathon (no projects)
+    // is deleted first in the same transaction; one with projects (and so possibly scores,
+    // awards and payout history) blocks the delete with a 409 instead of a raw FK 500.
     await prisma.$transaction(async (tx) => {
       await setDeleteContext(tx, `api_key:${req.apiKey!.userId}`, 'api_v1');
+      const hackathon = await tx.hackathon.findUnique({ where: { partyId: id }, select: { id: true } });
+      if (hackathon) {
+        const projects = await tx.hackathonSubmission.count({ where: { hackathonId: hackathon.id } });
+        if (projects > 0) {
+          throw new AppError(
+            'This party has a hackathon with submitted projects. Disable the hackathon instead of deleting the party.',
+            409,
+            'HACKATHON_HAS_SUBMISSIONS',
+          );
+        }
+        await tx.hackathon.delete({ where: { id: hackathon.id } });
+      }
       await tx.party.delete({ where: { id } });
+    }).catch((e: any) => {
+      // Race backstop: a project created between the count and the delete trips the FK.
+      if (e?.code === 'P2003') {
+        throw new AppError('This party has hackathon projects. Disable the hackathon instead of deleting the party.', 409, 'HACKATHON_HAS_SUBMISSIONS');
+      }
+      throw e;
     });
 
     // Trigger webhook

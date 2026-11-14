@@ -156,3 +156,21 @@ describe('dashboardKind', () => {
     expect(dashboardKind(gpp, true)).toBe('gpp27');
   });
 });
+
+describe('hackathon checklist items (series)', () => {
+  it('open the Hackathon app, on the sub-section the auto rule is about', () => {
+    expect(resolveChecklistAction(item('Publish tracks, prizes and rules', 'hackathon_published', 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon', section: 'tracks' });
+    expect(resolveChecklistAction(item('Set up the submission platform', 'hackathon_submissions_ready', 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon', section: 'judging' });
+    expect(resolveChecklistAction(item('Line up judges and mentors', 'hackathon_judges_added', 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon', section: 'judging' });
+    expect(resolveChecklistAction(item('Run demos and judging', null, 'hackathon'), 'series'))
+      .toEqual({ kind: 'tab', tab: 'hackathon' });
+  });
+
+  it('hostTabPath carries the section as a query param', () => {
+    expect(hostTabPath('abc', 'hackathon', 'judging')).toBe('/host/abc/hackathon?section=judging');
+    expect(hostTabPath('abc', 'hackathon')).toBe('/host/abc/hackathon');
+  });
+});

@@ -1,6 +1,6 @@
 import {
   PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket,
-  ShieldCheck, Pizza, Camera, FileImage, Printer, Zap, Monitor, Settings, LucideIcon,
+  ShieldCheck, Pizza, Camera, FileImage, Printer, Zap, Monitor, Settings, Trophy, ListChecks, Gavel, LucideIcon,
 } from 'lucide-react';
 import type { ChecklistItem } from '../../types';
 import type { ChecklistVariant } from './checklistActions';
@@ -32,6 +32,9 @@ const RULE_ICONS: Record<string, LucideIcon> = {
   venue_added: MapPin,
   pizzerias_selected: Pizza,
   attendance_estimated: Users,
+  hackathon_published: Trophy,
+  hackathon_submissions_ready: ListChecks,
+  hackathon_judges_added: Gavel,
 };
 const TAB_ICONS: Record<string, LucideIcon> = {
   partners: Handshake,
@@ -45,6 +48,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   guests: Users,
   pizza: Pizza,
   details: Settings,
+  hackathon: Trophy,
 };
 
 // Display-label overrides — the DB `name` stays the stable key (matched for

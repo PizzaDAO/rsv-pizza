@@ -62,8 +62,8 @@ export const HostChecklistCard: React.FC<HostChecklistCardProps> = ({ variant })
     // drives brand-series relative due dates.
   }, [party?.id, party?.coHosts?.length, party?.address, party?.addressIsCityDefault, party?.date, loadChecklist]);
 
-  const goToTab = useCallback((tab: string) => {
-    if (inviteCode) navigate(hostTabPath(inviteCode, tab));
+  const goToTab = useCallback((tab: string, section?: string) => {
+    if (inviteCode) navigate(hostTabPath(inviteCode, tab, section));
   }, [inviteCode, navigate]);
 
   const handleToggleItem = async (itemId: string) => {
@@ -93,7 +93,7 @@ export const HostChecklistCard: React.FC<HostChecklistCardProps> = ({ variant })
         : action?.kind === 'venue-modal' ? () => setFindVenueOpen(true)
         : action?.kind === 'attendance-modal' ? () => setAttendanceModalOpen(true)
         : action?.kind === 'social-modal' ? () => setSocialModalOpen(true)
-        : action?.kind === 'tab' ? () => goToTab(action.tab)
+        : action?.kind === 'tab' ? () => goToTab(action.tab, action.section)
         : undefined;
       return {
         id: item.id,

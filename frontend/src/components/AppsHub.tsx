@@ -21,6 +21,7 @@ import {
   Pin,
   PinOff,
   Zap,
+  Trophy,
 } from 'lucide-react';
 import { updateParty } from '../lib/supabase';
 import { usePizza } from '../contexts/PizzaContext';
@@ -170,6 +171,15 @@ const apps: AppItem[] = [
     status: 'live',
     category: 'day-of',
     tab: 'raffle',
+  },
+  {
+    id: 'hackathon',
+    name: 'Hackathon',
+    description: 'Tracks, prizes, rules, judges and a scoring rubric for your hackathon',
+    icon: Trophy,
+    status: 'live',
+    category: 'day-of',
+    tab: 'hackathon',
   },
 
   // After Party

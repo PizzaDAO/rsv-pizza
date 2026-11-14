@@ -38,6 +38,8 @@ import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
 import raffleRoutes from './routes/raffle.routes.js';
+import hackathonPublicRoutes from './routes/hackathon-public.routes.js';
+import hackathonRoutes from './routes/hackathon.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import performerRoutes from './routes/performer.routes.js';
 import venueRoutes from './routes/venue.routes.js';
@@ -247,6 +249,8 @@ app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
+app.use('/api/parties', hackathonPublicRoutes); // Hackathon public read (host gets the full setup)
+app.use('/api/parties', hackathonRoutes); // Hackathon host setup (auth + host check per route)
 app.use('/api/parties', displayRoutes); // Display routes (host management, some public)
 app.use('/api/parties', performerRoutes); // Performer/music routes
 app.use('/api/parties', venuePhotoRoutes); // Venue photo routes (host only)

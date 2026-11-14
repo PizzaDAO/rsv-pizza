@@ -97,7 +97,7 @@ export const CREATE_PRESETS: Record<CreateFlowKey, CreatePreset> = {
     fields: ['description', 'capacity', 'requireApproval', 'externalLink'],
     requiredFields: ['name', 'location', 'date', 'capacity'],
     defaults: { requireApproval: true, hideGuests: false },
-    pinnedApps: ['checklist', 'venue', 'staffing', 'displays'],
+    pinnedApps: ['checklist', 'hackathon', 'venue', 'staffing', 'displays'],
     cityDedupeHint: false,
     copy: {
       title: 'Host a hackathon',

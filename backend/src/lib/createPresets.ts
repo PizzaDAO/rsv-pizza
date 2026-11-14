@@ -61,7 +61,7 @@ export const CREATE_PRESETS: Record<CreateFlowKey, ServerCreatePreset> = {
     defaultStart: '10:00',
     defaultEnd: '18:00',
     defaults: { requireApproval: true },
-    pinnedApps: ['checklist', 'venue', 'staffing', 'displays'],
+    pinnedApps: ['checklist', 'hackathon', 'venue', 'staffing', 'displays'],
     requireMaxGuests: true,
     maxSpanDays: 14,
   },

@@ -1153,6 +1153,8 @@ export interface PublicEvent {
   // focaccina-58550: host-customizable one-sheet config, rendered read-only on
   // the public /onesheet/:slug page. Null/absent = the fixed default one-sheet.
   oneSheetConfig?: OneSheetConfig | null;
+  // Hackathon platform: true when a published, enabled hackathon exists (EventPage fetches it).
+  hasHackathon?: boolean;
 }
 
 // Public Event API (no auth required)

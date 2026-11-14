@@ -113,6 +113,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         underbossStatus: true,
         reimbursementCapUsd: true,
         oneSheetConfig: true, // focaccina-58550
+        hackathon: { select: { publishedAt: true, disabledAt: true } }, // hackathon PR 2: section flag only
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -196,6 +197,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
           underbossStatus: true,
           reimbursementCapUsd: true,
           oneSheetConfig: true, // focaccina-58550
+          hackathon: { select: { publishedAt: true, disabledAt: true } }, // hackathon PR 2: section flag only
           password: true,
           userId: true,
           user: {
@@ -426,6 +428,8 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         reimbursementCapUsd: party.reimbursementCapUsd != null ? Number(party.reimbursementCapUsd) : null,
         // focaccina-58550: host-customizable one-sheet config (read-only on public page).
         oneSheetConfig: party.oneSheetConfig ?? null,
+        // Hackathon platform: the event page fetches GET /api/parties/:id/hackathon only when true.
+        hasHackathon: !!(party.hackathon?.publishedAt && !party.hackathon.disabledAt),
         // arugula-38633 v2 follow-up: numeric-tag fallback when no
         // underboss-validated cap exists. See helpers/reimbursementCap.ts.
         effectiveReimbursementCapUsd: computeEffectiveCapUsd({
