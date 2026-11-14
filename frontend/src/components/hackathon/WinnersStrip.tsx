@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Medal, Tag } from 'lucide-react';
 import { ordinal, type PublicWinner } from '../../lib/hackathonApi';
 
@@ -5,7 +6,12 @@ import { ordinal, type PublicWinner } from '../../lib/hackathonApi';
  * Public winners on the event page (plans/hackathon-platform.md §8, PR 5). Only rendered after
  * the host reveals results; the API never sends recipients or payout data.
  */
-export function WinnersStrip({ winners, quantities }: { winners: PublicWinner[]; quantities?: Record<string, number> }) {
+export function WinnersStrip({ winners, quantities, projectHref }: {
+  winners: PublicWinner[];
+  quantities?: Record<string, number>;
+  /** PR 6: link each winner to its project page (only passed while the gallery is open). */
+  projectHref?: (projectSlug: string) => string;
+}) {
   if (!winners.length) return null;
   return (
     <div className="mb-4" data-testid="hackathon-winners">
@@ -23,7 +29,9 @@ export function WinnersStrip({ winners, quantities }: { winners: PublicWinner[];
                 </p>
                 {w.prizeAmount && <span className="text-sm font-semibold text-theme-text shrink-0">{w.prizeAmount}</span>}
               </div>
-              <p className="text-base font-semibold text-theme-text mt-1 break-words">{w.projectName}</p>
+              <p className="text-base font-semibold text-theme-text mt-1 break-words">
+                {projectHref && w.projectSlug ? <Link to={projectHref(w.projectSlug)} className="hover:underline">{w.projectName}</Link> : w.projectName}
+              </p>
               {w.projectTagline && <p className="text-sm text-theme-text-secondary break-words">{w.projectTagline}</p>}
               <p className="text-xs text-theme-text-muted mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                 {w.teamName && <span className="break-words">{w.teamName}</span>}

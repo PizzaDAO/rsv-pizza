@@ -17,6 +17,7 @@ const contentTypeLabels: Record<DisplayContentType, string> = {
   photos: 'Photo Wall',
   upload: 'Upload',
   custom: 'Custom',
+  hackathon: 'Hackathon',
 };
 
 const contentTypeIcons: Record<DisplayContentType, string> = {
@@ -26,6 +27,7 @@ const contentTypeIcons: Record<DisplayContentType, string> = {
   photos: '🖼️',
   upload: '📤',
   custom: '⚙️',
+  hackathon: '🏆',
 };
 
 export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive }: DisplayCardProps) {
@@ -71,6 +73,10 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
         return config?.mediaType === 'video' ? 'Video' : 'Image';
       case 'custom':
         return 'Custom content';
+      case 'hackathon': {
+        const mode = config?.mode || 'auto';
+        return mode === 'auto' ? 'Countdown, then projects, then winners' : mode === 'countdown' ? 'Deadline countdown' : mode === 'gallery' ? 'Project showcase' : 'Winners';
+      }
       default:
         return '';
     }

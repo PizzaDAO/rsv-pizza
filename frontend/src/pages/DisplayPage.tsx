@@ -4,8 +4,13 @@ import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { getDisplayForViewer, getDisplayPhotos } from '../lib/api';
-import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo } from '../types';
+import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo, HackathonDisplayConfig } from '../types';
 import { brandUrl } from '../config/brand';
+import { getDisplayHackathon, type DisplayHackathonData } from '../lib/hackathonGalleryApi';
+import { HackathonDisplay, foregroundFor } from '../components/displays/HackathonDisplay';
+
+/** Hackathon displays refresh their data every 30 s (plans/hackathon-platform.md §12: no realtime). */
+const HACKATHON_POLL_MS = 30_000;
 
 export function DisplayPage() {
   const { t } = useTranslation('partner');
@@ -16,6 +21,7 @@ export function DisplayPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [hackathon, setHackathon] = useState<DisplayHackathonData | null | undefined>(undefined);
 
   const loadDisplay = useCallback(async () => {
     if (!partyId || !slug) return;
@@ -26,6 +32,7 @@ export function DisplayPage() {
       if (result) {
         setData(result);
         if (result.photos) setPhotos(result.photos);
+        if (result.display.contentType === 'hackathon') setHackathon(result.hackathon ?? null);
       } else {
         setError(t('display.notFound'));
       }
@@ -60,6 +67,21 @@ export function DisplayPage() {
     return () => clearInterval(interval);
   }, [data, partyId, slug]);
 
+  // Hackathon data refresh (poll; keeps the last good data on a failed poll)
+  const isHackathon = data?.display.contentType === 'hackathon';
+  useEffect(() => {
+    if (!isHackathon || !partyId || !slug) return;
+    const interval = setInterval(async () => {
+      try {
+        const r = await getDisplayHackathon(partyId, slug);
+        setHackathon(r.hackathon);
+      } catch {
+        /* keep showing what we have */
+      }
+    }, HACKATHON_POLL_MS);
+    return () => clearInterval(interval);
+  }, [isHackathon, partyId, slug]);
+
   // Slideshow / photo rotation
   useEffect(() => {
     if (!data) return;
@@ -90,6 +112,8 @@ export function DisplayPage() {
   }
 
   const { display, party } = data;
+  // Inline, so brand themes that recolour .text-white (light themes) can't hide the overlays.
+  const overlayColor = foregroundFor(display.backgroundColor).muted;
   const rsvpUrl = party.customUrl
     ? brandUrl(party.customUrl)
     : brandUrl(`rsvp/${party.inviteCode}`);
@@ -99,20 +123,21 @@ export function DisplayPage() {
       <Helmet>
         <title>{display.name} - {party.name}</title>
       </Helmet>
+      {/* fixed + inset-0: full-bleed even on brand themes that frame #root (e.g. .monad-theme). */}
       <div
-        className="min-h-screen w-full relative overflow-hidden"
+        className="fixed inset-0 w-full overflow-hidden"
         style={{ backgroundColor: display.backgroundColor }}
       >
         {/* Clock overlay */}
         {display.showClock && (
-          <div className="absolute top-4 right-4 z-10 text-white/80 text-2xl font-mono">
+          <div className="absolute top-4 right-4 z-10 text-white/80 text-2xl font-mono" style={{ color: overlayColor }}>
             {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         )}
 
         {/* Event name overlay */}
         {display.showEventName && (
-          <div className="absolute top-4 left-4 z-10 text-white/80 text-xl font-semibold">
+          <div className="absolute top-4 left-4 z-10 text-white/80 text-xl font-semibold" style={{ color: overlayColor }}>
             {party.name}
           </div>
         )}
@@ -124,6 +149,16 @@ export function DisplayPage() {
           {display.contentType === 'slideshow' && <SlideshowDisplay config={display.contentConfig as SlideshowConfig} />}
           {display.contentType === 'photos' && <PhotosDisplay config={display.contentConfig as PhotosConfig} photos={photos} currentIndex={currentSlideIndex} />}
           {display.contentType === 'upload' && <UploadDisplay config={display.contentConfig as UploadConfig} />}
+          {display.contentType === 'hackathon' && (
+            <HackathonDisplay
+              config={display.contentConfig as HackathonDisplayConfig}
+              data={hackathon}
+              backgroundColor={display.backgroundColor}
+              rotationInterval={display.rotationInterval}
+              galleryUrl={brandUrl(`${party.customUrl || party.inviteCode}/projects`)}
+              eventUrl={brandUrl(party.customUrl || party.inviteCode)}
+            />
+          )}
         </div>
       </div>
     </>
