@@ -31,6 +31,7 @@ export interface CreatePreset {
   /** Soft "already one in this city" hint. */
   cityDedupeHint: boolean;
   copy: {
+    /** May use {series} / {brand} tokens (renderNameTemplate). */
     title: string;
     subtitle: string;
     cityPlaceholder: string;
@@ -55,7 +56,7 @@ export const CREATE_PRESETS: Record<CreateFlowKey, CreatePreset> = {
     pinnedApps: ['checklist', 'venue'],
     cityDedupeHint: true,
     copy: {
-      title: 'Host a party',
+      title: 'Host a Party for {series}',
       subtitle: 'Pick your city and you are done. You can add the venue later.',
       cityPlaceholder: 'Your city',
       namePlaceholder: 'Event name',

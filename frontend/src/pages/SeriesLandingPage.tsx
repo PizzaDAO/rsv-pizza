@@ -167,7 +167,7 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
         {showCreateCta && (
           <div className="text-center mb-10">
             <Link to="/new" className="btn-primary inline-flex items-center gap-2">
-              Create an event
+              {globalDay ? `Host a Party for ${title}` : 'Create an event'}
             </Link>
           </div>
         )}
