@@ -20,7 +20,14 @@ describe('hackathon checklist auto rules', () => {
       hackathon_published: true,
       hackathon_submissions_ready: true,
       hackathon_judges_added: true,
+      hackathon_judging_closed: false,
     });
+  });
+
+  it('judging closed only when judging_status = closed', () => {
+    expect(hackathonAutoStates({ ...base, judgingStatus: 'closed' }).hackathon_judging_closed).toBe(true);
+    expect(hackathonAutoStates({ ...base, judgingStatus: 'open' }).hackathon_judging_closed).toBe(false);
+    expect(hackathonAutoStates({ ...base, judgingStatus: 'closed', disabledAt: new Date() }).hackathon_judging_closed).toBe(false);
   });
 
   it('published needs published_at AND >= 1 track AND >= 1 prize', () => {
@@ -39,7 +46,7 @@ describe('hackathon checklist auto rules', () => {
   });
 
   it('missing or disabled hackathon completes nothing', () => {
-    const none = { hackathon_published: false, hackathon_submissions_ready: false, hackathon_judges_added: false };
+    const none = { hackathon_published: false, hackathon_submissions_ready: false, hackathon_judges_added: false, hackathon_judging_closed: false };
     expect(hackathonAutoStates(null)).toEqual(none);
     expect(hackathonAutoStates({ ...base, disabledAt: new Date() })).toEqual(none);
   });

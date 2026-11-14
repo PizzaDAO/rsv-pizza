@@ -104,6 +104,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
         publishedAt: true,
         disabledAt: true,
         submissionDeadline: true,
+        judgingStatus: true,
         _count: { select: { tracks: true, prizes: true, criteria: true, judges: { where: { status: 'active' } } } },
       },
     });
@@ -117,6 +118,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
         prizeCount: hk._count.prizes,
         criterionCount: hk._count.criteria,
         activeJudgeCount: hk._count.judges,
+        judgingStatus: hk.judgingStatus,
       } : null),
       event_created: true,
       party_kit_submitted: !!partyKit,

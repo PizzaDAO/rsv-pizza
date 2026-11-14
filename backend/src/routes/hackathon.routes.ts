@@ -10,6 +10,11 @@
  * table number) and GET /export.csv (formula-injection-safe). Participant routes live in
  * hackathon-participant.routes.ts.
  *
+ * PR 4 adds POST /judging {status: open|closed} and GET /leaderboard (host only: rankings,
+ * every judge's scores + private comments, judge progress). Judge routes live in
+ * hackathon-judge.routes.ts. Rubric after scoring starts: no add / delete / max-score change
+ * (409 RUBRIC_LOCKED); weight changes re-total every score (lib/hackathon/scoring.ts).
+ *
  * Delete rules follow the PR 1 FKs (nothing silently deletes participant data):
  *   - track with prizes or project entries -> 409 (prizes.track_id is NO ACTION)
  *   - prize with awards -> 409; criterion once any score exists -> 409
@@ -17,13 +22,16 @@
  *   - hackathon: DELETE = soft disable (disabled_at); ?hard=true only while no submission exists
  */
 import { Router, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { rateLimit } from 'express-rate-limit';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { isUuid } from '../lib/guestToken.js';
 import { requireHackathonHost } from '../lib/hackathon/access.js';
-import { HACKATHON_INCLUDE, TEAM_INCLUDE, hostHackathon, hostTeam, submissionImagePaths } from '../lib/hackathon/serialize.js';
+import { HACKATHON_INCLUDE, TEAM_INCLUDE, hostHackathon, hostTeam, publicCriterion, publicTrack, submissionImagePaths } from '../lib/hackathon/serialize.js';
+import { buildLeaderboard, computeTotal, readCriterionScores, type LbScore } from '../lib/hackathon/scoring.js';
+import { JUDGE_SUBMISSION_INCLUDE, isConflicted } from '../lib/hackathon/judge.js';
 import { hackathonDefaults } from '../lib/hackathon/defaults.js';
 import { signImagePaths } from '../lib/hackathon/media.js';
 import { toCsv } from '../lib/hackathon/csv.js';
@@ -169,6 +177,15 @@ router.put('/:partyId/hackathon', ...guard, async (req: AuthRequest, res: Respon
 
 // ---------------------------------------------------------------- tracks
 
+/** Active judges whose only scoped track is `trackId` (names or emails, for the 409 message). */
+async function judgesScopedOnlyTo(hackathonId: string, trackId: string): Promise<string[]> {
+  const judges = await prisma.hackathonJudge.findMany({
+    where: { hackathonId, status: 'active', tracks: { some: { trackId } } },
+    select: { name: true, email: true, tracks: { select: { trackId: true } } },
+  });
+  return judges.filter((j) => j.tracks.length === 1).map((j) => j.name || j.email);
+}
+
 router.post('/:partyId/hackathon/tracks', ...guard, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
@@ -213,6 +230,15 @@ router.delete('/:partyId/hackathon/tracks/:trackId', ...guard, async (req: AuthR
     }
     if (entries > 0) {
       throw conflict(`${entries} project(s) entered this track, so it can't be deleted.`, 'TRACK_HAS_SUBMISSIONS');
+    }
+    // A judge scoped to only this track would silently widen to ALL tracks once its
+    // hackathon_judge_tracks row cascades away (no rows = all tracks). Make the host decide.
+    const onlyTrackJudges = await judgesScopedOnlyTo(h.id, id);
+    if (onlyTrackJudges.length) {
+      throw conflict(
+        `${onlyTrackJudges.join(', ')} only judge${onlyTrackJudges.length === 1 ? 's' : ''} this track. Change their tracks in Judging first.`,
+        'TRACK_HAS_JUDGES',
+      );
     }
     await prisma.hackathonTrack.delete({ where: { id } })
       .catch((e) => mapFk(e, 'This track has prizes or projects. Remove them first.', 'TRACK_IN_USE'));
@@ -273,6 +299,35 @@ router.delete('/:partyId/hackathon/prizes/:prizeId', ...guard, async (req: AuthR
 
 // ---------------------------------------------------------------- rubric criteria
 
+/**
+ * Rubric writes vs score writes. A rubric change that depends on "has anyone scored yet?" takes
+ * FOR UPDATE on the hackathon row; the judge score write takes FOR SHARE on the same row and
+ * re-reads the rubric under it (hackathon-judge.routes.ts). So a first score and a criterion
+ * add / max-score change / delete are serialized: whichever commits second sees the other.
+ */
+async function lockHackathon(tx: any, hackathonId: string) {
+  await tx.$queryRaw`SELECT id FROM hackathons WHERE id = ${hackathonId}::uuid FOR UPDATE`;
+}
+
+/**
+ * Recompute hackathon_scores.total from criterion_scores with the current weights, inside the
+ * caller's transaction. One UPDATE ... FROM (VALUES ...) per 500 rows; raw so updated_at (the
+ * judge's "scored at") isn't bumped by a host weight edit.
+ */
+async function retotalScores(tx: any, hackathonId: string) {
+  const criteria = await tx.hackathonCriterion.findMany({ where: { hackathonId }, select: { id: true, weight: true, maxScore: true } });
+  const scores = await tx.hackathonScore.findMany({ where: { hackathonId }, select: { id: true, criterionScores: true, total: true } });
+  const changed = (scores as Array<{ id: string; criterionScores: unknown; total: unknown }>)
+    .map((s) => ({ id: s.id, total: computeTotal(readCriterionScores(s.criterionScores), criteria), old: Number(String(s.total)) }))
+    .filter((s): s is { id: string; total: number; old: number } => s.total !== null && s.total !== s.old);
+  for (let i = 0; i < changed.length; i += 500) {
+    const rows = Prisma.join(changed.slice(i, i + 500).map((c) => Prisma.sql`(${c.id}::uuid, ${c.total}::numeric)`));
+    await tx.$executeRaw(Prisma.sql`UPDATE hackathon_scores AS s SET total = v.total FROM (VALUES ${rows}) AS v(id, total) WHERE s.id = v.id AND s.hackathon_id = ${hackathonId}::uuid`);
+  }
+}
+
+const hasScores = async (tx: any, hackathonId: string) => (await tx.hackathonScore.count({ where: { hackathonId } })) > 0;
+
 router.post('/:partyId/hackathon/criteria', ...guard, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
@@ -280,7 +335,14 @@ router.post('/:partyId/hackathon/criteria', ...guard, async (req: AuthRequest, r
     const data = parseCriterion(req.body ?? {}, false);
     await assertCap('hackathonCriterion', h.id, LIMITS.criteria, 'criteria');
     if (data.sortOrder === undefined) data.sortOrder = await nextSort('hackathonCriterion', h.id);
-    await prisma.hackathonCriterion.create({ data: { ...(data as any), hackathonId: h.id } });
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      // Adding a criterion after scoring started would leave every existing score incomplete.
+      if (await hasScores(tx, h.id)) {
+        throw conflict('Judges have started scoring, so criteria can no longer be added. You can still change weights.', 'RUBRIC_LOCKED');
+      }
+      await tx.hackathonCriterion.create({ data: { ...(data as any), hackathonId: h.id } });
+    });
     return respond(res, partyId, 201);
   } catch (error) {
     next(error);
@@ -293,8 +355,20 @@ router.patch('/:partyId/hackathon/criteria/:criterionId', ...guard, async (req: 
     const id = childId(req.params.criterionId);
     const h = await getHackathon(partyId);
     const data = parseCriterion(req.body ?? {}, true);
-    const r = await prisma.hackathonCriterion.updateMany({ where: { id, hackathonId: h.id }, data });
-    if (!r.count) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      const current = await tx.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, weight: true, maxScore: true } });
+      if (!current) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
+      const scored = await hasScores(tx, h.id);
+      // Rubric rules once scoring started (lib/hackathon/scoring.ts): max score is locked
+      // (existing scores were given on the old scale); weight changes re-total every score in
+      // this same transaction, so stored totals never disagree with the weights.
+      if (scored && data.maxScore !== undefined && data.maxScore !== current.maxScore) {
+        throw conflict('Judges have started scoring, so the max score can no longer change. You can still change the weight.', 'RUBRIC_LOCKED');
+      }
+      await tx.hackathonCriterion.updateMany({ where: { id, hackathonId: h.id }, data });
+      if (scored && data.weight !== undefined && data.weight !== current.weight) await retotalScores(tx, h.id);
+    }, { timeout: 20_000 });
     return respond(res, partyId);
   } catch (error) {
     next(error);
@@ -306,11 +380,13 @@ router.delete('/:partyId/hackathon/criteria/:criterionId', ...guard, async (req:
     const { partyId } = req.params;
     const id = childId(req.params.criterionId);
     const h = await getHackathon(partyId);
-    const c = await prisma.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true } });
-    if (!c) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
-    const scores = await prisma.hackathonScore.count({ where: { hackathonId: h.id } });
-    if (scores > 0) throw conflict('Judges have started scoring, so rubric criteria can no longer be deleted.', 'RUBRIC_LOCKED');
-    await prisma.hackathonCriterion.delete({ where: { id } });
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      const c = await tx.hackathonCriterion.findFirst({ where: { id, hackathonId: h.id }, select: { id: true } });
+      if (!c) throw new AppError('Criterion not found', 404, 'NOT_FOUND');
+      if (await hasScores(tx, h.id)) throw conflict('Judges have started scoring, so rubric criteria can no longer be deleted.', 'RUBRIC_LOCKED');
+      await tx.hackathonCriterion.delete({ where: { id } });
+    });
     return respond(res, partyId);
   } catch (error) {
     next(error);
@@ -508,6 +584,121 @@ router.get('/:partyId/hackathon/export.csv', ...readGuard, async (req: AuthReque
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="hackathon-${kind}.csv"`);
     res.send(csv);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------------------------------------------------------------- judging (PR 4)
+
+// POST /:partyId/hackathon/judging {status: 'open' | 'closed'} - judges score only while open.
+// Closed -> open again is allowed (the host can reopen to fix a mistake).
+router.post('/:partyId/hackathon/judging', ...guard, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const h = await getHackathon(partyId);
+    const status = (req.body ?? {}).status;
+    if (status !== 'open' && status !== 'closed') throw new AppError('status must be open or closed', 400, 'VALIDATION_ERROR');
+    await prisma.hackathon.update({ where: { id: h.id }, data: { judgingStatus: status } });
+    return respond(res, partyId);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /:partyId/hackathon/leaderboard - host only. Submitted projects ranked overall and per
+// track (mean of judge totals recomputed from criterion_scores with the current rubric),
+// per-criterion means, every individual score with private comments + team feedback, and a
+// judge progress table. Removed judges' scores are listed but not averaged.
+router.get('/:partyId/hackathon/leaderboard', ...readGuard, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const hk = await getHackathon(partyId);
+    const [h, subs, scores] = await Promise.all([
+      prisma.hackathon.findUnique({ where: { id: hk.id }, include: HACKATHON_INCLUDE }),
+      prisma.hackathonSubmission.findMany({
+        where: { hackathonId: hk.id, status: 'submitted' },
+        include: JUDGE_SUBMISSION_INCLUDE,
+        orderBy: { submittedAt: 'asc' },
+        take: 2000,
+      }),
+      prisma.hackathonScore.findMany({ where: { hackathonId: hk.id }, take: 50000 }),
+    ]);
+    if (!h) throw new AppError('The hackathon app is not enabled for this event', 404, 'HACKATHON_NOT_ENABLED');
+    const criteria = h.criteria;
+    const judges = h.judges as Array<Record<string, any>>;
+    const judgeById = new Map(judges.map((j) => [j.id, j]));
+    const subIds = new Set(subs.map((s) => s.id));
+
+    const scoresBySub = new Map<string, LbScore[]>();
+    const detailBySub = new Map<string, unknown[]>();
+    for (const s of scores) {
+      if (!subIds.has(s.submissionId)) continue; // drafts / withdrawn / disqualified: not ranked
+      const j = judgeById.get(s.judgeId);
+      const counted = j?.status === 'active';
+      const cs = readCriterionScores(s.criterionScores);
+      (scoresBySub.get(s.submissionId) ?? scoresBySub.set(s.submissionId, []).get(s.submissionId)!).push({ judgeId: s.judgeId, criterionScores: cs, counted });
+      (detailBySub.get(s.submissionId) ?? detailBySub.set(s.submissionId, []).get(s.submissionId)!).push({
+        judgeId: s.judgeId,
+        judgeName: j?.name ?? null,
+        judgeEmail: j?.email ?? null,
+        counted,
+        total: computeTotal(cs, criteria),
+        criterionScores: cs,
+        privateComment: s.privateComment ?? null,
+        teamFeedback: s.teamFeedback ?? null,
+        updatedAt: s.updatedAt?.toISOString?.() ?? null,
+      });
+    }
+
+    const lbSubs = subs.map((s) => ({ id: s.id, trackIds: s.tracks.map((t) => t.trackId) }));
+    const board = buildLeaderboard(lbSubs, scoresBySub, criteria, h.tracks.map((t) => t.id));
+    const projects: Record<string, unknown> = {};
+    for (const s of subs) {
+      projects[s.id] = {
+        id: s.id,
+        name: s.name,
+        tagline: s.tagline ?? null,
+        teamName: s.team?.name ?? null,
+        trackIds: s.tracks.map((t) => t.trackId),
+        tableNumber: s.tableNumber ?? null,
+        scores: detailBySub.get(s.id) ?? [],
+      };
+    }
+
+    const judgeProgress = judges.map((j) => {
+      const tracks: string[] = (j.tracks ?? []).map((t: Record<string, any>) => t.trackId);
+      const assigned = subs.filter((s) =>
+        (!tracks.length || s.tracks.some((t) => tracks.includes(t.trackId))) && !isConflicted(s as any, j.email));
+      // Only scores on projects in the judge's CURRENT assignment (a track change or a new
+      // conflict must not make "scored" exceed "assigned").
+      const assignedIds = new Set(assigned.map((s) => s.id));
+      const mine = scores.filter((x) => x.judgeId === j.id && assignedIds.has(x.submissionId));
+      const last = mine.reduce<Date | null>((acc, x) => (!acc || x.updatedAt > acc ? x.updatedAt : acc), null);
+      return {
+        id: j.id,
+        name: j.name ?? null,
+        email: j.email,
+        status: j.status,
+        trackIds: tracks,
+        linked: !!j.userId,
+        assigned: assigned.length,
+        scored: mine.length,
+        lastScoredAt: last ? last.toISOString() : null,
+      };
+    });
+
+    res.set('Cache-Control', 'private, no-store');
+    res.json({
+      judgingStatus: h.judgingStatus,
+      blindJudging: !!h.blindJudging,
+      criteria: criteria.map(publicCriterion),
+      tracks: h.tracks.map(publicTrack),
+      overall: board.overall,
+      byTrack: board.tracks,
+      projects,
+      judges: judgeProgress,
+    });
   } catch (error) {
     next(error);
   }

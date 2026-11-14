@@ -7,7 +7,7 @@
  *   Publish tracks, prizes and rules  -> hackathon  [auto: hackathon_published]
  *   Set up the submission platform    -> hackathon  [auto: hackathon_submissions_ready]
  *   Line up judges and mentors        -> hackathon  [auto: hackathon_judges_added] (mentors stay manual)
- *   Run demos and judging             -> hackathon  (auto rule comes with PR 4)
+ *   Run demos and judging             -> hackathon  [auto: hackathon_judging_closed] (PR 4)
  *   Post winners and photos           -> hackathon  (auto rule comes with PR 5)
  *   Send prizes to winners            -> hackathon  (auto rule comes with PR 5)
  *
@@ -32,7 +32,7 @@ const HACKATHON_ITEMS = [
   ['Publish tracks, prizes and rules', 'hackathon_published', ['details']],
   ['Set up the submission platform', 'hackathon_submissions_ready', []],
   ['Line up judges and mentors', 'hackathon_judges_added', []],
-  ['Run demos and judging', null, []],
+  ['Run demos and judging', 'hackathon_judging_closed', []],
   ['Post winners and photos', null, ['photos']],
   ['Send prizes to winners', null, []],
 ];

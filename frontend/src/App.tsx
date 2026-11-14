@@ -21,6 +21,7 @@ import { GPP27CreatePage } from './pages/GPP27CreatePage';
 import { SideCreatePage } from './pages/SideCreatePage';
 import { CheckInPage } from './pages/CheckInPage';
 const DJPage = React.lazy(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
+const JudgePage = React.lazy(() => import('./pages/JudgePage').then(m => ({ default: m.JudgePage })));
 const PublicReportPage = React.lazy(() => import('./pages/PublicReportPage').then(m => ({ default: m.PublicReportPage })));
 const PublicVenueReportPage = React.lazy(() => import('./pages/PublicVenueReportPage').then(m => ({ default: m.PublicVenueReportPage })));
 const DisplayPage = React.lazy(() => import('./pages/DisplayPage').then(m => ({ default: m.DisplayPage })));
@@ -188,6 +189,8 @@ function App() {
             <Route path="/run/:inviteCode" element={<DayOfRunPage />} />
             <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
             <Route path="/dj/:inviteCode" element={<DJPage />} />
+            {/* Hackathon PR 4: judge queue + scoring (works on brand sites; not in GPP_ONLY_PATHS) */}
+            <Route path="/judge/:inviteCode" element={<JudgePage />} />
             {/* pepperoni-58341: full-bleed art slideshow — more specific than /display/:partyId/:slug */}
             <Route path="/display/:partyId/art" element={<ArtDisplayPage />} />
             <Route path="/display/:partyId/:slug" element={<DisplayPage />} />

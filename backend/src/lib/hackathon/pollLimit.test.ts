@@ -44,6 +44,15 @@ describe('isHackathonPollRead', () => {
     expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/export.csv`, tok('u1')))).toBe(false);
     expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon`, tok('u1')))).toBe(false);
   });
+
+  it('PR 4: host leaderboard and judge queue polls; not judge detail reads or score writes', () => {
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/leaderboard`, tok('u1')))).toBe(true);
+    expect(isHackathonPollRead(req('GET', `/api/hackathon-judge/${PARTY}/queue`, tok('u1')))).toBe(true);
+    expect(isHackathonPollRead(req('GET', `/api/hackathon-judge/${PARTY}/queue`))).toBe(false);
+    expect(isHackathonPollRead(req('GET', `/api/hackathon-judge/${PARTY}/submissions/${PARTY}`, tok('u1')))).toBe(false);
+    expect(isHackathonPollRead(req('PUT', `/api/hackathon-judge/${PARTY}/submissions/${PARTY}/score`, tok('u1')))).toBe(false);
+    expect(isHackathonPollRead(req('GET', `/api/hackathon-judge/not-a-uuid/queue`, tok('u1')))).toBe(false);
+  });
 });
 
 describe('limiter wiring', () => {

@@ -35,6 +35,7 @@ const RULE_ICONS: Record<string, LucideIcon> = {
   hackathon_published: Trophy,
   hackathon_submissions_ready: ListChecks,
   hackathon_judges_added: Gavel,
+  hackathon_judging_closed: Gavel,
 };
 const TAB_ICONS: Record<string, LucideIcon> = {
   partners: Handshake,

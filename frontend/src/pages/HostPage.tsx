@@ -588,7 +588,7 @@ function HostPageContent() {
 
               {activeTab === 'hackathon' && party && (
                 <Suspense fallback={<div className="card p-6 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" /></div>}>
-                  <HackathonTab partyId={party.id} />
+                  <HackathonTab partyId={party.id} inviteCode={party.inviteCode} />
                 </Suspense>
               )}
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { timeLeft } from './HackathonSection';
-import { isoToLocalInput, localInputToIso, prizeAmount } from '../../lib/hackathonApi';
+import { isoToLocalInput, localInputToIso, prizeAmount, weightedTotal, judgeLink } from '../../lib/hackathonApi';
 import { PINNABLE_APPS, BROADCAST_APPS } from '../../lib/appDefinitions';
 import { ALL_HOST_TABS } from '../../lib/tabPermissions';
 import { CREATE_PRESETS } from '../../config/createPresets';
@@ -31,5 +31,18 @@ describe('hackathon frontend helpers', () => {
     expect(BROADCAST_APPS.some((a) => a.tab === 'hackathon')).toBe(true);
     expect(ALL_HOST_TABS.some((t) => t.id === 'hackathon')).toBe(true);
     expect(CREATE_PRESETS.hackathon.pinnedApps).toContain('hackathon');
+  });
+});
+
+describe('hackathon judging helpers (PR 4)', () => {
+  const C = [{ id: 'a', weight: 3, maxScore: 5 }, { id: 'b', weight: 1, maxScore: 10 }];
+  it('weightedTotal matches the backend formula', () => {
+    expect(weightedTotal({ a: 4, b: 7 }, C)).toBe(77.5);
+    expect(weightedTotal({ a: 5, b: 10 }, C)).toBe(100);
+    expect(weightedTotal({ a: 4 }, C)).toBe(80);
+    expect(weightedTotal({}, C)).toBeNull();
+  });
+  it('judgeLink uses the current origin (brand sites keep their domain)', () => {
+    expect(judgeLink('abc123')).toBe(`${window.location.origin}/judge/abc123`);
   });
 });

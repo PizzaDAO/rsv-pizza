@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Trophy, Loader2, Eye, EyeOff, CheckCircle2, Circle, Lock } from 'lucide-react';
-import { hackathonHostApi, type HostHackathon, type HackathonSettingsInput } from '../../lib/hackathonApi';
+import { hackathonHostApi, hackathonJudgingHostApi, type HostHackathon, type HackathonSettingsInput } from '../../lib/hackathonApi';
 import { ErrorBanner } from './shared';
 import { SetupSection } from './SetupSection';
 import { TracksPrizesSection } from './TracksPrizesSection';
 import { JudgingSection } from './JudgingSection';
 import { TeamsSubmissionsSection } from './TeamsSubmissionsSection';
+import { LeaderboardSection } from './LeaderboardSection';
 
-export type HackathonSection = 'setup' | 'tracks' | 'judging' | 'submissions';
+export type HackathonSection = 'setup' | 'tracks' | 'judging' | 'submissions' | 'leaderboard';
 const SECTIONS: Array<{ id: HackathonSection; label: string }> = [
   { id: 'setup', label: 'Setup' },
   { id: 'tracks', label: 'Tracks & Prizes' },
   { id: 'judging', label: 'Judging' },
   { id: 'submissions', label: 'Teams & Submissions' },
+  { id: 'leaderboard', label: 'Leaderboard' },
 ];
 
-export function HackathonTab({ partyId }: { partyId: string }) {
+export function HackathonTab({ partyId, inviteCode }: { partyId: string; inviteCode?: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('section');
   const section: HackathonSection = SECTIONS.some((s) => s.id === raw) ? (raw as HackathonSection) : 'setup';
@@ -208,7 +210,10 @@ export function HackathonTab({ partyId }: { partyId: string }) {
           hackathon={hackathon}
           busy={busy}
           run={run}
+          inviteCode={inviteCode}
+          onViewLeaderboard={() => setSection('leaderboard')}
           api={{
+            setJudging: (status) => hackathonJudgingHostApi.setJudging(partyId, status),
             addCriterion: (b) => hackathonHostApi.addCriterion(partyId, b),
             updateCriterion: (id, b) => hackathonHostApi.updateCriterion(partyId, id, b),
             deleteCriterion: (id) => hackathonHostApi.deleteCriterion(partyId, id),
@@ -219,6 +224,7 @@ export function HackathonTab({ partyId }: { partyId: string }) {
         />
       )}
       {section === 'submissions' && <TeamsSubmissionsSection partyId={partyId} hackathon={hackathon} />}
+      {section === 'leaderboard' && <LeaderboardSection partyId={partyId} hackathon={hackathon} onJudgingChanged={(h) => setHackathon(h)} />}
     </div>
   );
 }

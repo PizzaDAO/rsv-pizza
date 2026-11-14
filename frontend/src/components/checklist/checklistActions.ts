@@ -65,6 +65,7 @@ const HACKATHON_RULE_SECTIONS: Record<string, string> = {
   hackathon_published: 'tracks',
   hackathon_submissions_ready: 'judging',
   hackathon_judges_added: 'judging',
+  hackathon_judging_closed: 'leaderboard',
 };
 
 /**
