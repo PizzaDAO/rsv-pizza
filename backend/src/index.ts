@@ -269,7 +269,7 @@ app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before 
 app.use('/api/parties', surveyHostRouter); // romana-61204: survey send/results (host only, path-scoped, before partyRoutes)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
-app.use('/api/preferences', preferencesRoutes); // Public preferences (used during RSVP)
+app.use('/api/preferences', preferencesRoutes); // Caller's own preferences (auth required)
 app.use('/api/user', userRoutes);
 app.use('/api/events', pageviewRoutes); // Page view tracking (public, before eventRoutes)
 app.use('/api/events', linkclickRoutes); // Link click tracking (public, before eventRoutes)
