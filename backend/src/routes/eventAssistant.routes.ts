@@ -21,6 +21,7 @@ import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isPaymentAdmin, isUnde
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { prisma } from '../config/database.js';
+import { redactAssistantLogFields } from '../lib/assistantLogRedact.js';
 import { runEventAssistant, type AssistantHistoryTurn } from '../services/eventAssistant.service.js';
 import type { RequesterRole } from '../lib/eventEditSchema.js';
 
@@ -127,14 +128,21 @@ router.post(
       // can later report accepted/rejected keys + apply outcome via /feedback.
       let proposalId: string | null = null;
       try {
+        // Never persist a plaintext event password (the HTTP response keeps the real value).
+        const safe = redactAssistantLogFields({
+          instruction,
+          history,
+          proposedChanges: result.proposedChanges,
+          clarifyingQuestion: result.clarifyingQuestion ?? null,
+        });
         const logRow = await prisma.eventAssistantLog.create({
           data: {
             partyId: id,
             userId: req.userId ?? null,
-            instruction,
-            history: history.length > 0 ? (history as unknown as object) : undefined,
-            proposedChanges: result.proposedChanges as unknown as object,
-            clarifyingQuestion: result.clarifyingQuestion ?? null,
+            instruction: safe.instruction,
+            history: history.length > 0 ? (safe.history as unknown as object) : undefined,
+            proposedChanges: safe.proposedChanges as unknown as object,
+            clarifyingQuestion: safe.clarifyingQuestion ?? null,
             model: result.model,
             promptTokens: result.usage.promptTokens ?? null,
             completionTokens: result.usage.completionTokens ?? null,
