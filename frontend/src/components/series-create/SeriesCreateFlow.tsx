@@ -11,10 +11,11 @@ import { LoginModal } from '../LoginModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { createPartyApi, updatePartyApi, fetchPublicSeriesEvents } from '../../lib/api';
 import type { PublicSeries } from '../../lib/seriesApi';
-import type { CreatePreset } from '../../config/createPresets';
+import { renderNameTemplate, type CreatePreset } from '../../config/createPresets';
 import {
   buildCreatePayload,
   resolveName,
+  seriesTokens,
   resolveStartDate,
   validateCreateForm,
   type CreateFormState,
@@ -179,7 +180,7 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
     <>
       <form onSubmit={handleSubmit} noValidate className="space-y-3" data-testid="series-create-form">
         <div className="text-center pb-2">
-          <h1 className="text-2xl font-bold text-theme-text">{preset.copy.title}</h1>
+          <h1 className="text-2xl font-bold text-theme-text">{renderNameTemplate(preset.copy.title, seriesTokens(series, ''))}</h1>
           <p className="text-sm text-theme-text-secondary mt-1">{preset.copy.subtitle}</p>
         </div>
 
