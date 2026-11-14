@@ -7,7 +7,7 @@
 export const ALLOWED_LINK_TABS = [
   'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
   'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
-  'flyer', 'print', 'party-guide', 'payments',
+  'flyer', 'print', 'party-guide', 'payments', 'hackathon',
 ];
 
 /**

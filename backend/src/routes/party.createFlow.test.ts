@@ -225,8 +225,22 @@ describe('POST /api/parties create-flow presets', () => {
       expect(d.duration).toBe(56);
       expect(d.maxGuests).toBe(150);
       expect(d.requireApproval).toBe(true);
-      expect(d.pinnedApps).toEqual(['checklist', 'venue', 'staffing', 'displays', 'flyer']);
+      expect(d.pinnedApps).toEqual(['checklist', 'hackathon', 'venue', 'staffing', 'displays', 'flyer']);
       expect(d.externalLinks).toEqual([{ label: 'Devpost', url: 'https://x.devpost.com' }]);
+    });
+
+    it('default-on: the hackathons row is created in the same write (nested create), deadline = event end', async () => {
+      await post(body);
+      const d = created();
+      expect(d.hackathon).toEqual({
+        create: {
+          submissionDeadline: new Date('2027-03-06T23:00:00.000Z'),
+          teamMinSize: 1, teamMaxSize: 5, maxTracksPerSubmission: 1,
+          eligibility: 'registered', blindJudging: false, galleryVisibility: 'after_reveal',
+        },
+      });
+      expect(mockPrisma.party.create).toHaveBeenCalledTimes(1);
+      expect(d.pinnedApps).toContain('hackathon');
     });
 
     it('explicit body requireApproval=false overrides the preset default', async () => {
@@ -242,6 +256,20 @@ describe('POST /api/parties create-flow presets', () => {
       expect((await post({ ...body, endTime: undefined, duration: 5 })).status).toBe(400); // end required
       expect(mockPrisma.party.create).not.toHaveBeenCalled();
     });
+  });
+
+  it('no hackathons row for other flows or the generic create', async () => {
+    for (const row of [DOGE, TEAM1, { ...MONAD, createFlow: null }, null]) {
+      vi.clearAllMocks();
+      mockPrisma.party.create.mockResolvedValue({ id: 'p1', name: 'P', inviteCode: 'abc', userId: 'u1', user: { name: 'Host' } });
+      mockPrisma.party.count.mockResolvedValue(0);
+      mockPrisma.party.findMany.mockResolvedValue([]);
+      mockPrisma.slugAlias.findMany.mockResolvedValue([]);
+      seriesRow = row;
+      await post({ seriesSlug: row?.slug, name: 'N', city: 'Austin', address: 'Austin, TX', timezone: 'America/Chicago', date: '2027-03-04T18:30:00Z', endTime: '2027-03-04T20:30:00Z', maxGuests: 10 });
+      expect(mockPrisma.party.create).toHaveBeenCalled();
+      expect(created().hackathon).toBeUndefined();
+    }
   });
 
   describe('rate limit (5 branded creates per account per day)', () => {

@@ -1272,6 +1272,10 @@ export interface AutoCompleteStates {
   pizzerias_selected?: boolean;
   underboss_reviewed?: boolean;
   attendance_estimated?: boolean;
+  // Hackathon platform (backend lib/hackathon/checklistRules.ts)
+  hackathon_published?: boolean;
+  hackathon_submissions_ready?: boolean;
+  hackathon_judges_added?: boolean;
 }
 
 export interface ChecklistData {

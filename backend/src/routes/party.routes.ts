@@ -29,7 +29,7 @@ import { changesGuardedTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
 import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
-import { applyCreatePreset, enforceBrandCreateLimit } from '../lib/brandCreate.js';
+import { applyCreatePreset, enforceBrandCreateLimit, presetHackathonCreate } from '../lib/brandCreate.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -395,6 +395,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
           pinnedApps: presetOut.pinnedApps,
           ...(presetOut.externalLinks ? { externalLinks: presetOut.externalLinks } : {}),
         } : {}),
+        // Hackathon create flow: the hackathons row is created with the party (default-on).
+        ...presetHackathonCreate(createPreset, presetOut),
       },
       include: {
         user: { select: { name: true } },

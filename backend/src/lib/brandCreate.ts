@@ -14,6 +14,7 @@ import {
   customUrlCandidates,
 } from './createPresets.js';
 import { isValidTimezone, localToUTC, localHM } from './localTime.js';
+import { hackathonDefaults } from './hackathon/defaults.js';
 
 /** Brand creates per account per rolling 24h (Decided #10). Applies only to preset flows. */
 export const BRAND_CREATES_PER_DAY = 5;
@@ -91,6 +92,21 @@ export async function enforceBrandCreateLimit(userId: string): Promise<void> {
       'RATE_LIMITED',
     );
   }
+}
+
+/**
+ * Hackathon platform default-on (plans/hackathon-platform.md §9): a party created through a
+ * `create_flow = 'hackathon'` series gets its hackathons row in the SAME write as the party (a
+ * Prisma nested create, so both commit or neither does). Deadline = event end; other settings
+ * are the plan defaults (team 1-5, 1 track/project, registered, blind off, unpublished).
+ * Returns the `data` fragment to spread into prisma.party.create, or {} for other flows.
+ */
+export function presetHackathonCreate(
+  preset: ServerCreatePreset | null,
+  times: { date: Date | null; endTime: Date | null; duration: number | null } | null,
+): { hackathon?: { create: ReturnType<typeof hackathonDefaults> } } {
+  if (!preset || preset.key !== 'hackathon' || !times) return {};
+  return { hackathon: { create: hackathonDefaults(times) } };
 }
 
 export async function applyCreatePreset(
