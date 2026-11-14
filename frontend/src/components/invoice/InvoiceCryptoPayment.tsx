@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSwitchChain, useEnsAddress } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
+import { OpenInWallet } from '../OpenInWallet';
 import { Address, isAddress } from 'viem';
 import { Copy, Check, ExternalLink, ChevronDown, Loader2 } from 'lucide-react';
 import { useTokenBalances, type TokenBalance } from '../../hooks/useTokenBalances';
@@ -248,6 +249,8 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
               )}
             </ConnectKitButton.Custom>
           </div>
+
+          <OpenInWallet />
 
           {/* Copy address fallback */}
           <div className="bg-[#0f0f23] rounded-xl p-4 border border-white/10">

@@ -9,6 +9,7 @@ import { useRSVPForm, publicEventToRSVPData, RSVPSubmitResult } from '../hooks/u
 import { useMintNFT, MintStatus, MintResult } from '../hooks/useMintNFT';
 import { useAccount } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
+import { OpenInWallet } from './OpenInWallet';
 import { useTranslation } from 'react-i18next';
 import { RSVPFlowContent } from './RSVPFlowContent';
 
@@ -218,6 +219,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           </ConnectKitButton.Custom>
         )}
       </div>
+      {!form.ethereumAddress.trim() && <OpenInWallet className="mt-2" />}
       {form.walletValidation === 'invalid' && form.ethereumAddress.trim() && (
         <span className="text-xs text-[#ff393a] mt-1 block">{tCommon('errors.invalidWallet')}</span>
       )}

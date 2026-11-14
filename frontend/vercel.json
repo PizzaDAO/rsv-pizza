@@ -18,6 +18,19 @@
   ],
   "headers": [
     {
+      "source": "/auth/verify",
+      "headers": [
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
       "source": "/cdn/(.*)",
       "headers": [
         {
