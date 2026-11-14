@@ -336,7 +336,7 @@ export const GuestList: React.FC = () => {
       <div className="space-y-6">
       {/* Confirmed Guests Section */}
       <div className="card p-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="guest-list-head flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-theme-text-secondary" />
             <h2 className="text-xl font-bold text-theme-text">{t('guests.title')}</h2>
