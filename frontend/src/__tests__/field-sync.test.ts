@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Import the actual exported values
-import { SAFE_PARTY_COLUMNS } from '../lib/supabase';
+import { SAFE_PARTY_COLUMNS, SENSITIVE_PARTY_COLUMNS } from '../lib/supabase';
 import { dbPartyToParty } from '../contexts/PizzaContext';
 
 // Helper to read source files
@@ -41,19 +41,34 @@ function parseSafeColumns(columnsStr: string): Set<string> {
 
 // Extract interface fields from TypeScript source
 function extractInterfaceFields(source: string, interfaceName: string): string[] {
-  const interfaceRegex = new RegExp(
-    `(?:export\\s+)?interface\\s+${interfaceName}\\s*\\{([^}]+(?:\\{[^}]*\\}[^}]*)*)\\}`,
-    's'
-  );
-  const match = source.match(interfaceRegex);
-  if (!match) return [];
+  const header = new RegExp(`(?:export\\s+)?interface\\s+${interfaceName}\\s*\\{`).exec(source);
+  if (!header) return [];
 
-  const body = match[1];
-  const fieldRegex = /^\s*(\w+)[\?:]?\s*:/gm;
+  // Walk to the matching closing brace so nested object types (e.g.
+  // Array<{label: string}>) don't truncate the interface body.
+  const start = header.index + header[0].length;
+  let depth = 1;
+  let end = start;
+  while (end < source.length && depth > 0) {
+    const ch = source[end];
+    if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+    end++;
+  }
+  const body = source.slice(start, end - 1);
+
+  // Only collect top-level fields (depth 0 within the interface body)
   const fields: string[] = [];
-  let fieldMatch;
-  while ((fieldMatch = fieldRegex.exec(body)) !== null) {
-    fields.push(fieldMatch[1]);
+  let level = 0;
+  for (const line of body.split('\n')) {
+    if (level === 0) {
+      const fieldMatch = /^\s*(\w+)[\?:]?\s*:/.exec(line);
+      if (fieldMatch) fields.push(fieldMatch[1]);
+    }
+    for (const ch of line) {
+      if (ch === '{') level++;
+      else if (ch === '}') level--;
+    }
   }
   return fields;
 }
@@ -147,9 +162,15 @@ describe('Field Mapping Consistency', () => {
     // We skip host_name (derived from API, not DB column), has_password (computed),
     // password (intentionally excluded for security), and host_profile (from join)
     // Host-only columns (anon cannot read them) come from GET /api/parties/:id instead.
+    // Every SENSITIVE_PARTY_COLUMNS entry is host-only by definition and must NOT be in the
+    // safe list (e.g. wifi_info, parking_notes, host_goals); co_hosts is served to anon as
+    // co_hosts_public. can_edit / allowed_tabs are client-side fields merged in from
+    // GET /api/parties/:id (not DB columns).
     const computedOrExcluded = new Set([
       'host_name', 'has_password', 'password', 'host_profile',
       'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by', 'reimbursement_cap_appeal_note',
+      ...SENSITIVE_PARTY_COLUMNS,
+      'can_edit', 'allowed_tabs',
     ]);
     const coreDbPartyFields = dbPartyFields.filter(
       f => !computedOrExcluded.has(f)
@@ -179,6 +200,7 @@ describe('Field Mapping Consistency', () => {
       'flyer_artist', 'x_post_url', 'x_post_views', 'farcaster_post_url', 'farcaster_views',
       'luma_views', 'poap_event_id', 'poap_mints', 'poap_moments',
       'report_published', 'report_public_slug',
+      'quiz_enabled',
     ]);
 
     const phantomColumns = Array.from(safeColumns).filter(

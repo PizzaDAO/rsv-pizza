@@ -1,3 +1,4 @@
+import '../../i18n';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -49,7 +50,7 @@ describe('PartnerForm mode="intake"', () => {
 
     // Intake-specific fields should be present
     expect(screen.getByPlaceholderText(/Company \/ Brand Name/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/1-2 sentence description/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/1-2 sentence brand description/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/^Email/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Any notes or special requests/i)).toBeInTheDocument();
 

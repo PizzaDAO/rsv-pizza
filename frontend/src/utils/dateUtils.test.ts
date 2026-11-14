@@ -170,7 +170,7 @@ describe('getLocalTimezone', () => {
     const tz = getLocalTimezone();
     expect(tz).toBeDefined();
     expect(tz.length).toBeGreaterThan(0);
-    // IANA timezones contain a /
-    expect(tz).toContain('/');
+    // IANA zones are "Area/City", or "UTC" (CI runners)
+    expect(tz === 'UTC' || tz.includes('/')).toBe(true);
   });
 });

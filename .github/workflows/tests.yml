@@ -1,10 +1,9 @@
-name: Tests (non-blocking)
+name: Tests
 
-# Runs the existing vitest suites (21 backend + 20 frontend files) on PRs. These
-# previously ran in NO CI workflow at all, so they gated nothing. NON-BLOCKING
-# for now (continue-on-error) to surface status without risking a flake blocking
-# merges; flip to blocking once green and stable. This is the structural fix —
-# adding more tests (RLS/anon-exposure, payout money-path) builds on top of it.
+# Runs the vitest suites (backend + frontend) on PRs. Both are BLOCKING: the
+# frontend suite is fully green, so a failing frontend test now blocks merges.
+# This is the structural fix — adding more tests (RLS/anon-exposure, payout
+# money-path) builds on top of it.
 on:
   pull_request:
     paths:
@@ -57,7 +56,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install
         run: npm ci
+      # BLOCKING: frontend suite is fully green.
       - name: Test (frontend)
         working-directory: frontend
-        continue-on-error: true
         run: npm test
