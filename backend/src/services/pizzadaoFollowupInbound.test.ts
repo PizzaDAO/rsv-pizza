@@ -18,7 +18,7 @@ describe('tryForwardFollowUpReply', () => {
     const r = await tryForwardFollowUpReply('555', { kind: 'text', text: ' on it ', messageId: 42 }, { fetchImpl: f as any, env });
     expect(r).toEqual({ claimed: true, ack: 'Got it' });
     const [url, init] = f.mock.calls[0] as any;
-    expect(url).toBe('https://app.pizzadao.org/api/followups/inbound');
+    expect(url).toBe('https://pizzadao.org/api/followups/inbound');
     expect(init.headers.Authorization).toBe('Bearer test-inbound-key-0123456789');
     expect(JSON.parse(init.body)).toEqual({ senderId: '555', kind: 'text', text: 'on it', externalKey: 'telegram:555:42' });
   });
