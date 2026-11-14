@@ -7,10 +7,12 @@ import { getRaffles, enterRaffle } from '../../lib/api';
 interface RaffleEntryProps {
   partyId: string;
   guestId?: string;
+  /** rsvp-overwrite-fix: guest capability token (from the RSVP response or my-guest). */
+  guestToken?: string | null;
   guestName?: string;
 }
 
-export function RaffleEntry({ partyId, guestId }: RaffleEntryProps) {
+export function RaffleEntry({ partyId, guestId, guestToken }: RaffleEntryProps) {
   const { t } = useTranslation('host');
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export function RaffleEntry({ partyId, guestId }: RaffleEntryProps) {
     setSuccessMessage(null);
 
     try {
-      const result = await enterRaffle(partyId, raffleId, guestId);
+      const result = await enterRaffle(partyId, raffleId, guestId, guestToken);
       if (result) {
         setSuccessMessage(t('raffle.enteredSuccess'));
         await loadRaffles(); // Refresh to show updated entry count

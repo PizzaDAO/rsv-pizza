@@ -5,6 +5,7 @@ import { AppError } from '../middleware/error.js';
 import { withBennySignature } from '../lib/bennySignature.js';
 import { formatAnnouncement, postTelegramMessage } from '../lib/telegramFormat.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
+import { signGuestToken } from '../lib/guestToken.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
@@ -592,7 +593,9 @@ router.get('/:id/my-guest', async (req: AuthRequest, res: Response, next: NextFu
       },
     });
 
-    res.json({ guest: guest ?? null });
+    // rsvp-overwrite-fix: the owner also gets their guest token (the capability guest-scoped
+    // endpoints like raffle/quiz/discount/NFT require), since they're logged in as the guest.
+    res.json({ guest: guest ? { ...guest, guestToken: signGuestToken(guest.id) } : null });
   } catch (error) {
     next(error);
   }

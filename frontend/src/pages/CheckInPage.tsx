@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
@@ -38,6 +38,10 @@ type CheckInState = 'loading' | 'show-qr' | 'vouching' | 'success' | 'already-ch
 
 export function CheckInPage() {
   const { inviteCode, guestId } = useParams<{ inviteCode: string; guestId: string }>();
+  // rsvp-overwrite-fix: optional guest capability token. Without it the discount endpoints
+  // need a login as the guest (or a host), so a logged-out visitor falls through to login.
+  const [searchParams] = useSearchParams();
+  const guestToken = searchParams.get('t');
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation('checkin');
@@ -58,7 +62,7 @@ export function CheckInPage() {
 
     const checkDiscount = async () => {
       try {
-        const status = await getDiscountStatus(inviteCode, guestId);
+        const status = await getDiscountStatus(inviteCode, guestId, guestToken);
         setDiscountChecked(true);
 
         if (status.hasEnded) {
@@ -80,7 +84,7 @@ export function CheckInPage() {
     };
 
     checkDiscount();
-  }, [inviteCode, guestId, discountChecked]);
+  }, [inviteCode, guestId, guestToken, discountChecked]);
 
   // Redirect to login if not authenticated (skip if discount flow is active, wait for discount check)
   useEffect(() => {
@@ -211,7 +215,7 @@ export function CheckInPage() {
 
   const handleClaimDiscount = async () => {
     try {
-      const result = await claimDiscount(inviteCode!, guestId!);
+      const result = await claimDiscount(inviteCode!, guestId!, guestToken);
       setDiscountData(result);
       setState('discount-claimed');
     } catch (err) {

@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
@@ -340,13 +341,20 @@ router.delete('/:partyId/raffles/:raffleId/prizes/:prizeId', requireAuth, async 
 });
 
 // POST /api/parties/:partyId/raffles/:raffleId/enter - Guest enters the raffle (public)
-router.post('/:partyId/raffles/:raffleId/enter', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// rsvp-overwrite-fix: a guest id alone no longer enters a raffle (ids leaked via the anon
+// guests grant). The caller must hold the guest's token (`guestToken` / X-Guest-Token) or be
+// logged in as the guest. A wrong token answers like an unknown guest.
+router.post('/:partyId/raffles/:raffleId/enter', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, raffleId } = req.params;
     const { guestId } = req.body;
 
     if (!guestId) {
       throw new AppError('Guest ID is required', 400, 'VALIDATION_ERROR');
+    }
+    // Malformed ids get the same 404 as an unknown guest (not a Prisma 500).
+    if (!isUuid(guestId) || !isUuid(partyId) || !isUuid(raffleId)) {
+      throw new AppError('Guest not found for this party', 404, 'GUEST_NOT_FOUND');
     }
 
     // porchetta-81402: cancelled events are read-only.
@@ -377,7 +385,7 @@ router.post('/:partyId/raffles/:raffleId/enter', async (req: AuthRequest, res: R
       where: { id: guestId, partyId, OR: [{ approved: true }, { approved: null }] },
     });
 
-    if (!guest) {
+    if (!guest || !callerOwnsGuest(req, guest)) {
       throw new AppError('Guest not found for this party', 404, 'GUEST_NOT_FOUND');
     }
 

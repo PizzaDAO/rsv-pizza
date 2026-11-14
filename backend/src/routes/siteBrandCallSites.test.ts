@@ -12,6 +12,7 @@ const mockPrisma = vi.hoisted(() => ({
   hostSurveyResponse: { findUnique: vi.fn(), upsert: vi.fn() },
   eventSeries: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() },
 }));
+process.env.JWT_SECRET ??= 'test-secret-rsvp-overwrite-fix-0123456789';
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 vi.mock('../services/webhook.service.js', () => ({ triggerWebhook: vi.fn() }));
 
@@ -25,6 +26,7 @@ import { buildSurveyEmail } from './survey.routes.js';
 import { buildInviteEmail } from './v1/guests.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { errorHandler } from '../middleware/error.js';
+import { signGuestToken } from '../lib/guestToken.js';
 import { _resetSiteBrandCache } from '../lib/siteBrand.js';
 
 function app() {
@@ -116,9 +118,11 @@ describe('branded call sites', () => {
       id: 'p1', name: 'T1 Party', date: null, timezone: null, address: null, customUrl: 'my-t1',
       eventImageUrl: null, eventSeriesId: 'series-team1',
     });
+    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1', name: 'Gus', email: 'g@example.com' });
     await request(app())
       .post('/api/rsvp/abc123/send-confirmation')
-      .send({ guestId: 'g1', guestEmail: 'g@example.com', guestName: 'Gus' });
+      // rsvp-overwrite-fix: needs the guest token; the email goes to the stored address.
+      .send({ guestId: 'g1', guestToken: signGuestToken('g1') });
     const body = lastResend();
     expect(body.from).toBe('Team1 Pizza <noreply@rsv.pizza>');
     expect(body.html).toContain('href="https://team1.rsv.pizza/my-t1"');

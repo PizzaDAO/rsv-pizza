@@ -64,17 +64,17 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
         setMintResult({ txHash: mintRes.txHash, tokenId: mintRes.tokenId, alreadyMinted: mintRes.alreadyMinted });
         setMintStatus('success');
 
-        // Save NFT data to backend
-        if (mintRes.txHash && mintRes.tokenId && form.email.trim()) {
+        // Save NFT data to backend. rsvp-overwrite-fix: authorized by the guest token from
+        // the RSVP response (a guest id + email no longer prove anything).
+        if (mintRes.txHash && mintRes.tokenId && result.guestToken) {
           const API_URL = import.meta.env.VITE_API_URL || '';
           try {
             const saveResponse = await fetch(`${API_URL}/api/nft/guest/${result.guest.id}`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Guest-Token': result.guestToken },
               body: JSON.stringify({
                 tokenId: parseInt(mintRes.tokenId),
                 transactionHash: mintRes.txHash,
-                email: form.email.trim().toLowerCase(),
               }),
             });
             if (!saveResponse.ok) {
@@ -86,6 +86,15 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           }
         }
       } catch (err) {
+        // rsvp-overwrite-fix: a 404 means "no mint for this RSVP" (e.g. the email was already
+        // on the list and the backend answered with a stand-in id, or the event has no NFT).
+        // Show the normal success screen with no NFT error, so the UI reveals nothing more
+        // than the RSVP response did.
+        if ((err as { status?: number } | null)?.status === 404) {
+          setMintResult({});
+          setMintStatus('idle');
+          return;
+        }
         setMintResult({ error: err instanceof Error ? err.message : 'Minting failed' });
         setMintStatus('error');
       }

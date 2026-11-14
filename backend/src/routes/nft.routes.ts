@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -90,19 +92,21 @@ router.get('/metadata/:partyId/:address', async (req, res) => {
 });
 
 // PATCH /api/nft/guest/:guestId - Save NFT data after minting
-// Requires email verification to prevent unauthorized updates
-router.patch('/guest/:guestId', async (req, res) => {
+// rsvp-overwrite-fix: the old check (body email == guest email) proved nothing, since guest
+// ids and emails both leaked via the anon guests grant. Now the caller must hold the guest's
+// token (`guestToken` / X-Guest-Token, returned by the RSVP response) or be logged in as the
+// guest. Anything else answers like an unknown guest.
+router.patch('/guest/:guestId', optionalAuth, async (req: AuthRequest, res) => {
   try {
     const { guestId } = req.params;
-    const { tokenId, transactionHash, email } = req.body;
+    if (!isUuid(guestId)) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
+    const { tokenId, transactionHash } = req.body;
 
     // Validate required fields
     if (!tokenId || !transactionHash) {
       return res.status(400).json({ error: 'tokenId and transactionHash are required' });
-    }
-
-    if (!email) {
-      return res.status(400).json({ error: 'email is required for verification' });
     }
 
     // Validate tokenId is a positive integer
@@ -122,13 +126,8 @@ router.patch('/guest/:guestId', async (req, res) => {
       select: { id: true, email: true, nftTokenId: true },
     });
 
-    if (!existingGuest) {
+    if (!existingGuest || !callerOwnsGuest(req, existingGuest)) {
       return res.status(404).json({ error: 'Guest not found' });
-    }
-
-    // Verify email matches (case-insensitive)
-    if (!existingGuest.email || existingGuest.email.toLowerCase() !== email.toLowerCase()) {
-      return res.status(403).json({ error: 'Email verification failed' });
     }
 
     // Prevent overwriting existing NFT data (idempotency check)
@@ -146,6 +145,8 @@ router.patch('/guest/:guestId', async (req, res) => {
         nftTransactionHash: transactionHash,
         nftMintedAt: new Date(),
       },
+      // Only the NFT fields go back (this used to return the whole guest row).
+      select: { id: true, nftTokenId: true, nftTransactionHash: true, nftMintedAt: true },
     });
 
     res.json({ success: true, guest });
@@ -159,6 +160,9 @@ router.patch('/guest/:guestId', async (req, res) => {
 router.get('/guest/:guestId', async (req, res) => {
   try {
     const { guestId } = req.params;
+    if (!isUuid(guestId)) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
 
     const guest = await prisma.guest.findUnique({
       where: { id: guestId },

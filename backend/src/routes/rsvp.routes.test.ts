@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 
 // Use vi.hoisted to create mocks
 const mockPrisma = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const mockPrisma = vi.hoisted(() => ({
   },
 }));
 
+process.env.JWT_SECRET ??= 'test-secret-rsvp-overwrite-fix-0123456789';
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
 // Mock webhook service
@@ -355,7 +357,7 @@ describe('RSVP Routes', () => {
       expect(res.body.requireApproval).toBe(true);
     });
 
-    it('updates existing guest on duplicate email', async () => {
+    it('updates existing guest on duplicate email when logged in as that email', async () => {
       const app = createTestApp();
       mockPrisma.party.findUnique.mockResolvedValue({
         ...BASE_PARTY,
@@ -374,8 +376,10 @@ describe('RSVP Routes', () => {
         email: 'duplicate@example.com',
       });
 
+      const token = jwt.sign({ userId: 'u1', email: 'Duplicate@Example.com' }, process.env.JWT_SECRET!);
       const res = await request(app)
         .post(`/api/rsvp/${INVITE_CODE}/guest`)
+        .set('Authorization', `Bearer ${token}`)
         .send({
           name: 'Updated Name',
           email: 'duplicate@example.com',
@@ -384,6 +388,7 @@ describe('RSVP Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.updated).toBe(true);
+      expect(mockPrisma.guest.update).toHaveBeenCalled();
     });
 
     it('returns 404 for non-existent party', async () => {
