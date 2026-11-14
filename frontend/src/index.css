@@ -881,6 +881,25 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .monad-theme .pac-item { background-color: #fff !important; border-color: #EEEBF6 !important; color: var(--monad-ink) !important; }
 .monad-theme .pac-item:hover { background-color: #F6F4FF !important; }
 .monad-theme .pac-item-query { color: var(--monad-ink) !important; }
+/* Landing hero: subtle radiating purple line art (original SVG, low contrast, behind the text). */
+.monad-theme main > header {
+  position: relative;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1200 420%22 preserveAspectRatio=%22xMidYMid slice%22 fill=%22none%22 stroke=%22%236E54FF%22 stroke-width=%221%22 stroke-opacity=%220.18%22%3E%3Cpath d=%22M0 20 C300 62 440 300 600 300%22/%3E%3Cpath d=%22M0 48 C300 86 440 300 600 300%22/%3E%3Cpath d=%22M0 75 C300 109 440 300 600 300%22/%3E%3Cpath d=%22M0 103 C300 133 440 300 600 300%22/%3E%3Cpath d=%22M0 131 C300 156 440 300 600 300%22/%3E%3Cpath d=%22M0 158 C300 180 440 300 600 300%22/%3E%3Cpath d=%22M0 186 C300 203 440 300 600 300%22/%3E%3Cpath d=%22M0 214 C300 227 440 300 600 300%22/%3E%3Cpath d=%22M0 242 C300 250 440 300 600 300%22/%3E%3Cpath d=%22M0 269 C300 274 440 300 600 300%22/%3E%3Cpath d=%22M0 297 C300 297 440 300 600 300%22/%3E%3Cpath d=%22M0 325 C300 321 440 300 600 300%22/%3E%3Cpath d=%22M0 352 C300 344 440 300 600 300%22/%3E%3Cpath d=%22M0 380 C300 368 440 300 600 300%22/%3E%3Cpath d=%22M1200 20 C900 62 760 300 600 300%22/%3E%3Cpath d=%22M1200 48 C900 86 760 300 600 300%22/%3E%3Cpath d=%22M1200 75 C900 109 760 300 600 300%22/%3E%3Cpath d=%22M1200 103 C900 133 760 300 600 300%22/%3E%3Cpath d=%22M1200 131 C900 156 760 300 600 300%22/%3E%3Cpath d=%22M1200 158 C900 180 760 300 600 300%22/%3E%3Cpath d=%22M1200 186 C900 203 760 300 600 300%22/%3E%3Cpath d=%22M1200 214 C900 227 760 300 600 300%22/%3E%3Cpath d=%22M1200 242 C900 250 760 300 600 300%22/%3E%3Cpath d=%22M1200 269 C900 274 760 300 600 300%22/%3E%3Cpath d=%22M1200 297 C900 297 760 300 600 300%22/%3E%3Cpath d=%22M1200 325 C900 321 760 300 600 300%22/%3E%3Cpath d=%22M1200 352 C900 344 760 300 600 300%22/%3E%3Cpath d=%22M1200 380 C900 368 760 300 600 300%22/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: 100% 100%;
+  padding-bottom: 2.5rem;
+}
+/* Series logoUrl duplicates the header wordmark (and is the white-on-dark variant); hide it. */
+.monad-theme main > header > img:first-child { display: none; }
+/* Mobile header: keep logo, language switcher and login on one line. */
+@media (max-width: 480px) {
+  .monad-theme .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .monad-theme .site-header > div > a img { height: 1.5rem; }
+  .monad-theme .site-header > div > div { gap: 0.25rem; }
+  .monad-theme .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .monad-theme .site-header button svg.lucide-chevron-down { display: none; }
+}
 /* Footer logo is white; render it dark on the light page. */
 .monad-theme footer img { filter: brightness(0) opacity(0.7); }
 /* Brand-red utilities -> Monad purple (red stays only for real error boxes). */
