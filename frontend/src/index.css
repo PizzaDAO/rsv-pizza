@@ -782,7 +782,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   border: 1px solid var(--team1-red);
   color: #fff;
 }
-.team1-theme .btn-primary:hover:not(:disabled) { background-color: #ff3a48; border-color: #ff3a48; }
+/* hover goes darker, not lighter: white on the old #ff3a48 hover was 3.5:1 */
+.team1-theme .btn-primary:hover:not(:disabled) { background-color: #C41C28; border-color: #C41C28; }
 .team1-theme .btn-secondary {
   background: var(--team1-card);
   border: 1px solid var(--team1-line);
@@ -1209,6 +1210,73 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   background: #FCF4E1 !important;
   border: 2px solid var(--doge-ink) !important;
   box-shadow: 0 16px 48px rgba(48, 45, 37, 0.3) !important;
+}
+
+/* ─── Brand-theme QA fixes (brand-page-qa) ───
+ * Status / accent colours below were picked for the dark default theme (green-400, amber-400,
+ * red-300, #39d98a, ...) and fall under 4.5:1 on the light Doge/Monad pages, and the faint /
+ * low-alpha white text tiers fall under 4.5:1 on Team1's black. Remapped per brand; the default
+ * theme is untouched. Light themes: dark status hues (success #1f7a45 7:1, warning #8a5a00 6:1,
+ * danger #b3261e 6.5:1 on cream/white). */
+.doge-theme, .monad-theme {
+  --text-faint: rgba(48, 45, 37, 0.72);
+}
+.monad-theme { --text-faint: rgba(17, 17, 17, 0.64); }
+.doge-theme .text-white\/40, .doge-theme .text-white\/30, .doge-theme .text-white\/20 { color: rgba(48, 45, 37, 0.7); }
+.monad-theme .text-white\/40, .monad-theme .text-white\/30 { color: rgba(17, 17, 17, 0.64); }
+.monad-theme .text-white\/20 { color: rgba(17, 17, 17, 0.58); }
+.doge-theme .text-green-400, .doge-theme .text-green-300, .doge-theme .text-emerald-400, .doge-theme .text-\[\#39d98a\],
+.monad-theme .text-green-400, .monad-theme .text-green-300, .monad-theme .text-emerald-400, .monad-theme .text-\[\#39d98a\] { color: #1f7a45; }
+.doge-theme .text-amber-400, .doge-theme .text-amber-400\/70, .doge-theme .text-yellow-400, .doge-theme .text-yellow-300, .doge-theme .text-orange-400,
+.monad-theme .text-amber-400, .monad-theme .text-amber-400\/70, .monad-theme .text-yellow-400, .monad-theme .text-yellow-300, .monad-theme .text-orange-400 { color: #8a5a00; }
+.doge-theme .text-red-400, .doge-theme .text-red-300, .doge-theme .text-\[\#ff393a\]\/60,
+.monad-theme .text-red-400, .monad-theme .text-red-300, .monad-theme .text-\[\#ff393a\]\/60 { color: #b3261e; }
+.doge-theme .text-\[\#5c7cfa\], .monad-theme .text-\[\#5c7cfa\] { color: #3a4fc4; }
+.doge-theme .text-blue-400, .doge-theme .text-sky-400, .doge-theme .text-cyan-400, .monad-theme .text-blue-400, .monad-theme .text-sky-400, .monad-theme .text-cyan-400 { color: #1d5fa8; }
+.doge-theme .text-purple-400, .doge-theme .text-violet-400, .doge-theme .text-pink-400, .monad-theme .text-purple-400, .monad-theme .text-violet-400, .monad-theme .text-pink-400 { color: #7a35b5; }
+/* Red-tinted fills without a red border/text are brand accents (badges, selected rows): purple on Monad.
+ * Anything with text-[#ff393a] + border-[#ff393a] is an error/danger box and keeps red (rule above). */
+.monad-theme :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]) { background-color: rgba(110, 84, 255, 0.12); }
+.monad-theme :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"])[class*="border-[#ff393a]"]:not([class*="text-[#ff393a]"]) {
+  background-color: rgba(110, 84, 255, 0.08);
+  border-color: rgba(110, 84, 255, 0.4);
+}
+.monad-theme :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]).text-\[\#ff393a\] { color: #4a35c9; }
+/* Tinted status pills (text on a 15-20% tint of its own colour): one step darker than plain text. */
+.doge-theme [class*="bg-[#39d98a]/"].text-\[\#39d98a\], .monad-theme [class*="bg-[#39d98a]/"].text-\[\#39d98a\] { color: #17663a; }
+/* Host Resources / app-hub icons carry their brand colour inline (amber, green, red on pale tints). */
+.doge-theme svg[style*="color: rgb(245, 158, 11)"], .monad-theme svg[style*="color: rgb(245, 158, 11)"] { color: #8a5a00 !important; }
+.doge-theme svg[style*="color: rgb(57, 217, 138)"], .monad-theme svg[style*="color: rgb(57, 217, 138)"],
+.doge-theme svg[style*="color: rgb(34, 197, 94)"], .monad-theme svg[style*="color: rgb(34, 197, 94)"] { color: #1f7a45 !important; }
+.doge-theme svg[style*="color: rgb(255, 57, 58)"] { color: #b3261e !important; }
+.doge-theme svg[style*="color: rgb(92, 124, 250)"], .monad-theme svg[style*="color: rgb(92, 124, 250)"] { color: #3a4fc4 !important; }
+.monad-theme svg[style*="color: rgb(255, 57, 58)"] { color: var(--monad-purple-deep) !important; }
+/* Solid accent fills (vote buttons, selected chips): `text-white` is remapped to ink above,
+ * which is invisible on Doge's ink accent and weak on Monad's purple. */
+.doge-theme .bg-theme-accent, .doge-theme .bg-theme-accent .text-white { color: var(--doge-cream); }
+.monad-theme .bg-theme-accent, .monad-theme .bg-theme-accent .text-white { color: #fff; }
+
+.team1-theme {
+  --text-faint: rgba(255, 255, 255, 0.55);
+}
+.team1-theme .text-white\/40, .team1-theme .text-white\/30, .team1-theme .text-white\/20 { color: rgba(255, 255, 255, 0.58); }
+.team1-theme .text-theme-accent { color: var(--accent-hover); }
+.team1-theme .text-\[\#5c7cfa\] { color: #8fa6ff; }
+.team1-theme .text-\[\#ff393a\]\/60 { color: #ff6b75; }
+/* Light-400 avatar chips: white text is under 3:1 on sky/fuchsia/lime..., use near-black. */
+.team1-theme [class~="text-theme-text"][class*=" bg-"][class*="-400"] { color: #0b0b0c; }
+
+/* Mobile: the host Guests card header (title + count pills + Import/Export) overflows the card at
+ * 390px; let it wrap on the brand sites. (Default theme layout left as is.) */
+@media (max-width: 480px) {
+  .doge-theme .guest-list-head, .monad-theme .guest-list-head, .team1-theme .guest-list-head { flex-wrap: wrap; row-gap: 0.75rem; }
+  .doge-theme .guest-list-head > div, .monad-theme .guest-list-head > div, .team1-theme .guest-list-head > div { flex-wrap: wrap; row-gap: 0.5rem; }
+  /* Doge header: keep wordmark, language switcher and login on one line (as Monad does). */
+  .doge-theme .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .doge-theme .site-header > div > a img { height: 1.5rem; }
+  .doge-theme .site-header > div > div { gap: 0.25rem; }
+  .doge-theme .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .doge-theme .site-header button svg.lucide-chevron-down { display: none; }
 }
 
 /* ─── Adding New Themes ───
