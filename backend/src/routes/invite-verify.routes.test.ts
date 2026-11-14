@@ -60,6 +60,7 @@ import {
   SEND_PER_EMAIL_IP as RSVP_CODE_PER_EMAIL_IP,
   SEND_PER_EMAIL_HOUR,
   FAIL_PER_IP,
+  FAIL_PER_IP_CODE_ONLY,
   FAIL_PER_EMAIL_IP,
   EMAIL_UNDER_ATTACK_FAILS,
   takeCodeSend,
@@ -648,9 +649,10 @@ describe('POST /api/auth/verify-code bound to an email', () => {
     expect(mockPrisma.magicLink.updateMany).not.toHaveBeenCalled();
   });
 
-  it(`code-only path: ${FAIL_PER_IP} wrong codes per IP, then 429 for that IP only`, async () => {
+  it(`legacy code-only path: its own low budget, ${FAIL_PER_IP_CODE_ONLY} wrong codes per IP, then 429 for that IP only`, async () => {
+    expect(FAIL_PER_IP_CODE_ONLY).toBeLessThan(FAIL_PER_IP);
     const code = await getCode();
-    for (let i = 0; i < FAIL_PER_IP; i++) {
+    for (let i = 0; i < FAIL_PER_IP_CODE_ONLY; i++) {
       expect((await verify('4.4.4.4', { code: String(100000 + i) === code ? '999999' : String(100000 + i) })).status).toBe(401);
     }
     expect((await verify('4.4.4.4', { code })).status).toBe(429);
@@ -658,6 +660,24 @@ describe('POST /api/auth/verify-code bound to an email', () => {
     expect(mockPrisma.magicLink.updateMany).not.toHaveBeenCalled();
     // Another IP is unaffected.
     expect((await verify('4.4.4.5', { code })).status).toBe(200);
+  });
+
+  it('the code-only and email-bound per-IP budgets are separate buckets', async () => {
+    const code = await getCode();
+    // Exhaust the legacy code-only bucket from one IP...
+    for (let i = 0; i < FAIL_PER_IP_CODE_ONLY; i++) await verify('4.4.4.6', { code: wrongOf(code) });
+    expect((await verify('4.4.4.6', { code })).status).toBe(429);
+    // ...the same IP can still use the email-bound path (e.g. a current bundle behind the same NAT).
+    expect((await verify('4.4.4.6', { code, email: 'ivy@example.com' })).status).toBe(200);
+  });
+
+  it(`email-bound: ${FAIL_PER_IP} wrong codes per IP across emails (NAT-friendly), more than the code-only ${FAIL_PER_IP_CODE_ONLY}`, async () => {
+    const code = await getCode();
+    // 5 per (email, IP), so spread over emails to reach the per-IP cap.
+    for (let i = 0; i < FAIL_PER_IP; i++) {
+      expect((await verify('4.4.4.7', { code: wrongOf(code), email: `n${Math.floor(i / FAIL_PER_EMAIL_IP)}@example.com` })).status).toBe(401);
+    }
+    expect((await verify('4.4.4.7', { code, email: 'ivy@example.com' })).status).toBe(429);
   });
 
   describe('parallel bursts cannot bypass the budget (slots are reserved before any await)', () => {
@@ -678,12 +698,18 @@ describe('POST /api/auth/verify-code bound to an email', () => {
       };
     }
 
-    it(`code-only: ${FAIL_PER_IP + 20} parallel wrong guesses from one IP → only ${FAIL_PER_IP} are looked up, the rest 429`, async () => {
+    it(`code-only: ${FAIL_PER_IP_CODE_ONLY + 20} parallel wrong guesses from one IP → only ${FAIL_PER_IP_CODE_ONLY} are looked up, the rest 429`, async () => {
       const code = await getCode();
-      const { evaluated, statuses } = await burst(FAIL_PER_IP + 20, (i) => ({ code: String(200000 + i) === code ? '999998' : String(200000 + i) }), '2.2.2.2');
-      expect(evaluated).toBe(FAIL_PER_IP);
-      expect(statuses.filter((s) => s === 401)).toHaveLength(FAIL_PER_IP);
+      const { evaluated, statuses } = await burst(FAIL_PER_IP_CODE_ONLY + 20, (i) => ({ code: String(200000 + i) === code ? '999998' : String(200000 + i) }), '2.2.2.2');
+      expect(evaluated).toBe(FAIL_PER_IP_CODE_ONLY);
+      expect(statuses.filter((s) => s === 401)).toHaveLength(FAIL_PER_IP_CODE_ONLY);
       expect(statuses.filter((s) => s === 429)).toHaveLength(20);
+    });
+
+    it(`email-bound across many emails: ${FAIL_PER_IP + 10} parallel wrong guesses from one IP → only ${FAIL_PER_IP} are looked up`, async () => {
+      const code = await getCode();
+      const { evaluated } = await burst(FAIL_PER_IP + 10, (i) => ({ code: wrongOf(code), email: `b${i}@example.com` }), '2.2.2.9');
+      expect(evaluated).toBe(FAIL_PER_IP);
     });
 
     it(`email-bound: 12 parallel wrong guesses from one IP → only ${FAIL_PER_EMAIL_IP} are looked up`, async () => {

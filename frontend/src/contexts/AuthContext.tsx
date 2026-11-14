@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AUTH_EXPIRED_EVENT } from '../lib/api';
+import { rememberAuthCodeEmail } from '../lib/authCodeEmail';
 import type { BankDetails, PayoutMethod } from '../types';
 
 interface User {
@@ -136,6 +137,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // The API puts the message under error.error (e.g. the 429 "Try again in a few minutes").
       throw new Error(error?.error?.message ?? error?.message ?? 'Failed to send magic link');
     }
+
+    // invite-verify: the code-entry page sends the email with the code (the backend binds
+    // the code to it), so remember which address the code went to for this tab.
+    rememberAuthCodeEmail(email);
 
     return response.json();
   };

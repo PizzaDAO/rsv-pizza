@@ -173,7 +173,13 @@ export const SEND_PER_EMAIL_IP = 3; // per (email, IP) per 15 min
 export const SEND_PER_EMAIL_HOUR = 10; // per email, any IP; above it each (email, IP) gets 1 per 15 min
 
 /** Wrong codes at POST /api/auth/verify-code. */
-export const FAIL_PER_IP = 40; // per IP per 15 min, both paths (generous for shared NAT, e.g. venue wifi)
+export const FAIL_PER_IP = 40; // email-bound checks: per IP per 15 min, all emails (generous for shared NAT)
+// Legacy code-only checks (no email; only old cached bundles still send them) get their own,
+// low per-IP budget, separate from the email-bound one.
+// TODO(invite-verify, added 2026-11-14): remove the code-only path from /verify-code after
+// 2026-11-28, once bundles cached from before PR #1253 have aged out. Every current caller
+// (AuthVerifyPage, GPP landing, RSVP code step) sends the email.
+export const FAIL_PER_IP_CODE_ONLY = 10;
 export const FAIL_PER_EMAIL_IP = 5; // per (email, IP) per 15 min, email-bound checks
 export const EMAIL_UNDER_ATTACK_FAILS = 25; // wrong codes on an email's live codes, any IP
 export const FAIL_PER_EMAIL_IP_UNDER_ATTACK = 1; // per (email, IP) once the email is under attack
@@ -241,7 +247,8 @@ function rollback(map: Map<string, number[]>, key: string, stamp: number) {
 /**
  * Wrong-code budget (reserveVerifyAttempt below). Checked BEFORE the code is looked up, so a refused
  * caller learns nothing about whether their guess was right. Refuses only this caller:
- *   - FAIL_PER_IP wrong codes from this IP in 15 min (any email, either path);
+ *   - FAIL_PER_IP wrong email-bound codes from this IP in 15 min (any email), or
+ *     FAIL_PER_IP_CODE_ONLY legacy code-only ones (a separate bucket);
  *   - for an email-bound check, FAIL_PER_EMAIL_IP wrong codes for this (email, IP), or
  *     just FAIL_PER_EMAIL_IP_UNDER_ATTACK once the email's live codes have collected
  *     EMAIL_UNDER_ATTACK_FAILS wrong guesses from anyone. A caller with no failures of
@@ -262,10 +269,10 @@ export interface VerifyAttempt {
  */
 export async function reserveVerifyAttempt(ip: string | undefined, email?: string | null): Promise<VerifyAttempt | null> {
   const now = Date.now();
-  const ipKey = `ip|${ip ?? '?'}`;
+  const ipKey = email ? `ip|${ip ?? '?'}` : `ipc|${ip ?? '?'}`; // code-only: own bucket
   const emailKey = email ? `${email}|${ip ?? '?'}` : null;
   const ipTs = recent(failLog, ipKey, now);
-  if (ipTs.length >= FAIL_PER_IP) return null;
+  if (ipTs.length >= (email ? FAIL_PER_IP : FAIL_PER_IP_CODE_ONLY)) return null;
   let mine = 0;
   if (emailKey) {
     const ts = recent(failLog, emailKey, now);

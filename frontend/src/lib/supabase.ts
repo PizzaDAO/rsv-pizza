@@ -17,6 +17,7 @@ import {
 import type { OneSheetConfig } from './api';
 import { uuid } from './utils';
 import { getInviteToken } from './inviteToken';
+import { postVerifyCode } from './authCodeEmail';
 import { sanitizeCoHosts } from './sanitizeCoHosts';
 import type { HostGoals } from '../types';
 import { renderPdfPageOneToPng } from './pdfUtils';
@@ -1746,11 +1747,7 @@ export async function verifyRsvpEmailCode(
   code: string,
   name?: string,
 ): Promise<{ id: string; email: string; name?: string | null }> {
-  const response = await fetch(`${API_URL}/api/auth/verify-code`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, email, ...(name ? { name } : {}) }),
-  });
+  const response = await postVerifyCode(code, email, { name });
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.accessToken) {
     const errCode = data?.error?.code;

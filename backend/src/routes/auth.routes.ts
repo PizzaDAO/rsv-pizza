@@ -248,9 +248,13 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
       throw new AppError('Invalid code format', 400, 'INVALID_FORMAT');
     }
 
-    // invite-verify: callers that know which email the code was sent to (the RSVP form's
-    // inline code step) pass `email`. The code must then belong to that email; a code that
-    // exists for some OTHER email gets the same INVALID_CODE as a code that doesn't exist.
+    // invite-verify: every current caller (AuthVerifyPage, GPP landing, the RSVP code step)
+    // passes `email`. The code must then belong to that email; a code that exists for some
+    // OTHER email gets the same INVALID_CODE as a code that doesn't exist.
+    // Requests WITHOUT `email` (bundles cached from before PR #1253) still use the old
+    // code-only lookup, with their own low per-IP failure budget (FAIL_PER_IP_CODE_ONLY).
+    // TODO(invite-verify, added 2026-11-14): after 2026-11-28, reject requests without
+    // `email` (400) and delete the code-only lookup.
     let boundEmail: string | null = null;
     if (req.body?.email !== undefined) {
       boundEmail = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : null;

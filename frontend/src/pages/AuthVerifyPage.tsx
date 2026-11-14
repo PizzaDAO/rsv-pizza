@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
 import { Layout } from '../components/Layout';
 import { sanitizeNextPath } from '../lib/wallet/handoff';
+import { getAuthCodeEmail, clearAuthCodeEmail, postVerifyCode } from '../lib/authCodeEmail';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
@@ -23,6 +24,12 @@ export function AuthVerifyPage() {
   const [pendingAuthData, setPendingAuthData] = useState<any>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  // invite-verify: the code is checked against the email it was sent to. Normally that's
+  // remembered from the request step; if not (new tab, storage blocked) we ask for it.
+  const [storedEmail] = useState<string | null>(() => getAuthCodeEmail());
+  const [typedEmail, setTypedEmail] = useState('');
+  const codeEmail = (storedEmail || typedEmail).trim().toLowerCase();
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(codeEmail);
   // Captured once at first render: the sign-in token (email link / wallet hand-off) and the
   // local `next` path. The token is stripped from the address bar immediately (see effect).
   const initialParams = useRef(new URLSearchParams(location.search));
@@ -108,14 +115,15 @@ export function AuthVerifyPage() {
   }, []);
 
   async function verifyCode(fullCode: string) {
+    if (!emailOk) {
+      setStatus('error');
+      setError(t('verifyPage.emailRequired'));
+      return;
+    }
     setStatus('verifying');
     setLastSubmittedCode(fullCode);
     try {
-      const response = await fetch(`${API_URL}/api/auth/verify-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: fullCode }),
-      });
+      const response = await postVerifyCode(fullCode, codeEmail);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -124,6 +132,7 @@ export function AuthVerifyPage() {
 
       const data = await response.json();
       sessionStorage.removeItem('isNewUser');
+      clearAuthCodeEmail();
 
       // If new user, prompt for name before completing
       if (isNewUser) {
@@ -240,6 +249,20 @@ export function AuthVerifyPage() {
             </div>
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.title')}</h1>
             <p className="text-theme-text-secondary mb-6">{t('verifyPage.subtitle')}</p>
+
+            {!storedEmail && (
+              <div className="mb-4 text-left">
+                <IconInput
+                  icon={Mail}
+                  type="email"
+                  autoComplete="email"
+                  value={typedEmail}
+                  onChange={(e) => setTypedEmail((e.target as HTMLInputElement).value)}
+                  placeholder={t('verifyPage.emailPlaceholder')}
+                  data-testid="verify-code-email"
+                />
+              </div>
+            )}
 
             <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
               {code.map((digit, index) => (
