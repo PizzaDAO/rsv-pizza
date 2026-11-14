@@ -87,13 +87,28 @@ function mapPhotonFeature(f: PhotonFeature): AddressResult | null {
 }
 
 async function searchPhoton(query: string, signal?: AbortSignal): Promise<AddressResult[]> {
-  const url = `${PHOTON_URL}?q=${encodeURIComponent(query)}&limit=5`;
+  // Over-fetch, then drop same-label duplicates: OSM often has a city and its
+  // identically named county (e.g. Philadelphia), which render as one label twice.
+  const url = `${PHOTON_URL}?q=${encodeURIComponent(query)}&limit=8`;
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Photon ${res.status}`);
   const data = (await res.json()) as { features?: PhotonFeature[] };
-  return (data.features || [])
-    .map(mapPhotonFeature)
-    .filter((r): r is AddressResult => r !== null);
+  return dedupeByLabel(
+    (data.features || [])
+      .map(mapPhotonFeature)
+      .filter((r): r is AddressResult => r !== null),
+  ).slice(0, 5);
+}
+
+/** Keep the first result for each displayed label (first = Photon's best match). */
+export function dedupeByLabel(results: AddressResult[]): AddressResult[] {
+  const seen = new Set<string>();
+  return results.filter((r) => {
+    const key = r.formattedName.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ── Nominatim (fallback) ────────────────────────────────────────────────────

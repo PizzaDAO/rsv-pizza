@@ -23,7 +23,7 @@ interface SeriesLandingPageProps {
 
 /** Live countdown to a series' global event day. Hooks live here (not in the page) so the
  *  page's early returns stay hook-safe. */
-function EventCountdown({ eventDate }: { eventDate: string }) {
+function EventCountdown({ eventDate, dayName }: { eventDate: string; dayName: string }) {
   const target = new Date(eventDate).getTime();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -47,6 +47,11 @@ function EventCountdown({ eventDate }: { eventDate: string }) {
 
   return (
     <div className="text-center mb-10" data-testid="event-countdown">
+      {diff > 0 && (
+        <p className="text-sm font-semibold uppercase tracking-widest text-theme-text-muted mb-1">
+          Countdown to {dayName}
+        </p>
+      )}
       <p className="text-lg font-semibold text-theme-text mb-3">{dateLabel}</p>
       {diff > 0 && (
         <div className="inline-flex gap-3" role="timer" aria-label={`${days} days until ${dateLabel}`}>
@@ -154,7 +159,7 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
           )}
         </header>
 
-        {globalDay && series.eventDate && <EventCountdown eventDate={series.eventDate} />}
+        {globalDay && series.eventDate && <EventCountdown eventDate={series.eventDate} dayName={title} />}
 
         {showCreateCta && (
           <div className="text-center mb-10">
