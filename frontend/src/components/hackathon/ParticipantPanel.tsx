@@ -8,6 +8,7 @@ import { LoginModal } from '../LoginModal';
 import { IconInput } from '../IconInput';
 import { ErrorBanner, Hint } from './shared';
 import { SubmissionForm } from './SubmissionForm';
+import { TeamResults } from './TeamResults';
 import {
   STATUS_LABEL,
   eligibilityMessage,
@@ -146,6 +147,8 @@ export function ParticipantPanel({ partyId, hackathon }: { partyId: string; hack
   const closed = me.deadlinePassed;
 
   // ------------------------------------------------------------ no team yet
+  // After the reveal there's nothing left to join: the winners strip says it all.
+  if (!team && hackathon.resultsRevealedAt) return null;
   if (!team) {
     let body: ReactNode;
     if (!me.loggedIn) {
@@ -256,6 +259,9 @@ export function ParticipantPanel({ partyId, hackathon }: { partyId: string; hack
 
   return (
     <div className="space-y-3 mb-3" data-testid="hackathon-participant">
+      {/* Results (after the host reveals them) */}
+      {me.results && <TeamResults results={me.results} />}
+
       {/* Team */}
       <div className="rounded-xl border border-theme-stroke bg-theme-surface p-4" data-testid="hackathon-team">
         <div className="flex items-start justify-between gap-3">

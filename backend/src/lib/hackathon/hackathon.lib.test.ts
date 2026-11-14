@@ -21,7 +21,21 @@ describe('hackathon checklist auto rules', () => {
       hackathon_submissions_ready: true,
       hackathon_judges_added: true,
       hackathon_judging_closed: false,
+      hackathon_results_revealed: false,
+      hackathon_prizes_paid: false,
     });
+  });
+
+  it('PR 5: results revealed; prizes paid needs >= 1 award and none unpaid / pending', () => {
+    expect(hackathonAutoStates({ ...base, resultsRevealedAt: new Date() }).hackathon_results_revealed).toBe(true);
+    expect(hackathonAutoStates({ ...base, resultsRevealedAt: null }).hackathon_results_revealed).toBe(false);
+    expect(hackathonAutoStates({ ...base, resultsRevealedAt: new Date(), disabledAt: new Date() }).hackathon_results_revealed).toBe(false);
+    expect(hackathonAutoStates({ ...base, awardCount: 3, openPayoutCount: 0 }).hackathon_prizes_paid).toBe(true);
+    expect(hackathonAutoStates({ ...base, awardCount: 3, openPayoutCount: 1 }).hackathon_prizes_paid).toBe(false);
+    // Zero awards is not "all prizes sent".
+    expect(hackathonAutoStates({ ...base, awardCount: 0, openPayoutCount: 0 }).hackathon_prizes_paid).toBe(false);
+    // Older callers without counts: not done.
+    expect(hackathonAutoStates(base).hackathon_prizes_paid).toBe(false);
   });
 
   it('judging closed only when judging_status = closed', () => {
@@ -46,7 +60,10 @@ describe('hackathon checklist auto rules', () => {
   });
 
   it('missing or disabled hackathon completes nothing', () => {
-    const none = { hackathon_published: false, hackathon_submissions_ready: false, hackathon_judges_added: false, hackathon_judging_closed: false };
+    const none = {
+      hackathon_published: false, hackathon_submissions_ready: false, hackathon_judges_added: false, hackathon_judging_closed: false,
+      hackathon_results_revealed: false, hackathon_prizes_paid: false,
+    };
     expect(hackathonAutoStates(null)).toEqual(none);
     expect(hackathonAutoStates({ ...base, disabledAt: new Date() })).toEqual(none);
   });

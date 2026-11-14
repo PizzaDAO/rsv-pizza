@@ -231,6 +231,8 @@ function seed() {
     hackathonTeamMember: [],
     hackathonSubmission: [],
     hackathonSubmissionTrack: [],
+    hackathonAward: [],
+    hackathonScore: [],
   };
 }
 
@@ -254,9 +256,12 @@ beforeEach(() => {
     screenshotPaths: [], status: 'draft', submittedAt: null, disqualifiedReason: null, tableNumber: null, createdAt: nextTime(), updatedAt: nextTime(),
   }));
   mockPrisma.hackathonSubmissionTrack = fakeModel('hackathonSubmissionTrack', () => ({ createdAt: new Date() }));
+  mockPrisma.hackathonAward = fakeModel('hackathonAward');
+  mockPrisma.hackathonScore = fakeModel('hackathonScore');
   mockPrisma.$transaction = vi.fn(async (arg: any) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)));
   mockPrisma.$queryRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
     const sql = strings.join('?');
+    if (sql.includes('FROM hackathons') && sql.includes('FOR SHARE')) return db.hackathon.filter((h) => h.id === vals[0]).map((h) => ({ id: h.id }));
     if (sql.includes('FOR UPDATE')) {
       const [teamId, hackathonId] = vals;
       return db.hackathonTeam.filter((t) => t.id === teamId && t.hackathonId === hackathonId).map((t) => ({ id: t.id }));

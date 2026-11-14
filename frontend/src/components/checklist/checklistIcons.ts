@@ -1,6 +1,6 @@
 import {
   PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket,
-  ShieldCheck, Pizza, Camera, FileImage, Printer, Zap, Monitor, Settings, Trophy, ListChecks, Gavel, LucideIcon,
+  ShieldCheck, Pizza, Camera, FileImage, Printer, Zap, Monitor, Settings, Trophy, ListChecks, Gavel, Medal, HandCoins, LucideIcon,
 } from 'lucide-react';
 import type { ChecklistItem } from '../../types';
 import type { ChecklistVariant } from './checklistActions';
@@ -36,6 +36,8 @@ const RULE_ICONS: Record<string, LucideIcon> = {
   hackathon_submissions_ready: ListChecks,
   hackathon_judges_added: Gavel,
   hackathon_judging_closed: Gavel,
+  hackathon_results_revealed: Medal,
+  hackathon_prizes_paid: HandCoins,
 };
 const TAB_ICONS: Record<string, LucideIcon> = {
   partners: Handshake,

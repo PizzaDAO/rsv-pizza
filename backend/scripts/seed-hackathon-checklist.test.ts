@@ -26,7 +26,15 @@ describe('seed-hackathon-checklist', () => {
       .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_judging_closed' });
     // PR 4 re-run over rows PR 2 already linked: only the new auto rule is added.
     expect(planRow({ name: 'Run demos and judging', link_tab: 'hackathon', auto_rule: null })).toEqual({ autoRule: 'hackathon_judging_closed' });
-    expect(planRow({ name: 'Post winners and photos', link_tab: 'photos', auto_rule: null })).toEqual({ linkTab: 'hackathon' });
+    expect(planRow({ name: 'Post winners and photos', link_tab: 'photos', auto_rule: null }))
+      .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_results_revealed' });
+    // PR 5 re-run over rows PR 2 already linked: only the new auto rules are added.
+    expect(planRow({ name: 'Post winners and photos', link_tab: 'hackathon', auto_rule: null })).toEqual({ autoRule: 'hackathon_results_revealed' });
+    expect(planRow({ name: 'Send prizes to winners', link_tab: 'hackathon', auto_rule: null })).toEqual({ autoRule: 'hackathon_prizes_paid' });
+    // ...and a third run changes nothing.
+    expect(planRow({ name: 'Send prizes to winners', link_tab: 'hackathon', auto_rule: 'hackathon_prizes_paid' })).toBeNull();
+    // A host who already ticked "Send prizes" by hand keeps it manual.
+    expect(planRow({ name: 'Send prizes to winners', link_tab: 'hackathon', auto_rule: null, completed: true })).toBeNull();
   });
 
   it('never clobbers an admin edit, and is idempotent', () => {

@@ -12,7 +12,10 @@
  *
  * PR 4 adds POST /judging {status: open|closed} and GET /leaderboard (host only: rankings,
  * every judge's scores + private comments, judge progress). Judge routes live in
- * hackathon-judge.routes.ts. Rubric after scoring starts: no add / delete / max-score change
+ * hackathon-judge.routes.ts. PR 5: reopening judging while results are revealed -> 409;
+ * disqualifying an awarded project -> 409; an awarded prize can't change track or drop below its
+ * awarded count; GET /export.csv?kind=awards. Awards / reveal routes: hackathon-awards.routes.ts.
+ * Rubric after scoring starts: no add / delete / max-score change
  * (409 RUBRIC_LOCKED); weight changes re-total every score (lib/hackathon/scoring.ts).
  *
  * Delete rules follow the PR 1 FKs (nothing silently deletes participant data):
@@ -35,6 +38,7 @@ import { JUDGE_SUBMISSION_INCLUDE, isConflicted } from '../lib/hackathon/judge.j
 import { hackathonDefaults } from '../lib/hackathon/defaults.js';
 import { signImagePaths } from '../lib/hackathon/media.js';
 import { toCsv } from '../lib/hackathon/csv.js';
+import { AWARD_INCLUDE, AWARDS_CSV_HEADER, awardsCsvRows, hostAward } from '../lib/hackathon/awards.js';
 import {
   LIMITS,
   parseCriterion,
@@ -272,8 +276,28 @@ router.patch('/:partyId/hackathon/prizes/:prizeId', ...guard, async (req: AuthRe
     const h = await getHackathon(partyId);
     const data = parsePrize(req.body ?? {}, true);
     if (data.trackId) await assertTracks(h.id, [data.trackId as string]);
-    const r = await prisma.hackathonPrize.updateMany({ where: { id, hackathonId: h.id }, data });
-    if (!r.count) throw new AppError('Prize not found', 404, 'NOT_FOUND');
+    // PR 5: once awarded, a prize can't move tracks or drop below its awarded count. Checked
+    // and written under the hackathon-row lock that award creation also takes
+    // (hackathon-awards.routes.ts), so an award can't slip in between check and write.
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      if ('trackId' in data || data.quantity !== undefined) {
+        const [cur, awarded] = await Promise.all([
+          tx.hackathonPrize.findFirst({ where: { id, hackathonId: h.id }, select: { trackId: true } }),
+          tx.hackathonAward.count({ where: { prizeId: id } }),
+        ]);
+        if (cur && awarded > 0) {
+          if ('trackId' in data && (data.trackId ?? null) !== (cur.trackId ?? null)) {
+            throw conflict('This prize has been awarded, so its track can no longer change. Remove the awards first.', 'PRIZE_AWARDED');
+          }
+          if (data.quantity !== undefined && (data.quantity as number) < awarded) {
+            throw conflict(`This prize has been awarded ${awarded} time(s), so its quantity can't go below ${awarded}.`, 'PRIZE_AWARDED');
+          }
+        }
+      }
+      const r = await tx.hackathonPrize.updateMany({ where: { id, hackathonId: h.id }, data });
+      if (!r.count) throw new AppError('Prize not found', 404, 'NOT_FOUND');
+    });
     return respond(res, partyId);
   } catch (error) {
     next(error);
@@ -517,27 +541,38 @@ router.patch('/:partyId/hackathon/submissions/:submissionId', ...guard, async (r
     const { partyId } = req.params;
     const id = childId(req.params.submissionId);
     const h = await getHackathon(partyId);
-    const sub = await prisma.hackathonSubmission.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, status: true, submittedAt: true } });
-    if (!sub) throw new AppError('Project not found', 404, 'NOT_FOUND');
     const m = parseModeration((req.body ?? {}) as Record<string, unknown>);
-    const data: Record<string, unknown> = {};
-    // Restore must return the exact pre-disqualification status without a new column. The
-    // status machine makes that derivable: draft never has submittedAt; submitted always does;
-    // withdrawn also does, so withdrawn projects can't be disqualified (they're out of judging
-    // anyway). Hence restore = submittedAt ? 'submitted' : 'draft' is exact.
-    if (m.action === 'disqualify') {
-      if (sub.status === 'withdrawn') {
-        throw conflict("A withdrawn project isn't judged, so there's nothing to disqualify.", 'WITHDRAWN');
+    // PR 5: read + check + write under the hackathon-row lock (award creation takes the same
+    // lock), so a project can't be disqualified while an award is being created for it.
+    const sub = await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      const sub = await tx.hackathonSubmission.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, status: true, submittedAt: true } });
+      if (!sub) throw new AppError('Project not found', 404, 'NOT_FOUND');
+      const data: Record<string, unknown> = {};
+      // Restore must return the exact pre-disqualification status without a new column. The
+      // status machine makes that derivable: draft never has submittedAt; submitted always does;
+      // withdrawn also does, so withdrawn projects can't be disqualified (they're out of judging
+      // anyway). Hence restore = submittedAt ? 'submitted' : 'draft' is exact.
+      if (m.action === 'disqualify') {
+        if (sub.status === 'withdrawn') {
+          throw conflict("A withdrawn project isn't judged, so there's nothing to disqualify.", 'WITHDRAWN');
+        }
+        // PR 5: a winner must lose its awards first (awards.submission_id is RESTRICT, and the
+        // public winners list would otherwise silently drop it).
+        if ((await tx.hackathonAward.count({ where: { submissionId: sub.id } })) > 0) {
+          throw conflict('This project has won a prize. Remove its awards in Winners & Payouts before disqualifying it.', 'HAS_AWARDS');
+        }
+        data.status = 'disqualified';
+        data.disqualifiedReason = m.reason;
+      } else if (m.action === 'restore') {
+        if (sub.status !== 'disqualified') throw conflict('Only a disqualified project can be restored.', 'NOT_DISQUALIFIED');
+        data.status = sub.submittedAt ? 'submitted' : 'draft';
+        data.disqualifiedReason = null;
       }
-      data.status = 'disqualified';
-      data.disqualifiedReason = m.reason;
-    } else if (m.action === 'restore') {
-      if (sub.status !== 'disqualified') throw conflict('Only a disqualified project can be restored.', 'NOT_DISQUALIFIED');
-      data.status = sub.submittedAt ? 'submitted' : 'draft';
-      data.disqualifiedReason = null;
-    }
-    if (m.tableNumber !== undefined) data.tableNumber = m.tableNumber;
-    await prisma.hackathonSubmission.update({ where: { id: sub.id }, data });
+      if (m.tableNumber !== undefined) data.tableNumber = m.tableNumber;
+      await tx.hackathonSubmission.update({ where: { id: sub.id }, data });
+      return sub;
+    });
     const team = await prisma.hackathonTeam.findFirst({ where: { hackathonId: h.id, submissions: { some: { id: sub.id } } }, include: TEAM_INCLUDE });
     const urls = await signImagePaths(submissionImagePaths((team as any)?.submissions?.[0]));
     res.set('Cache-Control', 'private, no-store');
@@ -552,6 +587,19 @@ router.get('/:partyId/hackathon/export.csv', ...readGuard, async (req: AuthReque
   try {
     const { partyId } = req.params;
     const h = await getHackathon(partyId);
+    if (req.query.kind === 'awards') {
+      // PR 5: awards + payout tracking (host only; wallet / reference / notes included).
+      const [awards, prizes, tracks] = await Promise.all([
+        prisma.hackathonAward.findMany({ where: { hackathonId: h.id }, include: AWARD_INCLUDE, orderBy: { awardedAt: 'asc' }, take: 1000 }),
+        prisma.hackathonPrize.findMany({ where: { hackathonId: h.id } }),
+        prisma.hackathonTrack.findMany({ where: { hackathonId: h.id }, select: { id: true, name: true } }),
+      ]);
+      const sorted = [...awards].sort((a: any, b: any) => (a.prize?.sortOrder ?? 0) - (b.prize?.sortOrder ?? 0) || (a.place ?? 0) - (b.place ?? 0));
+      res.set('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="hackathon-awards.csv"');
+      return res.send(toCsv(AWARDS_CSV_HEADER, awardsCsvRows(sorted.map(hostAward), prizes, tracks)));
+    }
     const kind = req.query.kind === 'members' ? 'members' : 'projects';
     const [teams, tracks] = await Promise.all([
       loadHostTeams(h.id),
@@ -599,7 +647,16 @@ router.post('/:partyId/hackathon/judging', ...guard, async (req: AuthRequest, re
     const h = await getHackathon(partyId);
     const status = (req.body ?? {}).status;
     if (status !== 'open' && status !== 'closed') throw new AppError('status must be open or closed', 400, 'VALIDATION_ERROR');
-    await prisma.hackathon.update({ where: { id: h.id }, data: { judgingStatus: status } });
+    // PR 5: reveal needs judging closed, so judging can't reopen while results are public.
+    // Same hackathon-row lock as reveal (hackathon-awards.routes.ts), so the two serialize.
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      if (status === 'open') {
+        const cur = await tx.hackathon.findUnique({ where: { id: h.id }, select: { resultsRevealedAt: true } });
+        if (cur?.resultsRevealedAt) throw conflict('Results are revealed. Hide the results before reopening judging.', 'RESULTS_REVEALED');
+      }
+      await tx.hackathon.update({ where: { id: h.id }, data: { judgingStatus: status } });
+    });
     return respond(res, partyId);
   } catch (error) {
     next(error);

@@ -12,6 +12,11 @@
  *     GPP27 / side event returns null. A password-protected event returns null unless the caller
  *     is logged in as one of its (non-rejected) guests; the password itself is only checked
  *     client-side, so there's no unlock proof to accept here.
+ *
+ * PR 5: once the host reveals results (results_revealed_at), both shapes carry
+ * `resultsRevealedAt` + `winners` (awards.publicWinners: prize name / amount / track, place,
+ * project name + tagline, team name; only `submitted` projects). Before the reveal: null / [].
+ * Never recipients, wallets, payout status, references, notes, emails or user ids.
  */
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
@@ -22,8 +27,16 @@ import { isEventHiddenFrom } from '../helpers/eventVisibility.js';
 import { isHackathonHost } from '../lib/hackathon/access.js';
 import { findGuestsByEmail } from '../lib/hackathon/eligibility.js';
 import { HACKATHON_INCLUDE, hostHackathon, isPubliclyVisible, publicHackathon } from '../lib/hackathon/serialize.js';
+import { AWARD_INCLUDE, publicWinners } from '../lib/hackathon/awards.js';
 
 const router = Router();
+
+/** Winners block (PR 5): only queried once results are revealed. */
+async function winnersBlock(h: { id: string; resultsRevealedAt: Date | null; tracks?: Array<{ id: string; name: string }> }) {
+  if (!h.resultsRevealedAt) return { resultsRevealedAt: null, winners: [] };
+  const awards = await prisma.hackathonAward.findMany({ where: { hackathonId: h.id }, include: AWARD_INCLUDE, take: 1000 });
+  return { resultsRevealedAt: h.resultsRevealedAt.toISOString(), winners: publicWinners(awards, h.tracks ?? []) };
+}
 
 /** Non-host viewer: the event-page gates (pre-launch GPP27 / side) + password protection. */
 async function viewerCanSeeEvent(partyId: string, viewerEmail: string | undefined): Promise<boolean> {
@@ -51,12 +64,12 @@ router.get('/:partyId/hackathon', optionalAuth, async (req: AuthRequest, res: Re
 
     if (await isHackathonHost(partyId, req.userId, req.userEmail)) {
       res.set('Cache-Control', 'private, no-store');
-      return res.json({ hackathon: hackathon ? hostHackathon(hackathon) : null, canManage: true });
+      return res.json({ hackathon: hackathon ? { ...hostHackathon(hackathon), ...(await winnersBlock(hackathon)) } : null, canManage: true });
     }
 
     res.set('Cache-Control', 'private, no-store');
     const visible = isPubliclyVisible(hackathon) && (await viewerCanSeeEvent(partyId, req.userEmail));
-    res.json({ hackathon: visible ? publicHackathon(hackathon!) : null, canManage: false });
+    res.json({ hackathon: visible ? { ...publicHackathon(hackathon!), ...(await winnersBlock(hackathon!)) } : null, canManage: false });
   } catch (error) {
     next(error);
   }
