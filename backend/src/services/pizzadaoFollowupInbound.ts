@@ -9,7 +9,7 @@
  * Telegram updates or webhooks.
  */
 
-export const DEFAULT_FOLLOWUP_INBOUND_URL = 'https://app.pizzadao.org/api/followups/inbound';
+export const DEFAULT_FOLLOWUP_INBOUND_URL = 'https://pizzadao.org/api/followups/inbound';
 export const FOLLOWUP_INBOUND_TIMEOUT_MS = 5000;
 
 export type FollowupForward = { claimed: true; ack: string } | null;

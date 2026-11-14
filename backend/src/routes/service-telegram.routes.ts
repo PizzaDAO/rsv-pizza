@@ -1,5 +1,5 @@
 /**
- * Send-only Telegram proxy for PizzaDAO's member app (app.pizzadao.org).
+ * Send-only Telegram proxy for PizzaDAO's member app (pizzadao.org).
  *
  * The app never holds the bot token: it asks this service to send. Nothing
  * here reads or changes the bot's inbound configuration; the inbound side
