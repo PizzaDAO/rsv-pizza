@@ -64,13 +64,16 @@ function app() {
   a.use(errorHandler);
   return a;
 }
-const bearer = () => `Bearer ${jwt.sign({ userId: 'u1', email: 'sam@example.com' }, JWT_SECRET)}`;
+// Unique user per call by default so the per-user rate limiter doesn't bleed between tests.
+let uid = 0;
+const bearer = (userId = `u${++uid}`, expiresIn: string | number = '30d') =>
+  `Bearer ${jwt.sign({ userId, email: 'sam@example.com' }, JWT_SECRET, { expiresIn: expiresIn as any })}`;
 
 describe('POST /api/auth/handoff + /verify-token', () => {
   beforeEach(() => {
     db.rows.length = 0;
     vi.clearAllMocks();
-    process.env.FRONTEND_URL = 'https://rsv.pizza';
+    process.env.FRONTEND_URL = 'https://example.org';
     mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', email: 'sam@example.com', name: 'Sam' });
   });
   afterEach(() => vi.useRealTimers());
@@ -139,6 +142,35 @@ describe('POST /api/auth/handoff + /verify-token', () => {
     const res = await request(app()).post('/api/auth/verify-token').send({ token: body.token });
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('TOKEN_USED');
+  });
+
+  it('caps the redeemed session at the minting session expiry', async () => {
+    const { body } = await request(app()).post('/api/auth/handoff').set('Authorization', bearer(undefined, '1d')).send({});
+    const res = await request(app()).post('/api/auth/verify-token').send({ token: body.token });
+    const exp = (jwt.decode(res.body.accessToken) as any).exp as number;
+    const remaining = exp - Math.floor(Date.now() / 1000);
+    expect(remaining).toBeGreaterThan(86_400 - 60);
+    expect(remaining).toBeLessThanOrEqual(86_400);
+  });
+
+  it('GET /verify returns the account email without spending the token', async () => {
+    const { body } = await request(app()).post('/api/auth/handoff').set('Authorization', bearer()).send({});
+    const peek = await request(app()).get('/api/auth/verify').query({ token: body.token });
+    expect(peek.status).toBe(200);
+    expect(peek.body.email).toBe('sam@example.com');
+    expect(db.rows[0].used).toBe(false);
+  });
+
+  it('rate-limits minting per user (10 per window)', async () => {
+    const auth = bearer('rate-user');
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      statuses.push((await request(app()).post('/api/auth/handoff').set('Authorization', auth).send({})).status);
+    }
+    expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+    // another user is unaffected
+    expect((await request(app()).post('/api/auth/handoff').set('Authorization', bearer()).send({})).status).toBe(200);
   });
 
   it('cannot be redeemed through /verify-code', async () => {

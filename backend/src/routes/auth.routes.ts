@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
+import { rateLimit } from 'express-rate-limit';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
@@ -193,6 +194,13 @@ router.get('/verify', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// Remaining lifetime (seconds) for a hand-off session, capped at the minting session's expiry; 30d otherwise.
+function handoffCap(code: string): number {
+  const m = HANDOFF_CODE_RE.exec(code);
+  if (!m) return 30 * 24 * 60 * 60;
+  return Math.max(60, Math.min(30 * 24 * 60 * 60, Number(m[1]) - Math.floor(Date.now() / 1000)));
+}
+
 // POST /api/auth/verify-token - Complete magic link verification
 router.post('/verify-token', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -246,7 +254,7 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email },
       jwtSecret,
-      { expiresIn: '30d' }
+      { expiresIn: handoffCap(magicLink.code) }
     );
 
     res.json({
@@ -269,7 +277,20 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
 // Controls: requires a valid Bearer JWT, 2-minute TTL, single use (atomic spend in
 // /verify-token), and the row's `code` is not 6 digits so /verify-code can never match it.
 export const HANDOFF_TTL_MS = 2 * 60 * 1000;
-router.post('/handoff', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+// Per-user cap on minting (10 per 10 minutes), keyed on the authenticated user id.
+const handoffLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req as AuthRequest).userId ?? 'anon',
+  message: { error: { message: 'Too many sign-in links requested. Try again in a few minutes.', code: 'RATE_LIMITED' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
+// Hand-off rows carry the minting session's expiry in their `code` ("ho<24 hex>x<exp epoch seconds>")
+// so the redeemed session can never outlive the session that minted it (no schema change).
+const HANDOFF_CODE_RE = /^ho[0-9a-f]{24}x(\d+)$/;
+router.post('/handoff', requireAuth, handoffLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.userId! } });
     if (!user) {
@@ -277,7 +298,9 @@ router.post('/handoff', requireAuth, async (req: AuthRequest, res: Response, nex
     }
 
     const token = randomBytes(32).toString('hex');
-    const code = `ho${randomBytes(12).toString('hex')}`;
+    const decoded = jwt.decode(req.headers.authorization!.split(' ')[1]) as { exp?: number } | null;
+    const sessionExp = decoded?.exp ?? Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const code = `ho${randomBytes(12).toString('hex')}x${sessionExp}`;
     const expiresAt = new Date(Date.now() + HANDOFF_TTL_MS);
 
     await prisma.magicLink.create({

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, AlertCircle, Check, Mail, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,9 +11,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 export function AuthVerifyPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setUser, signOut } = useAuth();
   const { t } = useTranslation('auth');
-  const [status, setStatus] = useState<'idle' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'confirm' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
@@ -24,43 +25,77 @@ export function AuthVerifyPage() {
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   // Captured once at first render: the sign-in token (email link / wallet hand-off) and the
   // local `next` path. The token is stripped from the address bar immediately (see effect).
-  const initialParams = useRef(typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams());
+  const initialParams = useRef(new URLSearchParams(location.search));
   const tokenRedeemStarted = useRef(false);
   const redirectTimer = useRef<number | null>(null);
   const [signedInAs, setSignedInAs] = useState<string | null>(null);
   const signedInAsRef = useRef<string | null>(null);
 
-  // Redeem a single-use token from the URL (wallet hand-off or emailed magic link).
+  const pendingToken = useRef<string | null>(null);
+  const nextPath = () => sanitizeNextPath(initialParams.current.get('next'));
+  const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
+
+  // Single-use token in the URL (wallet hand-off or emailed magic link). It is NEVER redeemed
+  // automatically: anyone can mint a token for their own account and send the link to someone
+  // else (login CSRF). So we (1) skip it entirely if this browser is already signed in,
+  // (2) look up the account email without spending the token, and (3) require an explicit tap.
   useEffect(() => {
     const token = initialParams.current.get('token');
     if (!token || tokenRedeemStarted.current) return;
     tokenRedeemStarted.current = true;
     // Remove the token from the URL/history right away so it can't leak via the address bar.
-    window.history.replaceState(null, '', window.location.pathname);
+    navigate(location.pathname, { replace: true });
+
+    let alreadySignedIn = false;
+    try { alreadySignedIn = !!localStorage.getItem('authToken'); } catch { /* storage blocked */ }
+    if (alreadySignedIn) {
+      navigate(nextPath() || '/', { replace: true });
+      return;
+    }
+
     setStatus('verifying');
     (async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/verify-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-        if (!response.ok) {
-          throw new Error(t('verifyPage.linkExpired', {
-            defaultValue: 'This sign-in link has expired or was already used. Enter a code from your email, or request a new one.',
-          }));
-        }
+        const response = await fetch(`${API_URL}/api/auth/verify?token=${encodeURIComponent(token)}`);
+        if (!response.ok) throw new Error('invalid');
         const data = await response.json();
-        signedInAsRef.current = data.user?.name || data.user?.email || null;
-        setSignedInAs(signedInAsRef.current);
-        handleSuccess(data);
-      } catch (err: any) {
+        pendingToken.current = token;
+        setConfirmEmail(data.email);
+        setStatus('confirm');
+      } catch {
         setStatus('error');
-        setError(err.message || 'Failed to verify link');
+        setError(t('verifyPage.linkExpired', {
+          defaultValue: 'This sign-in link has expired or was already used. Enter a code from your email, or request a new one.',
+        }));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function confirmRedeem() {
+    const token = pendingToken.current;
+    if (!token) return;
+    pendingToken.current = null;
+    setStatus('verifying');
+    try {
+      const response = await fetch(`${API_URL}/api/auth/verify-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      if (!response.ok) throw new Error('invalid');
+      const data = await response.json();
+      // Always the account email, never the display name (which anyone can set).
+      signedInAsRef.current = data.user?.email || null;
+      setSignedInAs(signedInAsRef.current);
+      handleSuccess(data);
+    } catch {
+      setStatus('error');
+      setError(t('verifyPage.linkExpired', {
+        defaultValue: 'This sign-in link has expired or was already used. Enter a code from your email, or request a new one.',
+      }));
+    }
+  }
 
   // Check if this is a new user on mount
   useEffect(() => {
@@ -134,12 +169,14 @@ export function AuthVerifyPage() {
     setStatus('success');
 
     // Redirect to ?next= (local paths only), else the stored return URL, else home.
+    // Hand-off sign-ins stay on the confirmation screen (showing the account email) until the user continues.
+    if (signedInAsRef.current) return;
     redirectTimer.current = window.setTimeout(() => {
       const nextParam = sanitizeNextPath(initialParams.current.get('next'));
       const returnUrl = sessionStorage.getItem('authReturnUrl');
       sessionStorage.removeItem('authReturnUrl');
       navigate(nextParam || returnUrl || '/');
-    }, signedInAsRef.current ? 2500 : 2000);
+    }, 2000);
   }
 
   function handleCodeChange(index: number, value: string) {
@@ -232,6 +269,26 @@ export function AuthVerifyPage() {
           </>
         )}
 
+        {status === 'confirm' && (
+          <>
+            <div className="w-16 h-16 bg-[#ff393a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff393a]/30">
+              <User className="w-8 h-8 text-[#ff393a]" />
+            </div>
+            <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.confirmTitle', { defaultValue: 'Continue to sign in' })}</h1>
+            <p className="text-theme-text-secondary mb-6 break-all">
+              {t('verifyPage.continueAs', { defaultValue: 'Continue as' })} <strong>{confirmEmail}</strong>
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmRedeem} className="btn-primary">
+                {t('verifyPage.continueToSignIn', { defaultValue: 'Continue to sign in' })}
+              </button>
+              <button onClick={() => navigate(nextPath() || '/', { replace: true })} className="btn-secondary">
+                {t('verifyPage.continueWithout', { defaultValue: 'Continue without signing in' })}
+              </button>
+            </div>
+          </>
+        )}
+
         {status === 'verifying' && (
           <>
             <Loader2 className="w-16 h-16 animate-spin text-[#ff393a] mx-auto mb-4" />
@@ -279,9 +336,18 @@ export function AuthVerifyPage() {
               <Check className="w-8 h-8 text-[#39d98a]" />
             </div>
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.welcomeBack')}</h1>
-            <p className="text-theme-text-secondary">{t('verifyPage.redirecting')}</p>
+            {!signedInAs && <p className="text-theme-text-secondary">{t('verifyPage.redirecting')}</p>}
             {signedInAs && (
-              <p className="text-theme-text-muted text-sm mt-4">
+              <button
+                type="button"
+                className="btn-primary mt-4"
+                onClick={() => navigate(nextPath() || '/', { replace: true })}
+              >
+                {t('verifyPage.continue')}
+              </button>
+            )}
+            {signedInAs && (
+              <p className="text-theme-text-muted text-sm mt-4 break-all">
                 {t('verifyPage.signedInAs', { defaultValue: 'Signed in as' })} {signedInAs}
                 {' \u2014 '}
                 <button
@@ -308,6 +374,14 @@ export function AuthVerifyPage() {
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.verificationFailed')}</h1>
             <p className="text-theme-text-secondary mb-6">{error}</p>
             <div className="flex flex-col gap-3">
+              {initialParams.current.has('next') || initialParams.current.has('token') ? (
+                <button
+                  onClick={() => navigate(nextPath() || '/', { replace: true })}
+                  className="btn-primary"
+                >
+                  {t('verifyPage.continueWithout', { defaultValue: 'Continue without signing in' })}
+                </button>
+              ) : null}
               <button
                 onClick={handleEnterNewCode}
                 className="btn-primary"

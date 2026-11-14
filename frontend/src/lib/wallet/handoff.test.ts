@@ -22,11 +22,11 @@ describe('hasInjectedProvider', () => {
 });
 
 describe('walletBrowseLinks', () => {
-  const url = 'https://monad.rsv.pizza/e/my party?token=a+b&next=%2Fx#h';
+  const url = 'https://monad.example.org/e/my party?token=a+b&next=%2Fx#h';
   const links = Object.fromEntries(walletBrowseLinks(url).map((l) => [l.id, l]));
 
   it('MetaMask: scheme-less host+path+query', () => {
-    expect(links.metamask.href).toBe('https://link.metamask.io/dapp/monad.rsv.pizza/e/my%20party?token=a+b&next=%2Fx#h');
+    expect(links.metamask.href).toBe('https://link.metamask.io/dapp/monad.example.org/e/my%20party?token=a+b&next=%2Fx#h');
   });
   it('Coinbase: encoded cb_url plus cbwallet fallback', () => {
     expect(links.coinbase.href).toBe(`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(url)}`);
@@ -41,13 +41,13 @@ describe('walletBrowseLinks', () => {
   });
   it('Phantom: encoded url in path and encoded origin as ref', () => {
     expect(links.phantom.href).toBe(
-      `https://phantom.com/ul/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent('https://monad.rsv.pizza')}`,
+      `https://phantom.com/ul/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent('https://monad.example.org')}`,
     );
   });
   it('encodes ampersands so the inner query survives', () => {
-    const l = walletBrowseLinks('https://rsv.pizza/auth/verify?token=abc&next=%2Fe%2Fx');
+    const l = walletBrowseLinks('https://example.org/auth/verify?token=abc&next=%2Fe%2Fx');
     const cb = new URL(l.find((x) => x.id === 'coinbase')!.href).searchParams.get('cb_url');
-    expect(cb).toBe('https://rsv.pizza/auth/verify?token=abc&next=%2Fe%2Fx');
+    expect(cb).toBe('https://example.org/auth/verify?token=abc&next=%2Fe%2Fx');
   });
 });
 
