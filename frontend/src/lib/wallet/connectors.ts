@@ -1,5 +1,4 @@
-import { injected, metaMask, coinbaseWallet } from 'wagmi/connectors';
-import { isMobile } from './handoff';
+import { injected, coinbaseWallet } from 'wagmi/connectors';
 
 /** Synchronously ask for EIP-6963 announcements; returns how many wallets answered. */
 export function countEip6963Wallets(win: Window | undefined = typeof window !== 'undefined' ? window : undefined): number {
@@ -29,16 +28,14 @@ export function needsLegacyInjected(win: (Window & { ethereum?: unknown }) | und
  *   (multiInjectedProviderDiscovery, on by default), so there is deliberately no generic
  *   `injected()` entry: it shows as a "Browser Wallet" that fails on mobile Safari and
  *   duplicates the discovered wallets on desktop.
- * - metaMask: MetaMask SDK, desktop only (QR over MetaMask's own relay). On mobile ConnectKit
- *   treats the SDK connector as "not installed" and deep-links to an empty WalletConnect URI,
- *   so mobile users get MetaMask through the OpenInWallet in-app-browser link instead.
+ * - No MetaMask SDK connector: ConnectKit treats it as "not installed" and shows a WalletConnect
+ *   QR screen that never fills without WalletConnect, and it claims the io.metamask rdns so the
+ *   extension's EIP-6963 entry is dropped. The extension connects through EIP-6963; phones get
+ *   MetaMask through the OpenInWallet in-app-browser link.
  * - coinbaseWallet: Coinbase Wallet SDK incl. Smart Wallet passkeys.
  */
 export const walletConnectors = (app: { name: string; url: string; icon: string }) => [
   ...(needsLegacyInjected() ? [injected({ shimDisconnect: true })] : []),
-  ...(isMobile()
-    ? []
-    : [metaMask({ dappMetadata: { name: app.name, url: app.url, iconUrl: app.icon }, enableAnalytics: false })]),
   coinbaseWallet({
     appName: app.name,
     appLogoUrl: app.icon,
