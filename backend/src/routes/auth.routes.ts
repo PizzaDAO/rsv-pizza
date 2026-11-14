@@ -5,64 +5,12 @@ import { rateLimit } from 'express-rate-limit';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
-import { siteForOrigin, type SiteBrand } from '../lib/siteBrand.js';
+import { siteForOrigin } from '../lib/siteBrand.js';
+import { issueLoginCode, takeCodeSend, reserveVerifyAttempt } from '../lib/loginCode.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
-
-// Helper function to send magic link email
-async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string, site: SiteBrand) {
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sign In to ${site.name}</title>
-      </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to ${site.name}</h1>
-          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
-        </div>
-
-        <div style="background: #f9f9f9; padding: 30px 20px; border-radius: 12px; text-align: center; margin: 30px 0;">
-          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666; font-weight: 600;">YOUR SIGN-IN CODE</p>
-          <div style="font-size: 48px; font-weight: 700; letter-spacing: 8px; color: #ff393a; margin: 10px 0;">${code}</div>
-          <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
-        </div>
-
-        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
-          <p style="margin-top: 20px;">
-            If you didn't request this email, you can safely ignore it.
-          </p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
-      to: [email],
-      subject: `${site.name} Code ${code}`,
-      html: emailHtml,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Resend API error: ${error}`);
-  }
-
-  return response.json();
-}
 
 // POST /api/auth/magic-link - Request magic link
 router.post('/magic-link', async (req: Request, res: Response, next: NextFunction) => {
@@ -89,56 +37,17 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     // Find or create user
     let user = await prisma.user.findUnique({ where: { email: normalized } });
 
-    // Generate secure token
-    const token = randomBytes(32).toString('hex');
-
-    // Generate unique 6-digit code
-    let code = '';
-    let codeExists = true;
-    while (codeExists) {
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-      const existing = await prisma.magicLink.findUnique({ where: { code } });
-      codeExists = !!existing;
-    }
-
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    // Create magic link record
-    await prisma.magicLink.create({
-      data: {
-        token,
-        code,
-        email: normalized,
-        expiresAt,
-        userId: user?.id,
-      },
-    });
-
-    // Send magic link email
     // Exact-match the request Origin against registered series site_urls; else today's FRONTEND_URL.
     const site = await siteForOrigin(req.get('origin'), process.env.FRONTEND_URL || 'http://localhost:5176');
-    const frontendUrl = site.url;
-    const magicLinkUrl = `${frontendUrl}/auth/verify?token=${token}`;
-
-    // Log for development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('\n========================================');
-      console.log('Magic Link (dev mode):');
-      console.log(magicLinkUrl);
-      console.log('========================================\n');
+    // invite-verify: code creation + the sign-in email live in lib/loginCode.ts so the RSVP
+    // form's inline code step sends exactly this email (no new email type).
+    // invite-verify (security review): per-email send limit, shared with the RSVP code step
+    // and charged to the requester (email + IP), so someone spamming this address can't use
+    // up the owner's own allowance. Not an oracle: any address can request a code.
+    if (!(await takeCodeSend(normalized, req.ip))) {
+      throw new AppError('Too many codes requested for this email. Try again in a few minutes.', 429, 'CODE_SEND_LIMIT');
     }
-
-    // Send email via Resend
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (resendApiKey) {
-      try {
-        // mushroom-48468: use normalized lowercase for `to:` field
-        await sendMagicLinkEmail(normalized, magicLinkUrl, code, resendApiKey, site);
-      } catch (emailError) {
-        console.error('Failed to send magic link email:', emailError);
-        // Don't fail the request if email fails
-      }
-    }
+    const { magicLinkUrl } = await issueLoginCode(normalized, site, user?.id);
 
     // Check if user is new (no name set)
     const isNewUser = !user || !user.name;
@@ -340,30 +249,75 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
       throw new AppError('Invalid code format', 400, 'INVALID_FORMAT');
     }
 
-    // Find magic link by code
-    const magicLink = await prisma.magicLink.findUnique({
-      where: { code },
-      include: { user: true },
-    });
-
-    if (!magicLink) {
-      throw new AppError('Invalid code', 401, 'INVALID_CODE');
+    // invite-verify: every current caller (AuthVerifyPage, GPP landing, the RSVP code step)
+    // passes `email`. The code must then belong to that email; a code that exists for some
+    // OTHER email gets the same INVALID_CODE as a code that doesn't exist.
+    // Requests WITHOUT `email` (bundles cached from before PR #1253) still use the old
+    // code-only lookup, with their own low per-IP failure budget (FAIL_PER_IP_CODE_ONLY).
+    // TODO(invite-verify, added 2026-11-14): after 2026-11-28, reject requests without
+    // `email` (400) and delete the code-only lookup.
+    let boundEmail: string | null = null;
+    if (req.body?.email !== undefined) {
+      boundEmail = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : null;
+      if (!boundEmail) {
+        throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
+      }
     }
 
-    // Check if locked due to too many attempts
+    // invite-verify (security review): brute-force budget, charged to the CALLER (IP, and
+    // email+IP when bound), checked before the lookup so a refused caller learns nothing.
+    // Wrong guesses never lock the stored codes, so nobody can lock the owner out.
+    // See lib/loginCode.ts for the limits and the PR for the math. The attempt slot is
+    // reserved synchronously, so parallel bursts can't all slip past the budget.
+    const attempt = await reserveVerifyAttempt(req.ip, boundEmail);
+    if (!attempt) {
+      throw new AppError('Too many wrong codes. Try again in a few minutes.', 429, 'VERIFY_RATE_LIMITED');
+    }
+    const fail = async (message: string, status: number, errCode: string): Promise<never> => {
+      await attempt.fail();
+      throw new AppError(message, status, errCode);
+    };
+    /** A stale code that DID belong to the submitted email: not a guess, don't charge it. */
+    const staleOwnCode = (message: string, errCode: string): never => {
+      attempt.release();
+      throw new AppError(message, 401, errCode);
+    };
+
+    // Find magic link by code
+    let magicLink;
+    try {
+      magicLink = await prisma.magicLink.findUnique({
+        where: { code },
+        include: { user: true },
+      });
+    } catch (err) {
+      attempt.release();
+      throw err;
+    }
+
+    if (!magicLink || (boundEmail && normalizeEmail(magicLink.email) !== boundEmail)) {
+      return await fail('Invalid code', 401, 'INVALID_CODE');
+    }
+
+    // Legacy: rows locked by an older build. Nothing sets locked_at any more.
     if (magicLink.lockedAt) {
-      throw new AppError('Code locked due to too many failed attempts', 429, 'CODE_LOCKED');
+      return await fail('Code locked due to too many failed attempts', 429, 'CODE_LOCKED');
     }
 
     // Check if expired
     if (magicLink.expiresAt < new Date()) {
-      throw new AppError('Code expired', 401, 'CODE_EXPIRED');
+      if (boundEmail) staleOwnCode('Code expired', 'CODE_EXPIRED');
+      return await fail('Code expired', 401, 'CODE_EXPIRED');
     }
 
     // Check if already used
     if (magicLink.used) {
-      throw new AppError('Code already used', 401, 'CODE_USED');
+      if (boundEmail) staleOwnCode('Code already used', 'CODE_USED');
+      return await fail('Code already used', 401, 'CODE_USED');
     }
+
+    // The code is right: give the reserved slot back.
+    attempt.release();
 
     // Mark as used
     await prisma.magicLink.update({

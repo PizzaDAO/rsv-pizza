@@ -5,7 +5,7 @@ import request from 'supertest';
 
 const mockPrisma = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
-  magicLink: { findUnique: vi.fn(), create: vi.fn() },
+  magicLink: { findUnique: vi.fn(), create: vi.fn(), count: vi.fn(() => Promise.resolve(0)) },
   party: { findUnique: vi.fn(), findMany: vi.fn() },
   slugAlias: { findUnique: vi.fn(() => Promise.resolve(null)) },
   guest: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn(), aggregate: vi.fn() },
@@ -28,6 +28,7 @@ import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { errorHandler } from '../middleware/error.js';
 import { signGuestToken } from '../lib/guestToken.js';
 import { _resetSiteBrandCache } from '../lib/siteBrand.js';
+import { resetCodeLimits } from '../lib/loginCode.js';
 
 function app() {
   const a = express();
@@ -57,6 +58,7 @@ const TEAM1_ROW = {
 describe('branded call sites', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCodeLimits();
     _resetSiteBrandCache();
     process.env.RESEND_API_KEY = 're_test';
     process.env.FRONTEND_URL = 'https://rsv.pizza';

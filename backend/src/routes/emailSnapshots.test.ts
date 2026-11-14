@@ -12,7 +12,7 @@ import request from 'supertest';
 
 const mockPrisma = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
-  magicLink: { findUnique: vi.fn(), create: vi.fn() },
+  magicLink: { findUnique: vi.fn(), create: vi.fn(), count: vi.fn(() => Promise.resolve(0)) },
   party: { findUnique: vi.fn() },
   slugAlias: { findUnique: vi.fn(() => Promise.resolve(null)) },
   guest: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn(), aggregate: vi.fn() },
@@ -35,6 +35,7 @@ import { errorHandler } from '../middleware/error.js';
 import { signGuestToken } from '../lib/guestToken.js';
 import { buildReminderHtml, buildReminderText, renderUnsubscribePage } from './reminder.routes.js';
 import { _resetSiteBrandCache } from '../lib/siteBrand.js';
+import { resetCodeLimits } from '../lib/loginCode.js';
 
 function app() {
   const a = express();
@@ -64,6 +65,7 @@ const PARTY = {
 describe('no-series emails are byte-identical to pre-change output', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCodeLimits();
     process.env.RESEND_API_KEY = 're_test';
     process.env.FRONTEND_URL = 'https://rsv.pizza';
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ id: 'r1' }), text: async () => '', headers: new Headers() });

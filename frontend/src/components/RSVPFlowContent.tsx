@@ -4,12 +4,12 @@ import { PublicEvent } from '../lib/api';
 import { DonationStep } from './DonationStep';
 import { RSVPFormStep1 } from './RSVPFormStep1';
 import { RSVPFormStep2 } from './RSVPFormStep2';
+import { RSVPCodeStep } from './RSVPCodeStep';
 import { ShareRSVP } from './ShareRSVP';
 import { AddToCalendarPopup } from './AddToCalendarPopup';
 import { MintStatus, MintResult } from '../hooks/useMintNFT';
 import { getNFTViewUrl, getChainConfig, NFTChain } from '../lib/nftContract';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
-import { useAuth } from '../contexts/AuthContext';
 
 interface RSVPFlowContentProps {
   event: PublicEvent;
@@ -37,7 +37,6 @@ export function RSVPFlowContent({
   mintResult,
   twitterHandles,
 }: RSVPFlowContentProps) {
-  const { user } = useAuth();
   // Calendar popup state (success screen)
   const [calendarOpen, setCalendarOpen] = useState(false);
   const calendarBtnRef = useRef<HTMLButtonElement>(null);
@@ -48,12 +47,10 @@ export function RSVPFlowContent({
 
   // ---- Success screen ----
   if (form.submitted) {
-    // rsvp-overwrite-fix: unless the RSVP email is the logged-in user's own, the backend
-    // answers a taken email exactly like a new RSVP (and changes nothing). So the screen
-    // can't know which happened and must read true for both.
-    const submittedEmail = form.email.trim().toLowerCase();
-    const isVerifiedOwner = !!user?.email && submittedEmail === user.email.trim().toLowerCase();
-    const showNeutralNote = !!submittedEmail && !isVerifiedOwner && !form.wasUpdated;
+    // invite-verify: this form sends `codeStep`, so a taken email no longer gets #1240's
+    // look-alike decoy here: it gets the inline code step instead, and a success screen
+    // always means the RSVP really was saved. (The old "your original RSVP stays as it
+    // was" note is gone with the decoy.)
 
     const getSuccessIcon = () => {
       if (form.alreadyRegistered && !form.wasUpdated) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
@@ -67,7 +64,7 @@ export function RSVPFlowContent({
       if (form.alreadyRegistered) return "You're already registered!";
       if (form.waitlisted) return "You're on the Waitlist!";
       if (form.pendingApproval) return 'RSVP Submitted!';
-      return isVerifiedOwner ? `See you at ${eventName}!` : "You're on the list!";
+      return `See you at ${eventName}!`;
     };
 
     const getSuccessIconComponent = () => {
@@ -116,11 +113,6 @@ export function RSVPFlowContent({
         {form.pendingApproval && !form.alreadyRegistered && !form.waitlisted && (
           <p className="text-theme-text-secondary mb-4">
             Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
-          </p>
-        )}
-        {showNeutralNote && (
-          <p className="text-xs text-theme-text-muted mb-4">
-            Already RSVP'd with this email? Your original RSVP stays as it was. Log in with that email to change it.
           </p>
         )}
         {/* Share Section */}
@@ -241,6 +233,11 @@ export function RSVPFlowContent({
 
       </div>
     );
+  }
+
+  // ---- invite-verify: inline email code step (nothing saved yet) ----
+  if (form.verificationEmail) {
+    return <RSVPCodeStep form={form} onClose={onClose} />;
   }
 
   // ---- Step 1 - Personal Info ----

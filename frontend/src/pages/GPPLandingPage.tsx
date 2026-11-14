@@ -8,10 +8,10 @@ import { GPPClouds } from '../components/GPPClouds';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import { createGPPEvent, fetchGppEventsForMap, GPPEventMapItem } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { postVerifyCode } from '../lib/authCodeEmail';
 import { useConfetti } from '../hooks/useConfetti';
 const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 /* ── colour tokens (from the 2026 flyer) ────────────────── */
 const C = {
@@ -126,11 +126,8 @@ export function GPPLandingPage() {
   async function verifyOtp(fullCode: string) {
     setOtpStatus('verifying');
     try {
-      const response = await fetch(`${API_URL}/api/auth/verify-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: fullCode }),
-      });
+      // invite-verify: bind the code to the address it was sent to (the email on this form).
+      const response = await postVerifyCode(fullCode, success?.email || email);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error?.message || 'Invalid code');

@@ -7,7 +7,21 @@ import { siteForParty } from '../lib/siteBrand.js';
 import { verifySecret } from '../lib/secretHash.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
-import { signGuestToken, verifyGuestToken, guestTokenFromRequest } from '../lib/guestToken.js';
+import { signGuestToken, verifyGuestToken, guestTokenFromRequest, callerOwnsGuest } from '../lib/guestToken.js';
+import { issueLoginCode, takeCodeSend } from '../lib/loginCode.js';
+
+/**
+ * invite-verify: the RSVP endpoint's answer when the submitted email is already on the
+ * party and the caller can't prove it's theirs. The same body for every kind of existing row.
+ */
+export function verificationRequiredResponse(email: string) {
+  return {
+    success: false,
+    verificationRequired: true,
+    email,
+    message: `We sent a sign-in code to ${email}. Enter it to finish your RSVP.`,
+  };
+}
 
 const router = Router();
 
@@ -300,6 +314,8 @@ router.get('/:inviteCode/guest/:email', optionalAuth, async (req: AuthRequest, r
 // email). Anyone else submitting a taken email gets a response identical to a new RSVP and
 // nothing is written. Every success carries `guestToken`, the per-guest capability that
 // guest-scoped endpoints (raffle, quiz, discount, NFT) now require instead of a bare id.
+// invite-verify: the owner can also prove it with the row's guest token (invite links), and
+// clients sending `codeStep: true` get a 202 inline sign-in code step instead of the decoy.
 router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.params;
@@ -536,6 +552,67 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       message,
     });
 
+    // Side effects of a FIRST RSVP: a brand-new guest, and (invite-verify) a host invite
+    // completed by its invitee. Both paths call these, so they get the same wallet and the
+    // same confirmation / pending-approval / waitlist email (template, sender, site brand).
+    const provisionWalletIfNeeded = async (guestId: string) => {
+      if (normalizedAddress || !email?.trim()) return;
+      try {
+        const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
+        if (walletResult) {
+          await prisma.guest.update({
+            where: { id: guestId },
+            data: {
+              ethereumAddress: walletResult.walletAddress.toLowerCase(),
+              privyUserId: walletResult.privyUserId,
+              walletSource: 'privy-embedded',
+            },
+          });
+          console.log(`Privy embedded wallet provisioned for guest ${guestId}: ${walletResult.walletAddress.toLowerCase()}`);
+        }
+      } catch (privyError) {
+        // Non-fatal: RSVP succeeds even if Privy provisioning fails
+        console.error('Privy wallet provisioning failed (non-fatal):', privyError);
+      }
+    };
+    const sendNewRsvpEmail = async (guestId: string) => {
+      if (!email?.trim()) return;
+      try {
+        if (isAtCapacity) {
+          await sendWaitlistConfirmationEmail({
+            guestEmail: email.trim(),
+            guestName: name.trim(),
+            guestId,
+            partyName: party.name,
+            partyDate: party.date,
+            partyTimezone: party.timezone,
+            waitlistPosition: waitlistPosition!,
+            inviteCode,
+            customUrl: party.customUrl,
+            eventSeriesId: party.eventSeriesId,
+          });
+        } else {
+          await sendRSVPConfirmationEmail({
+            guestEmail: email.trim(),
+            guestName: name.trim(),
+            guestId,
+            partyName: party.name,
+            partyDate: party.date,
+            partyTimezone: party.timezone,
+            partyAddress: party.address,
+            partyImageUrl: party.eventImageUrl,
+            inviteCode,
+            customUrl: party.customUrl,
+            requireApproval: party.requireApproval,
+            eventSeriesId: party.eventSeriesId,
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the RSVP if email fails
+      }
+    };
+
     const updateData = (existing: { status: string; submittedVia: string }) => ({
       name: name.trim(),
       ethereumAddress: normalizedAddress || null,
@@ -578,12 +655,12 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       });
 
       if (existingGuest) {
-        // rsvp-overwrite-fix: only the owner of the email (verified JWT) may change an
-        // existing RSVP. This used to be open to anyone who typed the address, and the
-        // 200 `updated` reply plus the returned guest id made it an RSVP oracle and a
-        // capability leak.
-        const callerEmail = req.userEmail?.trim().toLowerCase();
-        const isOwner = !!callerEmail && callerEmail === normalizedEmail;
+        // rsvp-overwrite-fix: only the owner may change an existing RSVP (this used to be
+        // open to anyone who typed the address). invite-verify: the owner is the caller
+        // logged in as this email (verified JWT) OR holding this row's capability token.
+        // Invite emails carry the token on their RSVP link (?t=) and the RSVP form sends it
+        // back as `guestToken`, so an invitee needs no login to complete their invite.
+        const isOwner = callerOwnsGuest(req, existingGuest);
 
         if (isOwner) {
           // mushroom-31723: if the host has rejected this guest (approved=false),
@@ -600,6 +677,33 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
               guestToken: signGuestToken(existingGuest.id),
               message: 'Your RSVP has been updated!',
             });
+          }
+
+          // A host invite (INVITED, never RSVP'd) completed by its invitee is their first
+          // RSVP. The update is conditional on the row still being INVITED, so exactly one
+          // request completes it (a concurrent duplicate falls through to a plain update).
+          // That one gets everything a brand-new RSVP gets: the same wallet provisioning and
+          // confirmation / pending / waitlist email, and the new-RSVP response shape.
+          if (existingGuest.status === 'INVITED') {
+            let completed: Awaited<ReturnType<typeof prisma.guest.update>> | null = null;
+            try {
+              completed = await prisma.guest.update({
+                where: { id: existingGuest.id, status: 'INVITED' },
+                data: updateData(existingGuest),
+              });
+            } catch (e) {
+              if ((e as { code?: string } | null)?.code !== 'P2025') throw e;
+            }
+            if (completed) {
+              await provisionWalletIfNeeded(completed.id);
+              await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
+              await sendNewRsvpEmail(completed.id);
+              return res.status(201).json(newRsvpResponse(completed.id));
+            }
+            // Lost the race: someone else completed it. Don't let updateData keep the stale
+            // host-invite submittedVia.
+            existingGuest.status = 'CONFIRMED';
+            existingGuest.submittedVia = 'rsvp';
           }
 
           const updatedGuest = await prisma.guest.update({
@@ -622,25 +726,42 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
           });
         }
 
-        // Not the owner. A host invite (status INVITED) holds no RSVP yet, only the
-        // address the host typed, so completing it is the same as a brand-new RSVP with
-        // that email (which anyone can always make). It keeps invite links working for
-        // logged-out invitees, and it answers exactly like a new RSVP.
-        if (existingGuest.status === 'INVITED' && existingGuest.approved !== false) {
-          const completed = await prisma.guest.update({
-            where: { id: existingGuest.id },
-            data: updateData(existingGuest),
-          });
-          await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
-          return res.status(201).json(newRsvpResponse(completed.id));
+        // Not the owner, whatever the row's status (RSVP'd, host invite, waitlisted,
+        // rejected): nothing is written. (A host invite used to be completable by anyone
+        // who knew the address, who then got the invitee's guest token.)
+        //
+        // invite-verify: clients that support the inline code step (`codeStep: true`, sent
+        // by the RSVP form) get 202 `verificationRequired`, and the address gets the normal
+        // sign-in code email (no new email type). Entering the code logs them in
+        // (POST /api/auth/verify-code with the email) and the form re-submits as the owner.
+        // The 202 body is identical for every kind of existing row, so it never says WHICH
+        // kind the email has. It does say "this email is on the party" (a new email gets an
+        // instant 201); see the PR notes for why that is accepted: the same fact already
+        // leaks through the public guest count, and every probe now emails the address
+        // owner. Sends share /api/auth/magic-link's budget, charged to the requester
+        // (email + IP; see lib/loginCode.ts takeCodeSend). An over-budget requester gets the
+        // same 202 (no new email) plus `recentlySent: true`.
+        if (req.body?.codeStep === true) {
+          // Over the send budget: still show the code step (a recent code stays valid for
+          // 15 minutes), just don't send another. `recentlySent` is a hint for the UI; it only
+          // follows a 202 this caller already gets, and is the same for every kind of row.
+          if (!(await takeCodeSend(normalizedEmail, req.ip))) {
+            return res.status(202).json({ ...verificationRequiredResponse(normalizedEmail), recentlySent: true });
+          }
+          try {
+            const codeUser = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
+            const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
+            await issueLoginCode(normalizedEmail, site, codeUser?.id);
+          } catch (codeErr) {
+            console.error('RSVP code step: failed to issue sign-in code:', codeErr);
+          }
+          return res.status(202).json(verificationRequiredResponse(normalizedEmail));
         }
 
-        // A real RSVP already exists for this email and the caller can't prove it's
-        // theirs: change NOTHING and answer exactly like a new RSVP would. The guest id
-        // is a fresh random UUID (its token is valid-looking but matches no guest, so it
-        // grants nothing); no field of the existing guest is read into the response.
-        // TODO(rsvp-overwrite-fix): optionally email the address a "manage your RSVP"
-        // link here. Not enabled: that would be a new send and needs Snax's OK.
+        // Older clients without the code step: change NOTHING and answer exactly like a new
+        // RSVP would. The guest id is a fresh random UUID (its token is valid-looking but
+        // matches no guest, so it grants nothing); no field of the existing guest is read
+        // into the response.
         return res.status(201).json(newRsvpResponse(randomUUID()));
       }
     }
@@ -679,25 +800,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     });
 
     // Auto-provision Privy embedded wallet if no wallet address was provided and email exists
-    if (!normalizedAddress && email?.trim()) {
-      try {
-        const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
-        if (walletResult) {
-          await prisma.guest.update({
-            where: { id: guest.id },
-            data: {
-              ethereumAddress: walletResult.walletAddress.toLowerCase(),
-              privyUserId: walletResult.privyUserId,
-              walletSource: 'privy-embedded',
-            },
-          });
-          console.log(`Privy embedded wallet provisioned for guest ${guest.id}: ${walletResult.walletAddress.toLowerCase()}`);
-        }
-      } catch (privyError) {
-        // Non-fatal: RSVP succeeds even if Privy provisioning fails
-        console.error('Privy wallet provisioning failed (non-fatal):', privyError);
-      }
-    }
+    await provisionWalletIfNeeded(guest.id);
 
     // Trigger webhook for guest registration or waitlist (using party owner's webhooks)
     if (isAtCapacity) {
@@ -707,42 +810,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     }
 
     // Send appropriate email if email provided
-    if (email?.trim()) {
-      try {
-        if (isAtCapacity) {
-          await sendWaitlistConfirmationEmail({
-            guestEmail: email.trim(),
-            guestName: name.trim(),
-            guestId: guest.id,
-            partyName: party.name,
-            partyDate: party.date,
-            partyTimezone: party.timezone,
-            waitlistPosition: waitlistPosition!,
-            inviteCode,
-            customUrl: party.customUrl,
-            eventSeriesId: party.eventSeriesId,
-          });
-        } else {
-          await sendRSVPConfirmationEmail({
-            guestEmail: email.trim(),
-            guestName: name.trim(),
-            guestId: guest.id,
-            partyName: party.name,
-            partyDate: party.date,
-            partyTimezone: party.timezone,
-            partyAddress: party.address,
-            partyImageUrl: party.eventImageUrl,
-            inviteCode,
-            customUrl: party.customUrl,
-            requireApproval: party.requireApproval,
-            eventSeriesId: party.eventSeriesId,
-          });
-        }
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Don't fail the RSVP if email fails
-      }
-    }
+    await sendNewRsvpEmail(guest.id);
 
     res.status(201).json(newRsvpResponse(guest.id));
   } catch (error) {
