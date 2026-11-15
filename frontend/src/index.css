@@ -439,9 +439,10 @@ body.modal-open {
   animation: confetti-fall ease-out forwards;
 }
 
-/* Pizza cursor sitewide */
+/* Pizza cursor sitewide. A drawn slice, not the 🍕 emoji: each OS draws the emoji facing a
+   different way, so no one rotation put its tip on the hotspot (#507). Tip is at 2,2. */
 *, *::before, *::after {
-  cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='24' transform='rotate(180 16 16)'>🍕</text></svg>") 4 4, auto;
+  cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M2 2L29 13Q25 25 13 29Z' fill='%23FFC93C' stroke='%235A2D0C' stroke-width='1.5' stroke-linejoin='round'/><path d='M29 13Q25 25 13 29' fill='none' stroke='%23C8742B' stroke-width='4' stroke-linecap='round'/><circle cx='12' cy='11' r='2.2' fill='%23D7263D'/><circle cx='19' cy='17' r='2.2' fill='%23D7263D'/><circle cx='12' cy='20' r='1.8' fill='%23D7263D'/></svg>") 2 2, auto;
 }
 
 /* ─── GPP Light Theme ─── */
