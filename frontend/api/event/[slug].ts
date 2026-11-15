@@ -1,4 +1,13 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+
+// The helpers Vercel's Node runtime adds to req/res. Declared here instead of importing
+// @vercel/node, which only supplied these types and pulled in a vulnerable undici.
+type VercelRequest = IncomingMessage & { query: Record<string, string | string[]> };
+type VercelResponse = ServerResponse & {
+  status(code: number): VercelResponse;
+  send(body: string): VercelResponse;
+  redirect(status: number, url: string): VercelResponse;
+};
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY!;
