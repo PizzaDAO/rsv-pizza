@@ -10,6 +10,8 @@ interface State {
   hasError: boolean;
 }
 
+// Light brand themes (doge/monad/swc) set --eb-* in index.css; the fallbacks keep
+// the default dark look. The theme class lives on <html>, so vars reach this root.
 export function reportError(source: string, error: unknown, extra?: unknown) {
   // No error-reporting service is configured; log to console.
   // eslint-disable-next-line no-console
@@ -44,8 +46,8 @@ export class ErrorBoundary extends Component<Props, State> {
           padding: 24,
           textAlign: 'center',
           fontFamily: 'system-ui, sans-serif',
-          background: '#111',
-          color: '#fff',
+          background: 'var(--eb-bg, #111)',
+          color: 'var(--eb-fg, #fff)',
         }}
       >
         <h1 style={{ fontSize: 20, margin: 0 }}>Something went wrong</h1>
@@ -59,8 +61,8 @@ export class ErrorBoundary extends Component<Props, State> {
             padding: '10px 20px',
             borderRadius: 8,
             border: 'none',
-            background: '#ff393a',
-            color: '#fff',
+            background: 'var(--eb-btn-bg, #ff393a)',
+            color: 'var(--eb-btn-fg, #fff)',
             fontSize: 16,
             cursor: 'pointer',
           }}
