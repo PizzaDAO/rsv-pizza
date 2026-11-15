@@ -18,6 +18,7 @@ const EXISTING: Record<string, string[]> = {
   monad: ['Create your event', 'Get approved', 'Confirm venue and Wi-Fi/power', 'Set capacity and review applications',
     'Publish tracks, prizes and rules', 'Line up judges and mentors', 'Plan meals per day: choose pizzerias',
     'Add a co-host or volunteers', 'Day-of: check-in and displays', 'Post winners and photos'],
+  // swc is new: nothing in prod yet, so no existing names to preserve.
 };
 
 describe('seed-brand-checklists', () => {
@@ -44,6 +45,14 @@ describe('seed-brand-checklists', () => {
     for (const rows of Object.values(BRAND_CHECKLISTS) as [string][][]) {
       expect(rows.map(([n]) => n)).toContain('Pick a photo/video person');
     }
+  });
+
+  it('swc list: meetup-style, about 15 items, crypto-advocacy steps present', () => {
+    const names = (BRAND_CHECKLISTS.swc as [string][]).map(([n]) => n);
+    expect(names.length).toBeGreaterThanOrEqual(14);
+    expect(names.length).toBeLessThanOrEqual(16);
+    expect(names).toContain('Share photos tagging @standwithcrypto');
+    expect(names).toContain('Ask attendees to check their voter registration');
   });
 
   it('flags invalid rules, tabs and duplicates', () => {

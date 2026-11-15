@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Upsert the `team1`, `monad` and `doge` white-label event_series rows (see plans/whitelabel-team1-monad.md §5).
+/** Upsert the `team1`, `monad`, `doge` and `swc` white-label event_series rows (see plans/whitelabel-team1-monad.md §5).
  *  Idempotent, keyed by slug. DRY RUN by default (read-only); --apply to write.
  *  On an existing row only the brand-defining fields are updated, so later edits made in
  *  /admin/series (tags, approval, checklist defaults, ...) are not overwritten.
@@ -38,16 +38,28 @@ const dogeRow = {
   eventDate: new Date('2027-11-02T00:00:00.000Z'),
 };
 
+// Stand With Crypto: community meetups (streamlined meetup create flow, one evening per event).
+// Brand name is the plain org name (no "Pizza" suffix), so the default title is "Stand With Crypto Meetup <city>".
+const swcRow = {
+  ...brandRow('swc', 'Stand With Crypto', 'Stand With Crypto', ['Stand With Crypto', 'SWC']),
+  name: 'Stand With Crypto Meetups',
+  createFlow: 'meetup',
+  nameTemplate: '{series} Meetup {city}',
+};
+
 const ROWS = [
   brandRow('team1', 'Team1', 'Team1 Pizza', ['Team1', 'Avalanche']),
   brandRow('monad', 'Monad', 'Monad Pizza', ['Monad']),
   dogeRow,
+  swcRow,
 ];
 
 // Fields refreshed on an existing row.
 const UPDATE_KEYS = ['name', 'displayName', 'brandName', 'siteUrl', 'themeClass', 'logoUrl', 'ogImageUrl', 'isActive'];
 // Only compared when the row defines it (team1/monad have no event date); Dates compare by time.
 const DATE_KEYS = ['eventDate'];
+// Only compared when the row defines it (only swc sets these here; team1/monad/doge flows are set in /admin/series).
+const OPTIONAL_KEYS = ['createFlow', 'nameTemplate'];
 
 (async () => {
   console.log(`\n=== brand series (${APPLY ? 'APPLY' : 'DRY RUN'}) ===`);
@@ -61,6 +73,7 @@ const DATE_KEYS = ['eventDate'];
     }
     const update = {};
     for (const k of UPDATE_KEYS) if (existing[k] !== row[k]) update[k] = row[k];
+    for (const k of OPTIONAL_KEYS) if (row[k] !== undefined && existing[k] !== row[k]) update[k] = row[k];
     for (const k of DATE_KEYS) {
       if (row[k] && (!existing[k] || existing[k].getTime() !== row[k].getTime())) update[k] = row[k];
     }
@@ -74,7 +87,7 @@ const DATE_KEYS = ['eventDate'];
   if (APPLY) {
     const rows = await prisma.eventSeries.findMany({
       where: { slug: { in: ROWS.map((r) => r.slug) } },
-      select: { slug: true, siteUrl: true, brandName: true, isActive: true, eventDate: true },
+      select: { slug: true, siteUrl: true, brandName: true, isActive: true, eventDate: true, createFlow: true, nameTemplate: true },
     });
     console.log('verified:', JSON.stringify(rows));
   }
