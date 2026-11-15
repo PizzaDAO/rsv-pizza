@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { BRAND } from '../config/brand';
 
 interface Props {
   children: ReactNode;
@@ -10,8 +11,6 @@ interface State {
   hasError: boolean;
 }
 
-// Light brand themes (doge/monad/swc) set --eb-* in index.css; the fallbacks keep
-// the default dark look. The theme class lives on <html>, so vars reach this root.
 export function reportError(source: string, error: unknown, extra?: unknown) {
   // No error-reporting service is configured; log to console.
   // eslint-disable-next-line no-console
@@ -33,9 +32,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.hasError) return this.props.children;
     if (this.props.fallback !== undefined) return this.props.fallback;
+    // Light brand themes (doge/monad/swc) set --eb-* in index.css; the fallbacks keep
+    // the default dark look. App's effect removes the <html> theme class when the tree
+    // unmounts on a crash, so the fallback re-applies the brand theme class itself.
     return (
       <div
         role="alert"
+        className={BRAND.themeClass || undefined}
         style={{
           minHeight: '100vh',
           display: 'flex',
