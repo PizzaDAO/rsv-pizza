@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, MapPin, CalendarDays } from 'lucide-react';
 import { Header } from '../components/Header';

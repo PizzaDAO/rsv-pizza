@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import { ArrowLeft, ExternalLink, Github, Globe, Hash, Loader2, Presentation, Tag, Users, Video } from 'lucide-react';

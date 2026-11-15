@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import ReactMarkdown from 'react-markdown';
 import { Trophy, Clock, Users, Tag, ChevronDown, ChevronUp, ListChecks, LayoutGrid } from 'lucide-react';
 import { markdownRemarkPlugins } from '../../lib/safeMarkdown';

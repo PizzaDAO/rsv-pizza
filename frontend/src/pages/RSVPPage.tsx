@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, getMyGuest, findApprovedGppPartyInCity, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';

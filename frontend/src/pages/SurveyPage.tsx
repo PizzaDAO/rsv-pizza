@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, AlertCircle, CheckCircle2, Star, MessageSquare } from 'lucide-react';
 import { Layout } from '../components/Layout';

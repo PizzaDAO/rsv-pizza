@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Shield, Check, X, ArrowRight, AlertCircle, Upload } from 'lucide-react';
 import { Layout } from '../components/Layout';

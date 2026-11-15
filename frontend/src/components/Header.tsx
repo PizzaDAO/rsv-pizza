@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { User, LogIn, Globe, ChevronDown } from 'lucide-react';
 import { LoginModal } from './LoginModal';

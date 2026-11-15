@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Eye, FolderOpen, Hash, Loader2, Medal, Tag, Users } from 'lucide-react';
 import { Layout } from '../components/Layout';

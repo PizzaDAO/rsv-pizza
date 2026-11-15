@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import {
   Users, UserPlus, KeyRound, Copy, Check, Crown, X, LogOut, RefreshCw, Pencil, Send, Undo2, Loader2, Rocket, Github, Video, Presentation, Globe,
 } from 'lucide-react';

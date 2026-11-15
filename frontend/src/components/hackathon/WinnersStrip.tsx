@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Medal, Tag } from 'lucide-react';
 import { ordinal, type PublicWinner } from '../../lib/hackathonApi';
 

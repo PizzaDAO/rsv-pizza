@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { ChevronDown, ChevronRight, Loader2, Pizza, Send } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { BRAND } from '../config/brand';

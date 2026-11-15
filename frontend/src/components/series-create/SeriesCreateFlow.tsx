@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Calendar, FileText, Link as LinkIcon, Loader2, Lock, Type, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';

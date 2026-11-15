@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { Check, Clock, Loader2, ShieldCheck } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { updateUnderbossStatus } from '../../lib/api';

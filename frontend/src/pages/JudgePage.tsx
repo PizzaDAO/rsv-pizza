@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { Gavel, Loader2, LogIn, CheckCircle2, Circle, EyeOff, Hash } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { LoginModal } from '../components/LoginModal';

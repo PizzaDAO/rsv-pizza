@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router';
 import { HelmetProvider } from 'react-helmet-async';
 import BrandHelmet from './components/BrandHelmet';
 import { BRAND } from './config/brand';

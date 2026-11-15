@@ -10,7 +10,7 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const setUser = vi.hoisted(() => vi.fn());
 vi.mock('../contexts/AuthContext', async (orig) => ({

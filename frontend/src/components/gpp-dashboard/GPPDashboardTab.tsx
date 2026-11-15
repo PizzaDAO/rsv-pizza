@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { Loader2, Check, ExternalLink } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { updateUnderbossStatus, listPayouts } from '../../lib/api';

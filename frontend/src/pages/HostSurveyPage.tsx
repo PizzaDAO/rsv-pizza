@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, AlertCircle, CheckCircle2, Star, MessageSquare, Users } from 'lucide-react';
 import { Layout } from '../components/Layout';
