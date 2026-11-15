@@ -5,7 +5,8 @@
  * auto rules this PR computes (GET /:partyId/checklist):
  *
  *   Publish tracks, prizes and rules  -> hackathon  [auto: hackathon_published]
- *   Set up the submission platform    -> hackathon  [auto: hackathon_submissions_ready]
+ *   Open project submissions          -> hackathon  [auto: hackathon_submissions_ready]
+ *     (renamed from 'Set up the submission platform': see RENAMES)
  *   Line up judges and mentors        -> hackathon  [auto: hackathon_judges_added] (mentors stay manual)
  *   Run demos and judging             -> hackathon  [auto: hackathon_judging_closed] (PR 4)
  *   Post winners and photos           -> hackathon  [auto: hackathon_results_revealed] (PR 5; photos stay manual)
@@ -17,7 +18,8 @@
  * Never clobbers an admin edit: a link is only changed when it is empty or still the value the
  * brand seed set (seed-brand-checklists.cjs: 'details' / 'photos' / none); an auto rule is only
  * set when the row has no auto rule, and never on a party item the host already completed (it
- * keeps its manual tick; it still gets the link). Names and sort order are never touched. Idempotent: a
+ * keeps its manual tick; it still gets the link). Sort order is never touched. Names are only touched by RENAMES (old -> new, on both the template
+ * and the party copies; completion state, link and auto rule are kept; skipped if the new name already exists in that scope). Idempotent: a
  * second run changes nothing.
  *
  * DRY RUN by default (read-only transaction). --apply to write. --series <slug> (default monad).
@@ -30,20 +32,27 @@ const path = require('path');
 // [name, autoRule|null, previousLinks the seed may have set]
 const HACKATHON_ITEMS = [
   ['Publish tracks, prizes and rules', 'hackathon_published', ['details']],
-  ['Set up the submission platform', 'hackathon_submissions_ready', []],
+  ['Open project submissions', 'hackathon_submissions_ready', []],
   ['Line up judges and mentors', 'hackathon_judges_added', []],
   ['Run demos and judging', 'hackathon_judging_closed', []],
   ['Post winners and photos', 'hackathon_results_revealed', ['photos']],
   ['Send prizes to winners', 'hackathon_prizes_paid', []],
 ];
 const LINK_TAB = 'hackathon';
+// old name -> new name (the platform is now our built-in hackathon platform)
+const RENAMES = { 'Set up the submission platform': 'Open project submissions' };
+
+/** Name a row will have after the renames (so planning works the same in dry run and apply). */
+function finalName(name) {
+  return RENAMES[name] || name;
+}
 
 /**
  * Pure plan for one row ({ name, link_tab, is_auto, auto_rule }). Returns the changes
  * ({ linkTab?, autoRule? }) or null when nothing changes / the row isn't a hackathon item.
  */
 function planRow(row) {
-  const item = HACKATHON_ITEMS.find(([name]) => name === row.name);
+  const item = HACKATHON_ITEMS.find(([name]) => name === finalName(row.name));
   if (!item) return null;
   const [, autoRule, previousLinks] = item;
   const change = {};
@@ -90,34 +99,55 @@ async function main() {
     }
     const seriesId = s.rows[0].id;
     if (s.rows[0].create_flow !== 'hackathon') console.log(`WARN: series create_flow is '${s.rows[0].create_flow}', not 'hackathon'.`);
-    const names = HACKATHON_ITEMS.map(([n]) => n);
+    const names = [...HACKATHON_ITEMS.map(([n]) => n), ...Object.keys(RENAMES)];
 
     const defaults = await client.query(
       'SELECT id, name, link_tab, is_auto, auto_rule FROM checklist_defaults WHERE series_id = $1 AND name = ANY($2::text[])',
       [seriesId, names],
     );
     const items = await client.query(
-      `SELECT ci.id, ci.name, ci.link_tab, ci.is_auto, ci.auto_rule, ci.completed
+      `SELECT ci.id, ci.party_id, ci.name, ci.link_tab, ci.is_auto, ci.auto_rule, ci.completed
          FROM checklist_items ci JOIN parties p ON p.id = ci.party_id
         WHERE p.event_series_id = $1 AND ci.is_default = true AND ci.name = ANY($2::text[])`,
       [seriesId, names],
     );
-    const missing = names.filter((n) => !defaults.rows.some((r) => r.name === n));
+    const missing = HACKATHON_ITEMS.map(([n]) => n).filter((n) => !defaults.rows.some((r) => finalName(r.name) === n));
     if (missing.length) console.log(`Not in the series template (skipped): ${missing.map((n) => `'${n}'`).join(', ')}`);
 
     let dChanged = 0;
+    let renamed = 0;
     console.log('\nchecklist_defaults:');
     for (const r of defaults.rows) {
+      const newName = RENAMES[r.name];
+      if (newName) {
+        const clash = defaults.rows.some((o) => o.name === newName);
+        if (clash) console.log(`  ${r.name}: rename skipped ('${newName}' already exists)`);
+        else {
+          console.log(`  ${r.name}: rename -> '${newName}'`);
+          if (APPLY) await client.query('UPDATE checklist_defaults SET name = $1, updated_at = now() WHERE id = $2', [newName, r.id]);
+          renamed++;
+        }
+        if (clash) continue;
+      }
       const c = planRow(r);
       const desc = c ? [c.linkTab && `link ${r.link_tab ?? '(none)'} -> ${c.linkTab}`, c.autoRule && `auto -> ${c.autoRule}`].filter(Boolean).join(', ') : 'no change';
-      console.log(`  ${r.name}: ${desc}`);
+      if (c || !RENAMES[r.name]) console.log(`  ${finalName(r.name)}: ${desc}`);
       if (c && APPLY) dChanged += await applyChange(client, 'checklist_defaults', 'id = $1', [r.id], c);
       else if (c) dChanged++;
     }
 
     const perName = {};
     let iChanged = 0;
+    let iRenamed = 0;
     for (const r of items.rows) {
+      const newName = RENAMES[r.name];
+      if (newName) {
+        const clash = items.rows.some((o) => o.party_id === r.party_id && o.name === newName);
+        if (!clash) {
+          if (APPLY) await client.query('UPDATE checklist_items SET name = $1, updated_at = now() WHERE id = $2', [newName, r.id]);
+          iRenamed++;
+        }
+      }
       const c = planRow(r);
       if (!c) continue;
       perName[r.name] = (perName[r.name] || 0) + 1;
@@ -127,6 +157,9 @@ async function main() {
     const partyCount = await client.query('SELECT COUNT(*)::int AS n FROM parties WHERE event_series_id = $1', [seriesId]);
     console.log(`\nchecklist_items (party copies): ${items.rows.length} matching row(s) across ${partyCount.rows[0].n} party(ies); ${APPLY ? 'updated' : 'would update'} ${iChanged}`);
     for (const [n, k] of Object.entries(perName)) console.log(`  ${n}: ${k}`);
+    console.log(`renames: ${APPLY ? 'renamed' : 'would rename'} ${renamed} template row(s) and ${iRenamed} party item(s) (completion state, link and auto rule kept)`);
+    const completedRenamed = items.rows.filter((r) => RENAMES[r.name] && r.completed).length;
+    if (completedRenamed) console.log(`  (${completedRenamed} of the renamed party item(s) are already completed; they stay completed)`);
 
     if (APPLY) {
       await client.query('COMMIT');
@@ -143,7 +176,7 @@ async function main() {
   }
 }
 
-module.exports = { HACKATHON_ITEMS, LINK_TAB, planRow };
+module.exports = { HACKATHON_ITEMS, LINK_TAB, RENAMES, planRow };
 
 if (require.main === module) {
   main().catch((err) => {

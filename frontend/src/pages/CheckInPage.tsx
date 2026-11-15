@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount, Attestation } from '../lib/api';
 import { BRAND, brandUrl } from '../config/brand';
 import type { CloudSpec } from '../components/GPPClouds';
+import { QRCode } from '../components/QRCode';
 
 // provolone-39042: friendly display name for an attestation row.
 const attestationDisplay = (a: Attestation): string => a.name || a.email || 'someone';
@@ -324,13 +325,7 @@ export function CheckInPage() {
             {t('postCheckIn.qrDescription')}
           </p>
           <div className="bg-white rounded-xl p-4 inline-block mb-4">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(brandUrl(`checkin/${inviteCode}/${guestId}`))}`}
-              alt="Check-in QR code"
-              width={250}
-              height={250}
-              className="block"
-            />
+            <QRCode value={brandUrl(`checkin/${inviteCode}/${guestId}`)} size={250} alt="Check-in QR code" className="block" />
           </div>
           <p className="text-theme-text-muted text-xs">
             {guestName && <span className="block text-theme-text-secondary mb-1">{guestName}</span>}

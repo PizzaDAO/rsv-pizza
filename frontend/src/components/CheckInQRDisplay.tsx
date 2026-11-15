@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { brandUrl } from '../config/brand';
+import { QRCode } from './QRCode';
 
 interface CheckInQRDisplayProps {
   inviteCode: string;
@@ -11,7 +12,6 @@ interface CheckInQRDisplayProps {
 
 export function CheckInQRDisplay({ inviteCode, guestId, guestName, onClose }: CheckInQRDisplayProps) {
   const qrData = brandUrl(`checkin/${inviteCode}/${guestId}`);
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}`;
 
   return createPortal(
     <div
@@ -34,13 +34,7 @@ export function CheckInQRDisplay({ inviteCode, guestId, guestName, onClose }: Ch
         <p className="text-theme-text-secondary text-sm mb-4">{guestName}</p>
 
         <div className="bg-white rounded-xl p-4 inline-block mb-4">
-          <img
-            src={qrSrc}
-            alt="Check-in QR code"
-            width={250}
-            height={250}
-            className="block"
-          />
+          <QRCode value={qrData} size={250} alt="Check-in QR code" className="block" />
         </div>
 
         <p className="text-theme-text-muted text-xs">

@@ -4,6 +4,7 @@ import { AppError } from '../middleware/error.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 import { siteForParty } from '../lib/siteBrand.js';
+import { CHECKIN_QR_SRC, checkInQrAttachment } from '../lib/qrCode.js';
 import { verifySecret } from '../lib/secretHash.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
@@ -963,8 +964,8 @@ async function sendRSVPConfirmationEmail(params: {
     ? `${baseUrl}/checkin/${params.inviteCode}/${params.guestId}`
     : eventUrl;
 
-  // Generate QR code using a free QR code API (encoded check-in URL)
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&bgcolor=f9f9f9&color=1a1a2e`;
+  const qrCodeUrl = CHECKIN_QR_SRC; // inline CID attachment generated locally (lib/qrCode.ts)
+  const qrAttachments = params.requireApproval ? [] : [await checkInQrAttachment(checkInUrl)];
 
   const dateText = params.partyDate
     ? new Date(params.partyDate).toLocaleDateString('en-US', {
@@ -1060,6 +1061,7 @@ async function sendRSVPConfirmationEmail(params: {
       to: [params.guestEmail],
       subject: emailSubject,
       html: emailHtml,
+      ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
     }),
   });
 
@@ -1102,8 +1104,8 @@ export async function sendApprovalEmail(params: {
   // Generate unique check-in URL with guest ID
   const checkInUrl = `${baseUrl}/checkin/${params.inviteCode}/${params.guestId}`;
 
-  // Generate QR code using a free QR code API (encoded check-in URL)
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&bgcolor=f9f9f9&color=1a1a2e`;
+  const qrCodeUrl = CHECKIN_QR_SRC; // inline CID attachment generated locally (lib/qrCode.ts)
+  const qrAttachments = [await checkInQrAttachment(checkInUrl)];
 
   const dateText = params.partyDate
     ? new Date(params.partyDate).toLocaleDateString('en-US', {
@@ -1182,6 +1184,7 @@ export async function sendApprovalEmail(params: {
       to: [params.guestEmail],
       subject: `You're approved for ${params.partyName}! 🍕`,
       html: emailHtml,
+      ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
     }),
   });
 
@@ -1328,8 +1331,8 @@ export async function sendPromotionEmail(params: {
   // Generate unique check-in URL with guest ID
   const checkInUrl = `${baseUrl}/checkin/${params.inviteCode}/${params.guestId}`;
 
-  // Generate QR code using a free QR code API
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&bgcolor=f9f9f9&color=1a1a2e`;
+  const qrCodeUrl = CHECKIN_QR_SRC; // inline CID attachment generated locally (lib/qrCode.ts)
+  const qrAttachments = [await checkInQrAttachment(checkInUrl)];
 
   const dateText = params.partyDate
     ? new Date(params.partyDate).toLocaleDateString('en-US', {
@@ -1410,6 +1413,7 @@ export async function sendPromotionEmail(params: {
       to: [params.guestEmail],
       subject: `You're in! A spot opened up at ${params.partyName}`,
       html: emailHtml,
+      ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
     }),
   });
 

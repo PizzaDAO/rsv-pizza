@@ -77,7 +77,8 @@ the deployed frontend bundle.
 - Follow existing modal patterns (fixed backdrop + `z-50` + click-outside-to-close)
 
 ## Project-Specific Notes
-- Supabase storage buckets must be created via dashboard, not code
+- Supabase storage buckets can't be created by Prisma migrations. Create them in the Supabase dashboard, or via the Storage API with the `service_role` key (e.g. `POST /storage/v1/bucket` with `public: false`, `file_size_limit`, `allowed_mime_types`). Buckets created this way:
+  - `hackathon-media`: private, 10 MB limit, images only
 - **Preview deploys share production backend + DB.** Frontend previews auto-deploy per branch, but the backend only deploys from `master` and the database is a single Supabase instance. New DB columns and backend endpoints must be applied to production **before** they'll work on preview branches.
 
 ## CI gates & migration safety
