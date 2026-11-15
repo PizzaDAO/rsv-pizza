@@ -1340,6 +1340,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   backdrop-filter: none !important;
 }
 .swc-theme .site-header a span { display: none; }
+/* Official logo is a stacked 3-line lockup: needs more height than the wide lockups to stay legible. */
+.swc-theme .site-header > div > a img { height: 3rem; }
 /* Cards: light slate, big radius, hairline border. */
 .swc-theme .card {
   background: var(--swc-card) !important;
@@ -1465,7 +1467,7 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   .swc-theme [role="timer"] .tabular-nums { font-size: 1.875rem; }
   /* Header: keep lockup, language switcher and login on one line. */
   .swc-theme .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
-  .swc-theme .site-header > div > a img { height: 1.25rem; }
+  .swc-theme .site-header > div > a img { height: 2.5rem; }
   .swc-theme .site-header > div > div { gap: 0.25rem; }
   .swc-theme .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
   .swc-theme .site-header button svg.lucide-chevron-down { display: none; }
