@@ -46,10 +46,16 @@ const swcRow = {
   name: 'Stand With Crypto Meetups',
   createFlow: 'meetup',
   nameTemplate: '{series} Meetup {city}',
+  flyerTemplateKey: 'swc',
+};
+
+const team1Row = {
+  ...brandRow('team1', 'Team1', 'Team1 Pizza', ['Team1', 'Avalanche']),
+  flyerTemplateKey: 'team1',
 };
 
 const ROWS = [
-  brandRow('team1', 'Team1', 'Team1 Pizza', ['Team1', 'Avalanche']),
+  team1Row,
   brandRow('monad', 'Monad', 'Monad Pizza', ['Monad']),
   dogeRow,
   swcRow,

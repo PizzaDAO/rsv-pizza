@@ -7,6 +7,10 @@ import { AVAX_POSTER_CONFIG } from './configs/avaxPosterConfig';
 import { AVAX_ROLLUP_CONFIG } from './configs/avaxRollupConfig';
 import { DOGE_POSTER_CONFIG } from './configs/dogePosterConfig';
 import { DOGE_ROLLUP_CONFIG } from './configs/dogeRollupConfig';
+import { TEAM1_POSTER_CONFIG } from './configs/team1PosterConfig';
+import { TEAM1_ROLLUP_CONFIG } from './configs/team1RollupConfig';
+import { SWC_POSTER_CONFIG } from './configs/swcPosterConfig';
+import { SWC_ROLLUP_CONFIG } from './configs/swcRollupConfig';
 
 describe('flyerEventUrl', () => {
   it('prefers the custom URL slug on the brand domain', () => {
@@ -21,7 +25,7 @@ describe('flyerEventUrl', () => {
 });
 
 describe('flyer QR configs', () => {
-  const configs = [POSTER_CONFIG, ROLLUP_CONFIG, AVAX_POSTER_CONFIG, AVAX_ROLLUP_CONFIG, DOGE_POSTER_CONFIG, DOGE_ROLLUP_CONFIG];
+  const configs = [POSTER_CONFIG, ROLLUP_CONFIG, AVAX_POSTER_CONFIG, AVAX_ROLLUP_CONFIG, DOGE_POSTER_CONFIG, DOGE_ROLLUP_CONFIG, TEAM1_POSTER_CONFIG, TEAM1_ROLLUP_CONFIG, SWC_POSTER_CONFIG, SWC_ROLLUP_CONFIG];
 
   it.each(configs.map((c) => [c.id, c] as const))('%s has an in-bounds, print-sized QR', (_id, c) => {
     const q = c.qr!;
