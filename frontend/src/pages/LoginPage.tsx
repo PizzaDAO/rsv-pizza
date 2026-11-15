@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
+import { sanitizeNextPath } from '../lib/wallet/handoff';
 
 export function LoginPage() {
   const { signIn, user } = useAuth();
@@ -17,7 +18,8 @@ export function LoginPage() {
 
   // Store redirect URL from query params
   useEffect(() => {
-    const redirect = searchParams.get('redirect');
+    // Local paths only: an unchecked ?redirect= is an open redirect.
+    const redirect = sanitizeNextPath(searchParams.get('redirect'));
     if (redirect) {
       sessionStorage.setItem('authReturnUrl', redirect);
     }
@@ -26,7 +28,7 @@ export function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const returnUrl = sessionStorage.getItem('authReturnUrl') || '/';
+      const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl')) || '/';
       sessionStorage.removeItem('authReturnUrl');
       navigate(returnUrl);
     }

@@ -185,7 +185,7 @@ export function AuthVerifyPage() {
     if (signedInAsRef.current) return;
     redirectTimer.current = window.setTimeout(() => {
       const nextParam = sanitizeNextPath(initialParams.current.get('next'));
-      const returnUrl = sessionStorage.getItem('authReturnUrl');
+      const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl'));
       sessionStorage.removeItem('authReturnUrl');
       navigate(nextParam || returnUrl || '/');
     }, 2000);
