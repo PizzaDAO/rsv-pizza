@@ -7,7 +7,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| jalapeno-61805 | Re-tune fake-event detection on current data (remove 10 dead heuristics, 4 threshold changes, private weights re-seed) | review | P2 |  | Snax | fraud, underboss | plans/jalapeno-61805.md |  | Supersedes #644. Code PR first; private config applied separately after merge via seedPrivateConfig --only/--dry-run |
 | prosciutto-60417 | Upgrade Prisma 6 → 7 (security advisories; Dependabot #1272) | todo | P3 |  |  | security, deps | plans/prosciutto-60417.md |  | Dependabot #1272 open as reference; needs a plan (schema/client changes, migrate deploy in Deploy Backend, CLAUDE.md migration-safety rules); 2026-11-14: the advisory (deepmerge-ts, build-time only) is fixed by an override, so this is no longer urgent. Plan: option A (keep prisma-client-js generator, add adapter-pg) |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |
@@ -75,6 +74,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 ## Done
 
 | ID | Task | Priority | Done | PR | Notes |
+| jalapeno-61805 | Re-tune fake-event detection on current data (remove 10 dead heuristics, 4 threshold changes, private weights re-seed) | P2 | 2026-11-15 | #1332 | Supersedes #644. Private config applied separately. |
 | brioche-61804 | Upgrade frontend vite 6 → 8 + plugin-react 6 (supersedes Dependabot #1306) | P3 | 2026-11-15 | #1320 | vite 8.3.8 (Rolldown), plugin-react 6.3.0; entry chunk 4.66→3.91 MB, build ~5× faster; CI Node 20→24 left as follow-up |
 | deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | P1 | 2026-11-14 |  | 2026-10-29: superseded for ordering by openpizza/plans/rsv-pizza-ordering.md (host pays at pickup, reimbursed); PR #164 not needed for that skipped: superseded by openpizza/plans/rsv-pizza-ordering.md (2026-10-29); PR #164 closed |
 | ciabatta-61803 | Upgrade react-router-dom 6 → 7 (security advisories; Dependabot #1280) | P2 | 2026-11-14 | #1308 | react-router 7.18.5; open-redirect fix shipped separately in #1302 |
