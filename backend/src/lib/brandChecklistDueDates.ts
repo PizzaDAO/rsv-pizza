@@ -39,7 +39,7 @@ export const BRAND_DUE_OFFSETS: Record<CreateFlowKey, Record<string, DueOffset>>
     'Use your Party Guide on Doge Day': { days: 0 },
     'Upload photos after the party': { days: 3 },
   },
-  // Team1 community meetup (single evening, shorter lead time).
+  // Team1 and Stand With Crypto community meetups (single evening, shorter lead time).
   meetup: {
     'Confirm venue': { days: -21 },
     'Line up a speaker or topic': { days: -21 },
@@ -54,6 +54,11 @@ export const BRAND_DUE_OFFSETS: Record<CreateFlowKey, Record<string, DueOffset>>
     'Remind guests the day before': { days: -1 },
     'Post photos and a recap': { days: 2 },
     'Schedule the next meetup': { days: 7 },
+    // Stand With Crypto-only items (same preset, so same table).
+    'Share your invite link': { days: -14 },
+    'Ask attendees to check their voter registration': { days: -10 },
+    'Prepare politician crypto score cards for guests': { days: -3 },
+    'Share photos tagging @standwithcrypto': { days: 1 },
   },
   // Monad hackathon (multi-day; post-event items anchor on the last day).
   hackathon: {

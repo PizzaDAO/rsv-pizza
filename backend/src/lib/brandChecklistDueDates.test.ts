@@ -9,19 +9,25 @@ const FLOW_FOR_SLUG: Record<string, keyof typeof BRAND_DUE_OFFSETS> = {
   doge: 'global_day',
   team1: 'meetup',
   monad: 'hackathon',
+  swc: 'meetup', // shares the meetup preset (and so its offsets table) with team1
 };
 
 const ymd = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
 describe('brand checklist due dates', () => {
   it('every brand item except "Create your event" has an offset, and every offset names a real item', () => {
+    const namesByFlow: Record<string, Set<string>> = {};
     for (const [slug, flow] of Object.entries(FLOW_FOR_SLUG)) {
       const names = (BRAND_CHECKLISTS[slug] as [string][]).map(([n]) => n);
       const offsetNames = Object.keys(BRAND_DUE_OFFSETS[flow]);
-      for (const n of offsetNames) expect(names).toContain(n);
       for (const n of names) {
         if (n !== 'Create your event') expect(offsetNames).toContain(n);
       }
+      for (const n of names) (namesByFlow[flow] ??= new Set()).add(n);
+    }
+    // Several brands can share a preset: an offset must belong to at least one of them.
+    for (const [flow, names] of Object.entries(namesByFlow)) {
+      for (const n of Object.keys(BRAND_DUE_OFFSETS[flow as keyof typeof BRAND_DUE_OFFSETS])) expect(names.has(n)).toBe(true);
     }
   });
 
@@ -36,6 +42,12 @@ describe('brand checklist due dates', () => {
     expect(ymd(brandDueDate('global_day', 'Pick a venue', dogeParty))).toBe('2027-09-21');
     expect(ymd(brandDueDate('global_day', 'Use your Party Guide on Doge Day', dogeParty))).toBe('2027-11-02');
     expect(ymd(brandDueDate('global_day', 'Upload photos after the party', dogeParty))).toBe('2027-11-05');
+  });
+
+  it('Stand With Crypto meetup items count from the meetup date', () => {
+    const p = { date: new Date('2027-03-10T23:00:00.000Z'), timezone: 'UTC', createdAt: new Date('2026-12-01T00:00:00.000Z') };
+    expect(ymd(brandDueDate('meetup', 'Ask attendees to check their voter registration', p))).toBe('2027-02-28');
+    expect(ymd(brandDueDate('meetup', 'Share photos tagging @standwithcrypto', p))).toBe('2027-03-11');
   });
 
   it('uses the local date, not the UTC date', () => {

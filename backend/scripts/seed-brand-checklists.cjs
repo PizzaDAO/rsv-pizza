@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * brand-checklists: grow the brand-series host checklists (Team1, Monad, Doge Day)
+ * brand-checklists: grow the brand-series host checklists (Team1, Monad, Doge Day, Stand With Crypto)
  * into full "prepare for the party" task lists, adapted from the GPP host list.
  *
  * How brand task lists work (same mechanism as GPP): a party seeds its checklist
@@ -111,6 +111,26 @@ const BRAND_CHECKLISTS = {
     ['Run demos and judging', null, null],
     ['Post winners and photos', null, 'photos'], // existing
     ['Send prizes to winners', null, null],
+  ],
+  // Stand With Crypto: community meetup (same shape as Team1's, adapted to crypto advocacy).
+  // New series: no rows exist yet, so every item is inserted.
+  swc: [
+    ['Create your event', 'event_created', 'details'],
+    ['Get approved', 'underboss_reviewed', null],
+    ['Confirm venue', 'venue_added', 'venue'],
+    ['Line up a speaker or topic', null, null],
+    ['Add a co-host', 'team_built', 'details'],
+    ['Estimate attendance', 'attendance_estimated', 'attendance'],
+    ['Choose a pizzeria', 'pizzerias_selected', 'pizza'],
+    ['Share your invite link', null, 'promo'],
+    ['Post to socials', null, 'social-post'],
+    ['Ask attendees to check their voter registration', null, null],
+    ['Prepare politician crypto score cards for guests', null, null],
+    ['Remind guests the day before', null, 'guests'],
+    ['Pick a photo/video person', null, 'photos'],
+    ['Share photos tagging @standwithcrypto', null, 'social-post'],
+    ['Post photos and a recap', null, 'photos'],
+    ['Schedule the next meetup', null, null],
   ],
 };
 

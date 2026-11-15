@@ -1279,6 +1279,201 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   .doge-theme .site-header button svg.lucide-chevron-down { display: none; }
 }
 
+/* Stand With Crypto (swc brand site). Light theme modelled on www.standwithcrypto.org: white
+ * page, near-black ink #020817, slate secondary text, brand purple #6C11FF (white text 6.2:1),
+ * light-slate #F2F5F9 cards with big radii, full pill buttons, and Satoshi type (loaded only for
+ * this theme from App.tsx; Fontshare). Lavender #F1EAFF / #E2D0FF tints are decorative.
+ * Contrast built in from the start (see the doge/monad QA block above): muted text tiers stay
+ * >= 4.5:1 on both white and the #F2F5F9 card, status hues are the dark light-theme set. */
+.swc-theme {
+  --swc-ink: #020817;
+  --swc-purple: #6C11FF;
+  --swc-purple-deep: #5A0DE0;
+  --swc-lavender: #F1EAFF;
+  --swc-card: #F2F5F9;
+  --swc-line: #DBE4F0;
+  --swc-font: 'Satoshi', 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --bg-main: #FFFFFF;
+  --bg-card: #F2F5F9;
+  --bg-card-hover: #EAEFF6;
+  --bg-surface: #F2F5F9;
+  --bg-surface-hover: #EAEFF6;
+  --bg-overlay: rgba(19, 0, 59, 0.55);
+  --bg-input: #FFFFFF;
+  --bg-input-focus: #FFFFFF;
+  --bg-header: #FFFFFF;
+  --text-primary: #020817;
+  --text-secondary: rgba(2, 8, 23, 0.8);
+  --text-muted: #52607A;
+  --text-faint: rgba(2, 8, 23, 0.64);
+  --text-inverted: #FFFFFF;
+  --stroke: #DBE4F0;
+  --stroke-hover: #CAABFF;
+  --stroke-strong: #6C11FF;
+  --accent: #6C11FF;
+  --accent-hover: #5A0DE0;
+  --success: #1f7a45;
+  --warning: #8a5a00;
+  --error: #b3261e;
+  --color-scheme: light;
+  color-scheme: light;
+  background: #FFFFFF;
+  font-family: var(--swc-font);
+}
+.swc-theme body { font-family: var(--swc-font); background: #FFFFFF; }
+.swc-theme button, .swc-theme input, .swc-theme textarea, .swc-theme select { font-family: var(--swc-font); }
+.swc-theme h1, .swc-theme h2, .swc-theme h3 {
+  font-family: var(--swc-font);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.swc-theme h1 { line-height: 1.05; text-wrap: balance; }
+.swc-theme h2 { text-wrap: balance; }
+/* Event title carries an inline Rubik style; force the brand face. */
+.swc-theme h1[data-testid="event-name"] { font-family: var(--swc-font) !important; font-weight: 700; }
+.swc-theme main > header > h1 { font-size: clamp(2.5rem, 7vw, 3.75rem); }
+.swc-theme [role="timer"] .tabular-nums { font-family: var(--swc-font); font-weight: 700; font-size: 2.25rem; line-height: 1.1; }
+/* Header: white bar, hairline border; the lockup logo carries the name, so hide the text span. */
+.swc-theme .site-header {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid var(--swc-line) !important;
+  backdrop-filter: none !important;
+}
+.swc-theme .site-header a span { display: none; }
+/* Cards: light slate, big radius, hairline border. */
+.swc-theme .card {
+  background: var(--swc-card) !important;
+  border: 1px solid var(--swc-line) !important;
+  border-radius: 24px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none;
+}
+.swc-theme .card:hover { border-color: #CAABFF !important; }
+.swc-theme main a.block.rounded-xl { background: var(--swc-card); border-color: var(--swc-line); border-radius: 20px; }
+.swc-theme main a.block.rounded-xl:hover { background: var(--swc-lavender); border-color: #CAABFF; }
+.swc-theme [role="timer"] > div { background: #fff; border: 1px solid var(--swc-line); border-radius: 16px; }
+/* Buttons: full pills. Purple primary (white text), white secondary. */
+.swc-theme .btn-primary, .swc-theme .btn-secondary {
+  font-weight: 700;
+  border-radius: 1000px;
+}
+.swc-theme .btn-primary {
+  background-color: var(--swc-purple);
+  color: #fff;
+  border: 1px solid var(--swc-purple);
+}
+.swc-theme .btn-primary:hover:not(:disabled) { background-color: var(--swc-purple-deep); border-color: var(--swc-purple-deep); color: #fff; }
+.swc-theme .btn-secondary {
+  background: #fff;
+  border: 1px solid var(--swc-line);
+  color: var(--swc-ink);
+}
+.swc-theme .btn-secondary:hover { background: var(--swc-lavender); border-color: #CAABFF; }
+.swc-theme .text-center > a.btn-primary { padding: 14px 32px; }
+/* Hard-coded white utilities (written for dark themes) -> ink on light. */
+.swc-theme .text-white, .swc-theme .text-white\/90 { color: var(--swc-ink); }
+.swc-theme .text-white\/80, .swc-theme .text-white\/70 { color: rgba(2, 8, 23, 0.82); }
+.swc-theme .text-white\/60, .swc-theme .text-white\/50 { color: rgba(2, 8, 23, 0.72); }
+.swc-theme .text-white\/40, .swc-theme .text-white\/30, .swc-theme .text-white\/20 { color: rgba(2, 8, 23, 0.68); }
+.swc-theme .hover\:text-white:hover { color: var(--swc-ink); }
+.swc-theme .hover\:text-white\/60:hover { color: rgba(2, 8, 23, 0.85); }
+.swc-theme .border-white\/10, .swc-theme .border-white\/20 { border-color: var(--swc-line); }
+.swc-theme .bg-white\/5, .swc-theme .bg-white\/6, .swc-theme .bg-white\/10 { background: rgba(108, 17, 255, 0.05); }
+.swc-theme .bg-white\/20 { background: rgba(108, 17, 255, 0.1); }
+.swc-theme .hover\:bg-white\/5:hover, .swc-theme .hover\:bg-white\/10:hover { background: rgba(108, 17, 255, 0.08); }
+.swc-theme .hover\:bg-white\/20:hover { background: rgba(108, 17, 255, 0.12); }
+.swc-theme .bg-red-500, .swc-theme .bg-red-500 .text-white { color: #fff; }
+.swc-theme .btn-primary .text-white { color: inherit; }
+/* Solid accent fills (vote buttons, selected chips): text-white is remapped to ink above. */
+.swc-theme .bg-theme-accent, .swc-theme .bg-theme-accent .text-white { color: #fff; }
+/* Inputs: white, slate border, rounded. */
+.swc-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.swc-theme textarea, .swc-theme select {
+  background: #fff !important;
+  border: 1px solid #C7D3E2 !important;
+  border-radius: 14px;
+  color: var(--swc-ink) !important;
+}
+.swc-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.swc-theme textarea:focus, .swc-theme select:focus {
+  border-color: var(--swc-purple) !important;
+  box-shadow: 0 0 0 3px rgba(108, 17, 255, 0.2);
+}
+.swc-theme input::placeholder, .swc-theme textarea::placeholder { color: #52607A !important; }
+.swc-theme input[type="time"], .swc-theme input[type="date"],
+.swc-theme input[type="datetime-local"] { color-scheme: light !important; }
+.swc-theme a:not(.btn-primary):not(.btn-secondary) { text-decoration-color: rgba(108, 17, 255, 0.5); }
+/* Google Places dropdown (appended to <body>, outside #root). */
+.swc-theme .pac-container {
+  background-color: #fff !important;
+  border: 1px solid var(--swc-line) !important;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(19, 0, 59, 0.15) !important;
+}
+.swc-theme .pac-item { background-color: #fff !important; border-color: #EAEFF6 !important; color: var(--swc-ink) !important; }
+.swc-theme .pac-item:hover { background-color: var(--swc-lavender) !important; }
+.swc-theme .pac-item-query { color: var(--swc-ink) !important; }
+/* Landing hero: soft lavender wash behind the headline (their promo-banner tint). */
+.swc-theme main > header {
+  background-image: radial-gradient(ellipse 80% 100% at 50% 0%, rgba(226, 208, 255, 0.55), rgba(241, 234, 255, 0) 70%);
+  border-radius: 32px;
+  padding-bottom: 2rem;
+}
+/* Series logoUrl duplicates the header lockup; hide it. */
+.swc-theme main > header > img:first-child { display: none; }
+/* Footer PizzaDAO logo is white; render it dark on the white page. */
+.swc-theme footer img { filter: brightness(0) opacity(0.7); }
+/* Brand-red utilities -> SWC purple (red stays only for real error boxes). */
+.swc-theme .text-\[\#ff393a\] { color: var(--swc-purple); }
+.swc-theme [class*="border-[#ff393a]/30"][class*="text-[#ff393a]"] { color: #b3261e; }
+.swc-theme .bg-\[\#ff393a\] { background-color: var(--swc-purple); color: #fff; }
+.swc-theme .bg-\[\#ff393a\] .text-white, .swc-theme .bg-\[\#ff393a\].text-white { color: #fff; }
+.swc-theme .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #E2D0FF, #F1EAFF); }
+.swc-theme .from-\[\#ff393a\] svg { color: rgba(19, 0, 59, 0.4); }
+.swc-theme .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--swc-purple); }
+/* Red-tinted fills without a red border/text are brand accents (badges, selected rows). Anything
+ * with text-[#ff393a] + border-[#ff393a] is an error/danger box and keeps red (rule above). */
+.swc-theme :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]) { background-color: rgba(108, 17, 255, 0.1); }
+.swc-theme :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"])[class*="border-[#ff393a]"]:not([class*="text-[#ff393a]"]) {
+  background-color: rgba(108, 17, 255, 0.07);
+  border-color: rgba(108, 17, 255, 0.4);
+}
+.swc-theme :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]).text-\[\#ff393a\] { color: #4a0bb8; }
+/* Status / accent hues picked for the dark default theme -> dark light-theme set (>= 4.5:1 on white and #F2F5F9). */
+.swc-theme .text-green-400, .swc-theme .text-green-300, .swc-theme .text-emerald-400, .swc-theme .text-\[\#39d98a\] { color: #1f7a45; }
+.swc-theme .text-amber-400, .swc-theme .text-amber-400\/70, .swc-theme .text-yellow-400, .swc-theme .text-yellow-300, .swc-theme .text-orange-400 { color: #8a5a00; }
+.swc-theme .text-red-400, .swc-theme .text-red-300, .swc-theme .text-\[\#ff393a\]\/60 { color: #b3261e; }
+.swc-theme .text-\[\#5c7cfa\] { color: #3a4fc4; }
+.swc-theme .text-blue-400, .swc-theme .text-sky-400, .swc-theme .text-cyan-400 { color: #1d5fa8; }
+.swc-theme .text-purple-400, .swc-theme .text-violet-400, .swc-theme .text-pink-400 { color: #6a2bb0; }
+.swc-theme [class*="bg-[#39d98a]/"].text-\[\#39d98a\] { color: #17663a; }
+.swc-theme svg[style*="color: rgb(245, 158, 11)"] { color: #8a5a00 !important; }
+.swc-theme svg[style*="color: rgb(57, 217, 138)"], .swc-theme svg[style*="color: rgb(34, 197, 94)"] { color: #1f7a45 !important; }
+.swc-theme svg[style*="color: rgb(255, 57, 58)"] { color: var(--swc-purple-deep) !important; }
+.swc-theme svg[style*="color: rgb(92, 124, 250)"] { color: #3a4fc4 !important; }
+/* Modals */
+.swc-theme .fixed.inset-0 .card, .swc-theme .fixed.inset-0 .bg-theme-header {
+  background: #fff !important;
+  border: 1px solid var(--swc-line) !important;
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(19, 0, 59, 0.25) !important;
+}
+@media (max-width: 480px) {
+  .swc-theme [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .swc-theme [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .swc-theme [role="timer"] .tabular-nums { font-size: 1.875rem; }
+  /* Header: keep lockup, language switcher and login on one line. */
+  .swc-theme .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .swc-theme .site-header > div > a img { height: 1.25rem; }
+  .swc-theme .site-header > div > div { gap: 0.25rem; }
+  .swc-theme .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .swc-theme .site-header button svg.lucide-chevron-down { display: none; }
+  /* Host Guests card header overflows the card at 390px; let it wrap. */
+  .swc-theme .guest-list-head { flex-wrap: wrap; row-gap: 0.75rem; }
+  .swc-theme .guest-list-head > div { flex-wrap: wrap; row-gap: 0.5rem; }
+}
+
 /* ─── Adding New Themes ───
  *
  * The theming system uses CSS custom properties (design tokens) with Tailwind
