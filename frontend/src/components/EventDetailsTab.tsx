@@ -11,6 +11,7 @@ import { BRAND_FEATURES } from '../config/brandScope';
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { TimePickerInput } from './TimePickerInput';
+import { nextEndDate } from '../utils/eventSchedule';
 import { TimezonePickerInput } from './TimezonePickerInput';
 import { Checkbox } from './Checkbox';
 import { getDateTimeInTimezone, parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
@@ -1247,8 +1248,8 @@ export const EventDetailsTab: React.FC = () => {
                   value={startDate}
                   onChange={(e) => {
                     setDateTimeError(null);
+                    setEndDate(nextEndDate(startDate, e.target.value, endDate));
                     setStartDate(e.target.value);
-                    if (!endDate) setEndDate(e.target.value);
                   }}
                   disabled={party?.eventType === 'gpp'}
                   onClick={(e) => { if (party?.eventType !== 'gpp') (e.target as HTMLInputElement).showPicker?.(); }}

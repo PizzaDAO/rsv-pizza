@@ -9,7 +9,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
-import { parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
+import { resolveSchedule, type ScheduleError, nextEndDate, DEFAULT_START_TIME, DEFAULT_END_TIME } from '../utils/eventSchedule';
+import { formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
@@ -116,17 +117,16 @@ export function EventForm() {
 
       // Use the event's timezone when parsing the entered date/time
       const tz = formData.timezone || 'UTC';
-      let duration: number | undefined;
-      let startDateTime: string | undefined;
-      if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
-        const start = parseDateTimeInTimezone(formData.startDate, formData.startTime, tz);
-        const end = parseDateTimeInTimezone(formData.endDate, formData.endTime, tz);
-        const durationMs = end.getTime() - start.getTime();
-        duration = durationMs / (1000 * 60 * 60);
-        startDateTime = start.toISOString();
-      } else if (formData.startDate && formData.startTime) {
-        startDateTime = parseDateTimeInTimezone(formData.startDate, formData.startTime, tz).toISOString();
+      const schedule = resolveSchedule({
+        startDate: formData.startDate || '', startTime: formData.startTime || '',
+        endDate: formData.endDate || '', endTime: formData.endTime || '', timezone: tz,
+      });
+      if (schedule.error) {
+        setImageError(scheduleErrorMessage(schedule.error));
+        setCreating(false);
+        return;
       }
+      const { startDateTime, duration } = schedule;
 
       const imageUrl = formData.eventImageUrl?.trim() || undefined;
 
@@ -220,6 +220,14 @@ export function EventForm() {
     setEventImageUrl('');
   };
 
+  const scheduleErrorMessage = (code: ScheduleError): string => {
+    switch (code) {
+      case 'needsStartDate': return t('eventForm.scheduleNeedsStartDate');
+      case 'invalid': return t('eventForm.scheduleInvalid');
+      case 'endBeforeStart': return t('eventForm.scheduleEndBeforeStart');
+    }
+  };
+
   const handleCreate = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
@@ -256,17 +264,13 @@ export function EventForm() {
 
       // Use the event's timezone when parsing the entered date/time
       const tz = timezone || 'UTC';
-      let duration: number | undefined;
-      let startDateTime: string | undefined;
-      if (startDate && startTime && endDate && endTime) {
-        const start = parseDateTimeInTimezone(startDate, startTime, tz);
-        const end = parseDateTimeInTimezone(endDate, endTime, tz);
-        const durationMs = end.getTime() - start.getTime();
-        duration = durationMs / (1000 * 60 * 60);
-        startDateTime = start.toISOString();
-      } else if (startDate && startTime) {
-        startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
+      const schedule = resolveSchedule({ startDate, startTime, endDate, endTime, timezone: tz });
+      if (schedule.error) {
+        setImageError(scheduleErrorMessage(schedule.error));
+        setCreating(false);
+        return;
       }
+      const { startDateTime, duration } = schedule;
 
       let imageUrl = eventImageUrl.trim() || undefined;
       if (eventImageFile) {
@@ -404,8 +408,8 @@ export function EventForm() {
                     type="date"
                     value={startDate}
                     onChange={(e) => {
+                      setEndDate(nextEndDate(startDate, e.target.value, endDate));
                       setStartDate(e.target.value);
-                      if (!endDate) setEndDate(e.target.value);
                     }}
                     className="w-full bg-transparent border-none text-theme-text text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
@@ -414,7 +418,7 @@ export function EventForm() {
                 <TimePickerInput
                   value={startTime}
                   onChange={setStartTime}
-                  placeholder="12:30 PM"
+                  placeholder={formatTimeDisplay(DEFAULT_START_TIME)}
                 />
               </div>
 
@@ -438,7 +442,7 @@ export function EventForm() {
                 <TimePickerInput
                   value={endTime}
                   onChange={setEndTime}
-                  placeholder="01:30 PM"
+                  placeholder={formatTimeDisplay(DEFAULT_END_TIME)}
                 />
               </div>
             </div>
@@ -666,8 +670,8 @@ export function EventForm() {
                   type="date"
                   value={startDate}
                   onChange={(e) => {
+                    setEndDate(nextEndDate(startDate, e.target.value, endDate));
                     setStartDate(e.target.value);
-                    if (!endDate) setEndDate(e.target.value);
                   }}
                   onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] cursor-pointer"
@@ -681,7 +685,7 @@ export function EventForm() {
                 <TimePickerInput
                   value={startTime}
                   onChange={setStartTime}
-                  placeholder="12:00 PM"
+                  placeholder={formatTimeDisplay(DEFAULT_START_TIME)}
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
@@ -708,7 +712,7 @@ export function EventForm() {
                 <TimePickerInput
                   value={endTime}
                   onChange={setEndTime}
-                  placeholder="1:00 PM"
+                  placeholder={formatTimeDisplay(DEFAULT_END_TIME)}
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
               </div>
