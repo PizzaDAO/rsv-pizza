@@ -205,7 +205,11 @@ export function JudgePage() {
       )}
       {shown.length === 0 ? (
         <div className="card p-6 text-center text-sm text-theme-text-muted">
-          {data.queue.length === 0 ? 'No submitted projects yet. This page refreshes on its own.' : 'No projects in this track.'}
+          {data.queue.length > 0
+            ? 'No projects in this track.'
+            : data.ownTeamHidden
+              ? "Your team's project is hidden here: judges can't score their own team. Other projects show up as they're submitted."
+              : 'No submitted projects yet. This page refreshes on its own.'}
         </div>
       ) : (
         <ul className="space-y-2">
@@ -268,6 +272,11 @@ export function JudgePage() {
           <div className="h-2 rounded-full bg-theme-surface border border-theme-stroke overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full bg-theme-accent" style={{ width: `${pct}%` }} />
           </div>
+          {!!data.ownTeamHidden && data.queue.length > 0 && (
+            <p className="mt-2 text-xs text-theme-text-muted" data-testid="judge-own-team-hidden">
+              Your team's project isn't listed: judges can't score their own team.
+            </p>
+          )}
         </div>
         {data.blindJudging && (
           <p className="text-xs text-theme-text-muted mt-3 flex items-center gap-1.5"><EyeOff size={14} /> Blind judging: team names are hidden and links unlock after you score.</p>
