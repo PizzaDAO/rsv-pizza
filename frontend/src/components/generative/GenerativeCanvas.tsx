@@ -13,7 +13,36 @@ import {
 } from '../flyer/renderFlyer';
 import { useCanvasDrag } from './useCanvasDrag';
 import { renderCanvas } from './renderCanvas';
-import type { FormatConfig, CanvasPositions } from './types';
+import type { FormatConfig, CanvasPositions, DogeSpeakSlot } from './types';
+import { buildDogePhrases, drawDogeSpeak, ensureDogeFont, type DogePhrase } from './dogeSpeak';
+
+/** Doge-speak preview layer (doge templates only). Same drawing code as the downloaded PNG. */
+function DogeSpeakOverlay({ phrases, slots, width, height }: {
+  phrases: DogePhrase[]; slots: DogeSpeakSlot[]; width: number; height: number;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [fontReady, setFontReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    ensureDogeFont().then(() => { if (alive) setFontReady(true); });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    const c = ref.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    ctx.clearRect(0, 0, c.width, c.height);
+    drawDogeSpeak(ctx, phrases, slots, 2);
+  }, [phrases, slots, fontReady]);
+  return (
+    <canvas
+      ref={ref}
+      width={width * 2}
+      height={height * 2}
+      style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none' }}
+    />
+  );
+}
 
 function parseCityFromAddress(address: string): string {
   const parts = address.split(',').map(p => p.trim());
@@ -70,6 +99,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [wowShuffle, setWowShuffle] = useState(0);
 
   // Popped-out logos
   const [poppedLogos, setPoppedLogos] = useState<Record<string, { x: number; y: number }>>(
@@ -392,6 +422,11 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const streetAddress = editStreetAddress !== null ? editStreetAddress : defaultStreetAddress;
   const city = editCity !== null ? editCity : defaultCity;
 
+  // Doge-speak (doge templates only): deterministic per event + city; "Shuffle wow" bumps the seed.
+  const dogePhrases = config.dogeSpeak
+    ? buildDogePhrases(`${party.id}|${wowShuffle}`, city)
+    : undefined;
+
   // Get text field configs
   const cityField = config.textFields.find(f => f.key === 'city')!;
   const timeField = config.textFields.find(f => f.key === 'time')!;
@@ -453,6 +488,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
       config,
       positions,
       textValues: { city, dateDisplay, timeDisplay: effectiveTimeDisplay, venueName, streetAddress },
+      dogePhrases,
       sponsors: sponsors.map(s => ({ id: s.id, logoUrl: s.logoUrl! })),
       sponsorBoxSize,
       logoSizes,
@@ -538,6 +574,15 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
           style={{ width: '100%', height: '100%', display: 'block' }}
           crossOrigin="anonymous"
         />
+
+        {config.dogeSpeak && dogePhrases && (
+          <DogeSpeakOverlay
+            phrases={dogePhrases}
+            slots={config.dogeSpeak.slots}
+            width={config.canvasWidth}
+            height={config.canvasHeight}
+          />
+        )}
 
         {/* City name */}
         {(() => {
@@ -1286,6 +1331,15 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
           <Plus className="w-4 h-4" />
           Add Logo
         </button>
+        {config.dogeSpeak && (
+          <button
+            onClick={() => setWowShuffle(n => n + 1)}
+            className="flex items-center gap-2 px-4 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors text-sm"
+            title="Regenerate the doge-speak phrases"
+          >
+            Shuffle wow
+          </button>
+        )}
         <button
           onClick={handleDownload}
           disabled={downloading || downloadingHiRes}

@@ -1,4 +1,5 @@
 import type { FormatConfig, CanvasPositions } from './types';
+import { drawDogeSpeak, ensureDogeFont, type DogePhrase } from './dogeSpeak';
 import {
   fitText, loadImg,
   CITY_COLOR,
@@ -19,6 +20,8 @@ export interface RenderCanvasOptions {
   logoSizes: Record<string, number>;
   poppedLogos: Record<string, { x: number; y: number }>;
   scaleFactor?: number;
+  /** Doge templates only (config.dogeSpeak): phrases from buildDogePhrases. */
+  dogePhrases?: DogePhrase[];
 }
 
 /**
@@ -27,7 +30,7 @@ export interface RenderCanvasOptions {
  * for full-resolution output.
  */
 export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanvasElement> {
-  const { config, positions, textValues, sponsors, sponsorBoxSize, logoSizes, poppedLogos, scaleFactor = 1 } = opts;
+  const { config, positions, textValues, sponsors, sponsorBoxSize, logoSizes, poppedLogos, scaleFactor = 1, dogePhrases } = opts;
   const { city, dateDisplay, timeDisplay, venueName, streetAddress } = textValues;
 
   const w = Math.round(config.canvasWidth * scaleFactor);
@@ -43,6 +46,11 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
   const templateSrc = scaleFactor > 1 ? config.fullResUrl : config.templatePath;
   const templateImg = await loadImg(templateSrc);
   ctx.drawImage(templateImg, 0, 0, w, h);
+
+  if (config.dogeSpeak && dogePhrases?.length) {
+    await ensureDogeFont();
+    drawDogeSpeak(ctx, dogePhrases, config.dogeSpeak.slots, s);
+  }
 
   ctx.textBaseline = 'top';
 

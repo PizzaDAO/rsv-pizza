@@ -18,7 +18,17 @@ export interface CanvasPositions {
   [key: string]: { x: number; y: number };
 }
 
+/** Slot for one doge-speak phrase (canvas px, top-left anchored). See dogeSpeak.ts. */
+export interface DogeSpeakSlot {
+  x: number;
+  y: number;
+  fontSize: number;
+  maxWidth: number;
+}
+
 export interface FormatConfig {
+  /** Doge templates only: draw Much-Wow style doge-speak phrases at these slots. */
+  dogeSpeak?: { slots: DogeSpeakSlot[] };
   id: string;
   label: string;
   templatePath: string;
