@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X, ThumbsUp, Shuffle, Download } from 'lucide-react';
 import { Layout } from '../components/Layout';

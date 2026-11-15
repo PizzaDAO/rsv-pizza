@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Loader2, FileSignature, AlertCircle, Check, Mail, User } from 'lucide-react';
 import { Mou } from '../types';
 import { getPublicMou, recordMouView, signMou } from '../lib/api';

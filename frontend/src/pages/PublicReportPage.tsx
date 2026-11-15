@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Loader2, AlertCircle, FileText, Lock } from 'lucide-react';
 import { EventReport } from '../types';
 import { checkReportPassword, fetchPublicReport } from '../lib/api';

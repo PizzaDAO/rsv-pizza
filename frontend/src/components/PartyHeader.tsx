@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BRAND } from '../config/brand';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
 import { uploadEventImage, cdnUrl } from '../lib/supabase';

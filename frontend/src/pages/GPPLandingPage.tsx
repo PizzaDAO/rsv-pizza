@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, MapPin, Globe, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

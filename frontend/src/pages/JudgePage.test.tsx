@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import type { JudgeQueueResponse, JudgeSubmissionResponse } from '../lib/hackathonApi';
 
 const auth = vi.hoisted(() => ({ user: { id: 'u1', email: 'judge@example.com' }, loading: false, signOut: () => {} }));

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { getPartnerIntake, submitPartnerIntake, PartnerIntakeData, PartnerIntakeResponse } from '../lib/api';
 import { PartnerForm, PartnerFormData } from '../components/sponsors/PartnerForm';

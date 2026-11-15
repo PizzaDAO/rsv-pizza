@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, X, Pause, Play, MapPin, ThumbsUp, SkipBack, SkipForward } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';

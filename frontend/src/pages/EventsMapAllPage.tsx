@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { fetchGppEventsForMap, GPPEventMapItem } from '../lib/api';

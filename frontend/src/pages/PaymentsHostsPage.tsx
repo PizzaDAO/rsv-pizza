@@ -5,7 +5,7 @@
  */
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { BRAND } from '../config/brand';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Search, ShieldX, Users } from 'lucide-react';
 import { Layout } from '../components/Layout';

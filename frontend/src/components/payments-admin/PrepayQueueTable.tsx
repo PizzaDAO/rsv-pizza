@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { AlertTriangle, Star, DollarSign } from 'lucide-react';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 import { PayoutMethodIcon, PAYOUT_METHOD_LABELS, CapInlineEditor } from '../payments-shared';

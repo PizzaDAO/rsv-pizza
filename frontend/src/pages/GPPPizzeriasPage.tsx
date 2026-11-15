@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { fetchGppPizzerias, GPPPizzeriaMapItem } from '../lib/api';

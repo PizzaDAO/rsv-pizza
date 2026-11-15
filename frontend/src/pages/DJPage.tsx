@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Music, Calendar, MapPin, Mic2, Disc3, ListMusic, ExternalLink, Clock, Instagram } from 'lucide-react';

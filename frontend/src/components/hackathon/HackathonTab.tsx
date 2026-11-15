@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { Trophy, Loader2, Eye, EyeOff, CheckCircle2, Circle, Lock } from 'lucide-react';
 import { hackathonHostApi, hackathonJudgingHostApi, type HostHackathon, type HackathonSettingsInput } from '../../lib/hackathonApi';
 import { ErrorBanner } from './shared';

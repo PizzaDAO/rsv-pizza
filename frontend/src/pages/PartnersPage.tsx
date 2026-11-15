@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, X } from 'lucide-react';
 import { GPPClouds } from '../components/GPPClouds';

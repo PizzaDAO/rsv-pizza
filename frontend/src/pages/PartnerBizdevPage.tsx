@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { Loader2, Shield, Building2, Info } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';

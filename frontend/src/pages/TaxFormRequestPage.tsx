@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { AlertTriangle, CheckCircle2, FileText, Loader2, Lock, XCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
