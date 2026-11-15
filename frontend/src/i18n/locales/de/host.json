@@ -920,5 +920,29 @@
     "rollupSubmitted": "Eingereicht am {{date}}",
     "rollupReceiptCount_one": "{{count}} Beleg",
     "rollupReceiptCount_other": "{{count}} Belege"
+  },
+  "pressRelease": {
+    "title": "Pressemitteilungs-Generator",
+    "subtitle": "Erstelle eine Pressemitteilung für lokale Medien",
+    "eventDetails": "Event-Details",
+    "hostNamePlaceholder": "Name des Gastgebers",
+    "phonePlaceholder": "Telefonnummer (für Medienanfragen)",
+    "pizzeriaPlaceholder": "Name der Pizzeria",
+    "cityPlaceholder": "Stadt",
+    "venuePlaceholder": "Veranstaltungsort / Adresse",
+    "sponsorsPlaceholder": "Lokale Sponsoren (durch Kommas getrennt)",
+    "autoFilled": "Automatisch aus deinen Event-Daten ausgefüllt. Bei Bedarf anpassen.",
+    "template": "Vorlage",
+    "resetTemplate": "Auf Standard zurücksetzen",
+    "templatePlaceholder": "Vorlage für die Pressemitteilung...",
+    "templateHelp": "Bearbeite die Vorlage oben. Platzhalter wie {city} werden beim Erstellen durch deine Angaben ersetzt.",
+    "generate": "Pressemitteilung erstellen",
+    "generated": "Erstellte Pressemitteilung",
+    "copy": "In die Zwischenablage kopieren",
+    "copied": "Kopiert!",
+    "copyButton": "In die Zwischenablage kopieren",
+    "download": "Als .txt herunterladen",
+    "dateTbd": "offen",
+    "defaultTemplate": "ZUR SOFORTIGEN VERÖFFENTLICHUNG\n\nGLOBAL PIZZA PARTY KOMMT AM {date} NACH {city}\n\n{city} — {host_name} gibt stolz bekannt, dass {city} am {date} an der Global Pizza Party teilnimmt, einer weltweiten Feier von Pizza und Gemeinschaft. Die Veranstaltung findet in {venue} statt.\n\nDie Global Pizza Party ist ein jährliches Event der PizzaDAO, das Pizzaliebhaber in Städten auf der ganzen Welt für einen Tag mit kostenloser Pizza, Gemeinschaft und Spaß zusammenbringt.\n\nBeim Event in {city} gibt es Pizza von {pizzeria} – die besten lokalen Aromen für die Feier.\n\nDas Event wird durch die großzügige Unterstützung lokaler Sponsoren ermöglicht, darunter {sponsors}.\n\nDie Teilnahme ist kostenlos und für die Öffentlichkeit zugänglich. Gäste werden gebeten, sich unter {rsvp_url} anzumelden.\n\nFür weitere Informationen oder Medienanfragen wenden Sie sich bitte an:\n{host_name}\nTelefon: {host_phone}\n\n###"
   }
 }

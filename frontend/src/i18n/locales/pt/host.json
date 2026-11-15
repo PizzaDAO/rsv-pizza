@@ -922,5 +922,29 @@
     "rollupSubmitted": "Enviado em {{date}}",
     "rollupReceiptCount_one": "{{count}} recibo",
     "rollupReceiptCount_other": "{{count}} recibos"
+  },
+  "pressRelease": {
+    "title": "Gerador de comunicado de imprensa",
+    "subtitle": "Gere um comunicado de imprensa para enviar aos veículos de mídia locais",
+    "eventDetails": "Detalhes do evento",
+    "hostNamePlaceholder": "Nome do anfitrião",
+    "phonePlaceholder": "Telefone (para contato da imprensa)",
+    "pizzeriaPlaceholder": "Nome da pizzaria",
+    "cityPlaceholder": "Cidade",
+    "venuePlaceholder": "Local / Endereço",
+    "sponsorsPlaceholder": "Patrocinadores locais (separados por vírgula)",
+    "autoFilled": "Preenchido automaticamente com os dados do seu evento. Edite se precisar.",
+    "template": "Modelo",
+    "resetTemplate": "Restaurar padrão",
+    "templatePlaceholder": "Modelo do comunicado de imprensa...",
+    "templateHelp": "Edite o modelo acima. Marcadores como {city} serão substituídos pelos valores dos seus campos ao gerar.",
+    "generate": "Gerar comunicado de imprensa",
+    "generated": "Comunicado de imprensa gerado",
+    "copy": "Copiar para a área de transferência",
+    "copied": "Copiado!",
+    "copyButton": "Copiar para a área de transferência",
+    "download": "Baixar como .txt",
+    "dateTbd": "a definir",
+    "defaultTemplate": "PARA DIVULGAÇÃO IMEDIATA\n\nGLOBAL PIZZA PARTY CHEGA A {city} EM {date}\n\n{city} — {host_name} tem o orgulho de anunciar que {city} participará, em {date}, da Global Pizza Party, uma celebração mundial da pizza e da comunidade. O evento será realizado em {venue}.\n\nA Global Pizza Party é um evento anual organizado pela PizzaDAO, que reúne amantes de pizza em cidades do mundo todo para um dia de pizza grátis, construção de comunidade e diversão.\n\nO evento de {city} terá pizza de {pizzeria}, trazendo os melhores sabores locais para a celebração.\n\nO evento é possível graças ao generoso apoio de patrocinadores locais, incluindo {sponsors}.\n\nO evento é gratuito e aberto ao público. Os participantes são incentivados a confirmar presença em {rsvp_url}.\n\nPara mais informações ou contato da imprensa:\n{host_name}\nTelefone: {host_phone}\n\n###"
   }
 }

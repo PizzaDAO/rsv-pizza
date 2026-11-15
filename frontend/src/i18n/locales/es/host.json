@@ -922,5 +922,29 @@
     "rollupSubmitted": "Enviado el {{date}}",
     "rollupReceiptCount_one": "{{count}} recibo",
     "rollupReceiptCount_other": "{{count}} recibos"
+  },
+  "pressRelease": {
+    "title": "Generador de comunicados de prensa",
+    "subtitle": "Genera un comunicado de prensa para enviar a los medios locales",
+    "eventDetails": "Detalles del evento",
+    "hostNamePlaceholder": "Nombre del anfitrión",
+    "phonePlaceholder": "Teléfono (para consultas de prensa)",
+    "pizzeriaPlaceholder": "Nombre de la pizzería",
+    "cityPlaceholder": "Ciudad",
+    "venuePlaceholder": "Lugar / Dirección",
+    "sponsorsPlaceholder": "Patrocinadores locales (separados por comas)",
+    "autoFilled": "Rellenado automáticamente con los datos de tu evento. Edita lo que necesites.",
+    "template": "Plantilla",
+    "resetTemplate": "Restablecer valores predeterminados",
+    "templatePlaceholder": "Plantilla del comunicado de prensa...",
+    "templateHelp": "Edita la plantilla de arriba. Los marcadores como {city} se sustituirán por los valores de tus campos al generar.",
+    "generate": "Generar comunicado de prensa",
+    "generated": "Comunicado de prensa generado",
+    "copy": "Copiar al portapapeles",
+    "copied": "¡Copiado!",
+    "copyButton": "Copiar al portapapeles",
+    "download": "Descargar como .txt",
+    "dateTbd": "por confirmar",
+    "defaultTemplate": "PARA PUBLICACIÓN INMEDIATA\n\nLA GLOBAL PIZZA PARTY LLEGA A {city} EL {date}\n\n{city} — {host_name} se enorgullece de anunciar que {city} participará el {date} en la Global Pizza Party, una celebración mundial de la pizza y la comunidad. El evento se celebrará en {venue}.\n\nLa Global Pizza Party es un evento anual organizado por PizzaDAO que reúne a los amantes de la pizza en ciudades de todo el mundo para pasar un día de pizza gratis, comunidad y diversión.\n\nEl evento de {city} contará con pizza de {pizzeria}, que aportará los mejores sabores locales a la celebración.\n\nEl evento es posible gracias al generoso apoyo de patrocinadores locales, entre ellos {sponsors}.\n\nEl evento es gratuito y abierto al público. Se invita a los asistentes a confirmar su asistencia en {rsvp_url}.\n\nPara más información o consultas de prensa, contacte con:\n{host_name}\nTeléfono: {host_phone}\n\n###"
   }
 }

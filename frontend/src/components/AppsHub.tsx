@@ -22,6 +22,7 @@ import {
   PinOff,
   Zap,
   Trophy,
+  Newspaper,
 } from 'lucide-react';
 import { updateParty } from '../lib/supabase';
 import { usePizza } from '../contexts/PizzaContext';
@@ -124,6 +125,15 @@ const apps: AppItem[] = [
     status: 'live',
     category: 'promotion',
     tab: 'promo',
+  },
+  {
+    id: 'press-release',
+    name: 'Press Release',
+    description: 'Generate a press release for local media',
+    icon: Newspaper,
+    status: 'live',
+    category: 'promotion',
+    tab: 'press-release',
   },
   {
     id: 'print-nametags',
