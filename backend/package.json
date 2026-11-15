@@ -42,7 +42,7 @@
     "sharp": "^0.35.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "viem": "^2.57.18"
+    "viem": "^2.57.19"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
