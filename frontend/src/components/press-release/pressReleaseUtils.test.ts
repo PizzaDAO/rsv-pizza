@@ -8,6 +8,7 @@ import {
   PLACEHOLDER_KEYS,
 } from './pressReleaseUtils';
 import type { Party } from '../../types';
+import { BRAND } from '../../config/brand';
 
 const asParty = (p: Partial<Party>) => p as Party;
 
@@ -31,8 +32,8 @@ describe('pressReleaseUtils', () => {
   });
 
   it('getPressReleaseRsvpUrl prefers the custom url', () => {
-    expect(getPressReleaseRsvpUrl(asParty({ customUrl: 'rome', inviteCode: 'abc' }))).toBe('rsv.pizza/rome');
-    expect(getPressReleaseRsvpUrl(asParty({ customUrl: null, inviteCode: 'abc' }))).toBe('rsv.pizza/rsvp/abc');
+    expect(getPressReleaseRsvpUrl(asParty({ customUrl: 'rome', inviteCode: 'abc' }))).toBe(`${BRAND.domain}/rome`);
+    expect(getPressReleaseRsvpUrl(asParty({ customUrl: null, inviteCode: 'abc' }))).toBe(`${BRAND.domain}/rsvp/abc`);
   });
 
   it('formatPressReleaseDate formats in the event timezone and falls back when missing', () => {

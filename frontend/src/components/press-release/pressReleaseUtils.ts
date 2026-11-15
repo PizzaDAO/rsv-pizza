@@ -1,5 +1,6 @@
 import { Party } from '../../types';
 import { getDateTimeInTimezone } from '../../utils/dateUtils';
+import { BRAND } from '../../config/brand';
 
 /**
  * Extract city and state/country from an address string.
@@ -58,13 +59,13 @@ export function formatPressReleaseDate(party: Party, locale = 'en-US', tbd = 'TB
 }
 
 /**
- * Get the RSVP URL for the press release. Uses rsv.pizza domain.
+ * Get the RSVP URL for the press release. Uses the brand domain.
  */
 export function getPressReleaseRsvpUrl(party: Party): string {
   if (party.customUrl) {
-    return `rsv.pizza/${party.customUrl}`;
+    return `${BRAND.domain}/${party.customUrl}`;
   }
-  return `rsv.pizza/rsvp/${party.inviteCode}`;
+  return `${BRAND.domain}/rsvp/${party.inviteCode}`;
 }
 
 /**
