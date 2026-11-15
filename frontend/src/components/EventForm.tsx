@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
-import { resolveSchedule, nextEndDate, DEFAULT_START_TIME, DEFAULT_END_TIME } from '../utils/eventSchedule';
+import { resolveSchedule, type ScheduleError, nextEndDate, DEFAULT_START_TIME, DEFAULT_END_TIME } from '../utils/eventSchedule';
 import { formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { BRAND } from '../config/brand';
@@ -122,7 +122,7 @@ export function EventForm() {
         endDate: formData.endDate || '', endTime: formData.endTime || '', timezone: tz,
       });
       if (schedule.error) {
-        setImageError(schedule.error);
+        setImageError(scheduleErrorMessage(schedule.error));
         setCreating(false);
         return;
       }
@@ -220,6 +220,14 @@ export function EventForm() {
     setEventImageUrl('');
   };
 
+  const scheduleErrorMessage = (code: ScheduleError): string => {
+    switch (code) {
+      case 'needsStartDate': return t('eventForm.scheduleNeedsStartDate');
+      case 'invalid': return t('eventForm.scheduleInvalid');
+      case 'endBeforeStart': return t('eventForm.scheduleEndBeforeStart');
+    }
+  };
+
   const handleCreate = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
@@ -258,7 +266,7 @@ export function EventForm() {
       const tz = timezone || 'UTC';
       const schedule = resolveSchedule({ startDate, startTime, endDate, endTime, timezone: tz });
       if (schedule.error) {
-        setImageError(schedule.error);
+        setImageError(scheduleErrorMessage(schedule.error));
         setCreating(false);
         return;
       }

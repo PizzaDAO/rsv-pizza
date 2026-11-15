@@ -42,6 +42,25 @@ describe('resolveSchedule', () => {
   });
 });
 
+describe('resolveSchedule end-time default', () => {
+  it('defaults the end to one hour after a late start instead of erroring', () => {
+    const r = resolveSchedule({ ...base, startDate: '2026-12-05', startTime: '18:00', endDate: '2026-12-05' });
+    expect(r.error).toBeUndefined();
+    expect(r.duration).toBe(1);
+  });
+
+  it('rolls the end past midnight', () => {
+    const r = resolveSchedule({ ...base, startDate: '2026-12-05', startTime: '23:30', endDate: '2026-12-05' });
+    expect(r.error).toBeUndefined();
+    expect(r.duration).toBe(1);
+  });
+
+  it('returns error codes', () => {
+    expect(resolveSchedule({ ...base, endDate: '2026-12-05' }).error).toBe('needsStartDate');
+    expect(resolveSchedule({ ...base, startDate: '2026-12-05', endDate: '2026-12-01' }).error).toBe('endBeforeStart');
+  });
+});
+
 describe('nextEndDate', () => {
   it('stays synced while the start date is typed through intermediate years', () => {
     let start = '';

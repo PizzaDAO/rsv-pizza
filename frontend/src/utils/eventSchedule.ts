@@ -24,13 +24,15 @@ export interface ScheduleInput {
   timezone: string;
 }
 
+export type ScheduleError = 'needsStartDate' | 'invalid' | 'endBeforeStart';
+
 export interface ScheduleResult {
   /** ISO start, undefined when the host entered no date at all. */
   startDateTime?: string;
   /** Hours. */
   duration?: number;
-  /** User-facing validation message; when set, do not submit. */
-  error?: string;
+  /** Validation error code (mapped to a translated message by the caller); when set, do not submit. */
+  error?: ScheduleError;
 }
 
 /**
@@ -40,16 +42,24 @@ export interface ScheduleResult {
 export function resolveSchedule(input: ScheduleInput): ScheduleResult {
   const { startDate, startTime, endDate, endTime } = input;
   if (!startDate) {
-    if (endDate || startTime || endTime) return { error: 'Pick a start date for your event.' };
+    if (endDate || startTime || endTime) return { error: 'needsStartDate' };
     return {};
   }
   const tz = input.timezone || 'UTC';
   const start = parseDateTimeInTimezone(startDate, startTime || DEFAULT_START_TIME, tz);
-  const end = parseDateTimeInTimezone(endDate || startDate, endTime || DEFAULT_END_TIME, tz);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return { error: 'Enter a valid start and end date.' };
+  let end: Date;
+  if (endTime) {
+    end = parseDateTimeInTimezone(endDate || startDate, endTime, tz);
+  } else if (startTime) {
+    // Host picked a start but no end: default to one hour later (rolls past midnight naturally).
+    end = new Date(start.getTime() + 60 * 60 * 1000);
+    // If they typed an explicit later end date, keep that date at the same clock time.
+    if (endDate && endDate > startDate) end = parseDateTimeInTimezone(endDate, startTime, tz);
+  } else {
+    end = parseDateTimeInTimezone(endDate || startDate, DEFAULT_END_TIME, tz);
   }
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return { error: 'invalid' };
   const durationMs = end.getTime() - start.getTime();
-  if (durationMs < 0) return { error: 'The end must be after the start.' };
+  if (durationMs < 0) return { error: 'endBeforeStart' };
   return { startDateTime: start.toISOString(), duration: durationMs / (1000 * 60 * 60) };
 }
