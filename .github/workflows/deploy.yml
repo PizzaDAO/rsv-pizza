@@ -35,6 +35,8 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
+          # The ~4.6 MB entry chunk can exhaust Node's default heap (one OOM, 2026-11-15).
+          NODE_OPTIONS: --max-old-space-size=6144
           # basil-14648: AI pizza ordering UI (repo variable; unset = off)
           VITE_AI_ORDERING: ${{ vars.VITE_AI_ORDERING }}
 
