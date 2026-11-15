@@ -126,27 +126,17 @@ export interface FakeDetectionRow {
 // ============================================
 
 export const WEIGHTS = {
-  cap_fill_no_waitlist: 0,
   low_domain_entropy: 0,
   wallet_too_low: 0,
-  wallet_too_high_reuse: 0,
-  wallet_reuse: 0,
   host_self_rsvp_mismatch: 0,
   pizzeria_fields_blank: 0,
   wallet_source_all_null: 0,
-  one_word_name: 0,
   firstname_digits_email: 0,
   day_gap_pattern: 0,
   low_hour_entropy: 0,
   rapid_intersubmission: 0,
-  cross_event_wallet: 0,
   low_funnel_coverage: 0,
-  high_per_visitor_rsvp_saturation: 0,
   mailing_list_opt_in_extreme: 0,
-  name_token_zscore: 0,
-  lsh_field_sig_cluster: 0,
-  email_digit_benford: 0,
-  co_host_twitter_handles_missing: 0,
   repeat_session_rsvp_count: 0,
   high_bounce_rate: 0,
   // checkin-heuristics (marinara-60931): attendance-fraud signals derived from
@@ -389,7 +379,21 @@ function flag(
   };
 }
 
-/** 1. cap_fill_no_waitlist — capacity ≥90% full but zero waitlist. */
+/** Flag for a heuristic no longer scored (not in WEIGHTS). Weight is always 0. */
+function deprecatedFlag(
+  id: string,
+  fired: boolean,
+  detail: string,
+  evidence?: Record<string, unknown>,
+): FlagResult {
+  return { id, name: id, fired, weight: 0, detail, evidence };
+}
+
+/**
+ * 1. cap_fill_no_waitlist — capacity ≥90% full but zero waitlist.
+ *
+ * @deprecated jalapeno-61805: no longer scored (no separation between fraudulent and legitimate events); not in WEIGHTS, weight is always 0.
+ */
 export function checkCapFillNoWaitlist(
   guests: FakeDetectionGuest[],
   maxGuests: number | null,
@@ -397,12 +401,12 @@ export function checkCapFillNoWaitlist(
   const id = 'cap_fill_no_waitlist';
   const n = guests.length;
   if (n < 20 || !maxGuests || maxGuests <= 0) {
-    return flag(id, false, `n=${n}, maxGuests=${maxGuests ?? 'null'} — below threshold`);
+    return deprecatedFlag(id, false, `n=${n}, maxGuests=${maxGuests ?? 'null'} — below threshold`);
   }
   const fill = n / maxGuests;
   const waitlistCount = guests.filter(g => g.waitlistPosition !== null && g.waitlistPosition > 0).length;
   const fired = fill >= 0.9 && waitlistCount === 0;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `fill=${(fill * 100).toFixed(1)}%, waitlist=${waitlistCount}`,
@@ -469,21 +473,25 @@ export function checkWalletTooLow(guests: FakeDetectionGuest[]): FlagResult {
   return flag(id, fired, `wallets=${walletCount}/${n} (${(ratio * 100).toFixed(1)}%)`, { walletCount, n, ratio });
 }
 
-/** 4b. wallet_too_high_reuse — everyone has a wallet but lots of reuse. */
+/**
+ * 4b. wallet_too_high_reuse — everyone has a wallet but lots of reuse.
+ *
+ * @deprecated jalapeno-61805: no longer scored (structurally dead: same-event wallet reuse never occurs in production data); not in WEIGHTS, weight is always 0.
+ */
 export function checkWalletTooHighReuse(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'wallet_too_high_reuse';
   const n = guests.length;
-  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  if (n < 30) return deprecatedFlag(id, false, `n=${n} below 30`);
   const walletAddrs = guests
     .map(g => (g.ethereumAddress ?? '').toLowerCase())
     .filter(a => a.length > 0);
   const walletCount = walletAddrs.length;
-  if (walletCount === 0) return flag(id, false, 'no wallets');
+  if (walletCount === 0) return deprecatedFlag(id, false, 'no wallets');
   const uniqueWallets = new Set(walletAddrs).size;
   const walletRatio = walletCount / n;
   const reuse = (walletCount - uniqueWallets) / walletCount;
   const fired = walletRatio > 0.95 && reuse > 0.3;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `wallets=${(walletRatio * 100).toFixed(1)}% of RSVPs, reuse=${(reuse * 100).toFixed(1)}%`,
@@ -491,19 +499,23 @@ export function checkWalletTooHighReuse(guests: FakeDetectionGuest[]): FlagResul
   );
 }
 
-/** 5. wallet_reuse — same wallet address used multiple times on the same event. */
+/**
+ * 5. wallet_reuse — same wallet address used multiple times on the same event.
+ *
+ * @deprecated jalapeno-61805: no longer scored (structurally dead: same-event wallet reuse never occurs in production data); not in WEIGHTS, weight is always 0.
+ */
 export function checkWalletReuse(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'wallet_reuse';
   const n = guests.length;
-  if (n < 10) return flag(id, false, `n=${n} below 10`);
+  if (n < 10) return deprecatedFlag(id, false, `n=${n} below 10`);
   const ethSubs = guests
     .map(g => (g.ethereumAddress ?? '').toLowerCase())
     .filter(a => a.length > 0);
-  if (ethSubs.length === 0) return flag(id, false, 'no wallets');
+  if (ethSubs.length === 0) return deprecatedFlag(id, false, 'no wallets');
   const uniqueEth = new Set(ethSubs).size;
   const reuse = (ethSubs.length - uniqueEth) / Math.max(ethSubs.length, 1);
   const fired = reuse >= 0.1;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `${ethSubs.length} wallets, ${uniqueEth} unique, reuse=${(reuse * 100).toFixed(1)}%`,
@@ -578,11 +590,15 @@ export function checkWalletSourceAllNull(guests: FakeDetectionGuest[]): FlagResu
   return flag(id, allNull, allNull ? 'every walletSource is null' : 'some walletSource set', { n });
 }
 
-/** 9. one_word_name — too many single-word guest names. */
+/**
+ * 9. one_word_name — too many single-word guest names.
+ *
+ * @deprecated jalapeno-61805: no longer scored (fires more often on legitimate events than fraudulent ones); not in WEIGHTS, weight is always 0.
+ */
 export function checkOneWordName(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'one_word_name';
   const n = guests.length;
-  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  if (n < 20) return deprecatedFlag(id, false, `n=${n} below 20`);
   let oneWord = 0;
   for (const g of guests) {
     const name = (g.name ?? '').trim();
@@ -592,10 +608,10 @@ export function checkOneWordName(guests: FakeDetectionGuest[]): FlagResult {
   }
   const ratio = oneWord / n;
   const fired = ratio > 0.2;
-  return flag(id, fired, `${oneWord}/${n} (${(ratio * 100).toFixed(1)}%) one-word names`, { oneWord, n, ratio });
+  return deprecatedFlag(id, fired, `${oneWord}/${n} (${(ratio * 100).toFixed(1)}%) one-word names`, { oneWord, n, ratio });
 }
 
-/** 10. firstname_digits_email — emails follow firstname+digits pattern and domains are low-entropy. */
+/** 10. firstname_digits_email — more than 70% of emails follow firstname+digits and domains are low-entropy (H < 0.5). */
 export function checkFirstnameDigitsEmail(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'firstname_digits_email';
   const n = guests.length;
@@ -608,7 +624,7 @@ export function checkFirstnameDigitsEmail(guests: FakeDetectionGuest[]): FlagRes
   const ratio = matches / n;
   const domains = emails.map(e => e.slice(e.lastIndexOf('@') + 1)).filter(d => d.length > 0);
   const domainEntropy = shannon(domains);
-  const fired = ratio > 0.95 && domainEntropy < 0.5;
+  const fired = ratio > 0.7 && domainEntropy < 0.5;
   return flag(
     id,
     fired,
@@ -684,7 +700,7 @@ export function checkDayGapPattern(
   return flag(id, false, 'no qualifying day-gap pattern');
 }
 
-/** 12. low_hour_entropy — submissions cluster into too few local hours. */
+/** 12. low_hour_entropy — submissions cluster into too few local hours (H < 2.0). */
 export function checkLowHourEntropy(
   guests: FakeDetectionGuest[],
   party: FakeDetectionParty,
@@ -694,7 +710,7 @@ export function checkLowHourEntropy(
   if (n < 20) return flag(id, false, `n=${n} below 20`);
   const hours = guests.map(g => String(localHour(g.submittedAt, party.timezone)));
   const h = shannon(hours);
-  const fired = h < 1.5;
+  const fired = h < 2.0;
   return flag(id, fired, `localHourEntropy=${h.toFixed(3)}`, { entropy: h, n });
 }
 
@@ -719,7 +735,11 @@ export function checkRapidIntersubmission(guests: FakeDetectionGuest[]): FlagRes
   return flag(id, fired, `medianDeltaSec=${median.toFixed(1)}`, { medianDeltaSec: median, n: deltas.length });
 }
 
-/** 14. cross_event_wallet — any guest wallet appears on the sybil-wallet set. */
+/**
+ * 14. cross_event_wallet — any guest wallet appears on the sybil-wallet set.
+ *
+ * @deprecated jalapeno-61805: no longer scored (no separation between fraudulent and legitimate events); not in WEIGHTS, weight is always 0.
+ */
 export function checkCrossEventWallet(
   guests: FakeDetectionGuest[],
   sybilWallets: Set<string>,
@@ -733,7 +753,7 @@ export function checkCrossEventWallet(
     }
   }
   const fired = matched.length > 0;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     fired ? `${matched.length} sybil wallet(s) on this event` : 'no sybil wallets',
@@ -742,7 +762,7 @@ export function checkCrossEventWallet(
 }
 
 /**
- * 15. low_funnel_coverage — unique `rsvp_opened` visitors are too few relative to direct RSVPs.
+ * 15. low_funnel_coverage — unique `rsvp_opened` visitors are under 25% of direct RSVPs.
  * Indicates RSVPs were not preceded by real page-open events (bot/scripted submissions).
  */
 export function checkLowFunnelCoverage(
@@ -755,7 +775,7 @@ export function checkLowFunnelCoverage(
   const opened = funnelEvents.filter(e => e.step === 'rsvp_opened');
   const uniqueVisitors = new Set(opened.map(e => e.visitorHash)).size;
   const ratio = uniqueVisitors / n;
-  const fired = ratio < 0.15;
+  const fired = ratio < 0.25;
   return flag(
     id,
     fired,
@@ -776,6 +796,9 @@ export function checkLowFunnelCoverage(
  * from flat QR-kiosk distributions (NYC Pizza Temple [10,10,10], Santa Cruz
  * [28,28,26]) where organizer phones happen to sit on the form during attendee
  * submission bursts.
+ *
+ *
+ * @deprecated jalapeno-61805: no longer scored (no setting separates; repeat_session_rsvp_count covers the same idea); not in WEIGHTS, weight is always 0.
  */
 export function checkHighPerVisitorRsvpSaturation(
   guests: FakeDetectionGuest[],
@@ -783,7 +806,7 @@ export function checkHighPerVisitorRsvpSaturation(
 ): FlagResult {
   const id = 'high_per_visitor_rsvp_saturation';
   if (funnelEvents.length === 0 || guests.length === 0) {
-    return flag(id, false, 'no funnel data');
+    return deprecatedFlag(id, false, 'no funnel data');
   }
   const TEN_MIN = 10 * 60 * 1000;
   const byVisitor = new Map<string, number[]>();
@@ -813,7 +836,7 @@ export function checkHighPerVisitorRsvpSaturation(
   }
   const ratio = secondMax > 0 ? max / secondMax : Infinity;
   const fired = max >= 5 && (secondMax === 0 || ratio >= 1.5);
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `max=${max}, secondMax=${secondMax} (ratio=${secondMax > 0 ? ratio.toFixed(2) : '∞'})`,
@@ -849,18 +872,21 @@ export function checkMailingListOptInExtreme(guests: FakeDetectionGuest[]): Flag
  *
  * Both conditions required: `maxCount >= 5` filters out small-tail noise,
  * `z > 3.0` filters out events where 5+ is the natural mode.
+ *
+ *
+ * @deprecated jalapeno-61805: no longer scored (fires more often on legitimate events than fraudulent ones); not in WEIGHTS, weight is always 0.
  */
 export function checkNameTokenZscore(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'name_token_zscore';
   const n = guests.length;
-  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  if (n < 30) return deprecatedFlag(id, false, `n=${n} below 30`);
   const counts = new Map<string, number>();
   for (const g of guests) {
     const first = (g.name ?? '').trim().toLowerCase().split(/\s+/)[0];
     if (!first) continue;
     counts.set(first, (counts.get(first) ?? 0) + 1);
   }
-  if (counts.size === 0) return flag(id, false, 'no names');
+  if (counts.size === 0) return deprecatedFlag(id, false, 'no names');
   const arr = [...counts.values()];
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
   const variance = arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length;
@@ -875,7 +901,7 @@ export function checkNameTokenZscore(guests: FakeDetectionGuest[]): FlagResult {
   }
   const z = stdev > 0 ? (maxCount - mean) / stdev : 0;
   const fired = maxCount >= 5 && z > 3.0;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `top first-token "${maxToken}" ×${maxCount}, z=${z.toFixed(2)} (mean=${mean.toFixed(2)}, stdev=${stdev.toFixed(2)})`,
@@ -892,11 +918,14 @@ export function checkNameTokenZscore(guests: FakeDetectionGuest[]): FlagResult {
  * many other guests are within Hamming distance ≤ 2. The largest such cluster
  * indicates how many guests share an "almost identical" field profile.
  * Fire if largest cluster > 40% of guests.
+ *
+ *
+ * @deprecated jalapeno-61805: no longer scored (no separation between fraudulent and legitimate events); not in WEIGHTS, weight is always 0.
  */
 export function checkLshFieldSigCluster(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'lsh_field_sig_cluster';
   const n = guests.length;
-  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  if (n < 30) return deprecatedFlag(id, false, `n=${n} below 30`);
   const sigs: number[] = new Array(n);
   for (let i = 0; i < n; i++) {
     const g = guests[i];
@@ -920,7 +949,7 @@ export function checkLshFieldSigCluster(guests: FakeDetectionGuest[]): FlagResul
   }
   const share = maxCluster / n;
   const fired = share > 0.4;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `largestCluster=${maxCluster}/${n} (${(share * 100).toFixed(1)}%) within Hamming ≤ 2`,
@@ -936,6 +965,9 @@ export function checkLshFieldSigCluster(guests: FakeDetectionGuest[]): FlagResul
  * Extract trailing digit run from each email's local-part; compute observed
  * leading-digit distribution over digits 1..9; sum-absolute-deviation from
  * canonical Benford. Fire if SAD > 0.40.
+ *
+ *
+ * @deprecated jalapeno-61805: no longer scored (no separation between fraudulent and legitimate events); not in WEIGHTS, weight is always 0.
  */
 export function checkEmailDigitBenford(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'email_digit_benford';
@@ -963,7 +995,7 @@ export function checkEmailDigitBenford(guests: FakeDetectionGuest[]): FlagResult
     total++;
   }
   if (total < 30) {
-    return flag(id, false, `emails-with-digit-suffix=${total} below 30`);
+    return deprecatedFlag(id, false, `emails-with-digit-suffix=${total} below 30`);
   }
   let sad = 0;
   const observed: number[] = new Array<number>(9).fill(0);
@@ -972,7 +1004,7 @@ export function checkEmailDigitBenford(guests: FakeDetectionGuest[]): FlagResult
     sad += Math.abs(observed[i] - BENFORD_EXPECTED[i]);
   }
   const fired = sad > 0.4;
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `SAD=${sad.toFixed(3)} over ${total} digit-suffix emails`,
@@ -990,6 +1022,9 @@ export function checkEmailDigitBenford(guests: FakeDetectionGuest[]): FlagResult
  * twitter handles are often empty by design).
  *
  * Fires when filtered set has ≥2 entries and missing/filtered > 0.25.
+ *
+ *
+ * @deprecated jalapeno-61805: no longer scored (fires on nearly every event (noise)); not in WEIGHTS, weight is always 0.
  */
 export function checkCoHostTwitterHandlesMissing(party: FakeDetectionParty): FlagResult {
   const id = 'co_host_twitter_handles_missing';
@@ -1001,7 +1036,7 @@ export function checkCoHostTwitterHandlesMissing(party: FakeDetectionParty): Fla
 
   const filteredTotal = filtered.length;
   if (filteredTotal < 2) {
-    return flag(id, false, `filteredTotal=${filteredTotal} below min n=2`);
+    return deprecatedFlag(id, false, `filteredTotal=${filteredTotal} below min n=2`);
   }
 
   const missingEntries = filtered.filter(h => {
@@ -1017,7 +1052,7 @@ export function checkCoHostTwitterHandlesMissing(party: FakeDetectionParty): Fla
     .filter(n => n.length > 0)
     .slice(0, 10);
 
-  return flag(
+  return deprecatedFlag(
     id,
     fired,
     `${missingCount}/${filteredTotal} (${(missingRatio * 100).toFixed(1)}%) co-hosts missing twitter`,
@@ -1029,15 +1064,15 @@ export function checkCoHostTwitterHandlesMissing(party: FakeDetectionParty): Fla
  * romana-30802: `repeat_session_rsvp_count` — cookie-based padding detector.
  *
  * Each RSVP page mount stamps `_rsvp_sid` (a per-browser UUID) into the guest
- * row's `visitor_session_id`. If the same session ID repeats 5+ times on one
+ * row's `visitor_session_id`. If the same session ID repeats 10+ times on one
  * event, that's near-certain same-browser padding.
  *
  * Supplements (does not replace) `high_per_visitor_rsvp_saturation`, which uses
  * a SHA-256(IP+UA) proxy joined temporally.
  *
  * - Min-n: need ≥20 guests with non-null session_id to skip legacy events.
- * - Threshold: max repeats ≥ 5 (couples may share a device for 2; 3-4 is rare
- *   but possible; 5+ is padding).
+ * - Threshold: max repeats ≥ 10 (couples share a device for 2; kiosks / shared
+ *   family phones reach 5–9 on legit events; ≥10 is padding).
  * - Nulls are ignored — they represent legacy rows and cookie-blocked browsers.
  */
 export function checkRepeatSessionRsvpCount(guests: FakeDetectionGuest[]): FlagResult {
@@ -1063,7 +1098,7 @@ export function checkRepeatSessionRsvpCount(guests: FakeDetectionGuest[]): FlagR
       worst = sid;
     }
   }
-  const fired = max >= 5;
+  const fired = max >= 10;
   return flag(
     id,
     fired,
@@ -1208,7 +1243,9 @@ export function scoreEvent(
   party: FakeDetectionParty,
   allGuests: FakeDetectionGuest[],
   linkClicks: FakeDetectionLinkClick[],
-  sybilWallets: Set<string>,
+  // Unused by scoring since jalapeno-61805 (cross_event_wallet was removed);
+  // kept so callers and the underboss route (meta.sybilWalletCount) are unchanged.
+  _sybilWallets: Set<string>,
   maxGuests: number | null,
   funnelEvents: FakeDetectionFunnelEvent[] = [],
   // marinara-71630 P3: resolved weights + tiers, injected from the async entry
@@ -1219,27 +1256,17 @@ export function scoreEvent(
   const guests = filterDirectRsvps(allGuests);
 
   const rawFlags: FlagResult[] = [
-    checkCapFillNoWaitlist(guests, maxGuests),
     checkLowDomainEntropy(guests),
     checkWalletTooLow(guests),
-    checkWalletTooHighReuse(guests),
-    checkWalletReuse(guests),
     checkHostSelfRsvpMismatch(guests, party),
     checkPizzeriaFieldsBlank(guests),
     checkWalletSourceAllNull(guests),
-    checkOneWordName(guests),
     checkFirstnameDigitsEmail(guests),
     checkDayGapPattern(guests, party, linkClicks),
     checkLowHourEntropy(guests, party),
     checkRapidIntersubmission(guests),
-    checkCrossEventWallet(guests, sybilWallets),
     checkLowFunnelCoverage(guests, funnelEvents),
-    checkHighPerVisitorRsvpSaturation(guests, funnelEvents),
     checkMailingListOptInExtreme(guests),
-    checkNameTokenZscore(guests),
-    checkLshFieldSigCluster(guests),
-    checkEmailDigitBenford(guests),
-    checkCoHostTwitterHandlesMissing(party),
     checkRepeatSessionRsvpCount(guests),
     checkHighBounceRate(guests),
     // checkin-heuristics (marinara-60931): run over ALL guests, since fraud
