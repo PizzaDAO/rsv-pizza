@@ -21,6 +21,8 @@ export const DOGE_ROLLUP_CONFIG: FormatConfig = {
       { x: 100, y: 1700, fontSize: 40, maxWidth: 440 },
     ],
   },
+  // Empty cream band between "powered by" (y~1850) and the city line (y 2200).
+  qr: { x: 410, y: 1925, size: 260, tileColor: '#FFFFFF', dark: INK, caption: 'SCAN TO RSVP', radius: 18 },
   textFields: ROLLUP_CONFIG.textFields.map((f) => ({
     ...f,
     color: INK,

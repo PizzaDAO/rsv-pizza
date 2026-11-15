@@ -14,10 +14,12 @@ export const DOGE_POSTER_CONFIG: FormatConfig = {
   templatePath: '/brands/doge/flyer/poster-template.png',
   fullResUrl: '/brands/doge/flyer/poster-template.png',
   handleColor: 'rgba(48,45,37,0.85)',
+  // Right-hand tile in the cream area below the frame; text boxes are narrowed to leave room for it.
+  qr: { x: 790, y: 985, size: 230, tileColor: '#FFFFFF', dark: INK, caption: 'SCAN TO RSVP', radius: 18 },
   textFields: [
-    { key: 'city', label: 'City', defaultX: 60, defaultY: 990, boxWidth: 960, boxHeight: 72, color: INK, fontFamily: `"Hub 191 Display", ${FONT}`, maxFontSize: 64 },
-    { key: 'time', label: 'Time', defaultX: 60, defaultY: 1072, boxWidth: 960, boxHeight: 60, color: INK, dateColor: DATE_PURPLE, fontFamily: FONT, maxFontSize: 50 },
-    { key: 'venue', label: 'Venue', defaultX: 60, defaultY: 1140, boxWidth: 960, boxHeight: 100, color: INK, fontFamily: FONT, maxFontSize: 40 },
+    { key: 'city', label: 'City', defaultX: 60, defaultY: 990, boxWidth: 700, boxHeight: 72, color: INK, fontFamily: `"Hub 191 Display", ${FONT}`, maxFontSize: 64 },
+    { key: 'time', label: 'Time', defaultX: 60, defaultY: 1072, boxWidth: 700, boxHeight: 60, color: INK, dateColor: DATE_PURPLE, fontFamily: FONT, maxFontSize: 50 },
+    { key: 'venue', label: 'Venue', defaultX: 60, defaultY: 1140, boxWidth: 700, boxHeight: 100, color: INK, fontFamily: FONT, maxFontSize: 40 },
   ],
   // Slots clear of the Doge's face (~x455-625, y450-612), the badge/mini-doge (right, y~820-900),
   // the headline (ends y~280) and the city/date/venue fields (start y 990).

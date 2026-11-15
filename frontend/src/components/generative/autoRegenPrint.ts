@@ -9,6 +9,7 @@
  */
 
 import { renderCanvas } from './renderCanvas';
+import { flyerEventUrl } from './flyerQr';
 import { POSTER_CONFIG } from './configs/posterConfig';
 import { ROLLUP_CONFIG } from './configs/rollupConfig';
 import type { FormatConfig, CanvasPositions } from './types';
@@ -148,6 +149,7 @@ async function doRegen(party: Party, config: FormatConfig): Promise<void> {
     sponsorBoxSize: { width: config.sponsorBox.width, height: config.sponsorBox.height },
     logoSizes: {},
     poppedLogos: {},
+    qrUrl: flyerEventUrl(party),
   });
 
   const blob = await new Promise<Blob | null>((resolve) =>
