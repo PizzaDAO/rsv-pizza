@@ -23,6 +23,7 @@
       "path-to-regexp": "0.1.13",
       "qs": "6.16.2"
     },
-    "deepmerge-ts": "8.0.2"
+    "deepmerge-ts": "8.0.2",
+    "@walletconnect/ethereum-provider": "2.26.0"
   }
 }
