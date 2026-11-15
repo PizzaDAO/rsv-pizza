@@ -9,7 +9,7 @@ import type { PartnerFormData } from '../sponsors/PartnerForm';
 import { cdnUrl } from '../../lib/supabase';
 import {
   fitText, loadImg, uses12Hour, formatFlyerTime,
-  CITY_COLOR, TIME_COLOR,
+  CITY_COLOR,
 } from '../flyer/renderFlyer';
 import { useCanvasDrag } from './useCanvasDrag';
 import { renderCanvas } from './renderCanvas';
@@ -720,7 +720,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                 ...dragProps.style,
               }}
             >
-              <span style={{ color: CITY_COLOR }}>{dateDisplay}</span>
+              <span style={{ color: timeField.dateColor ?? CITY_COLOR }}>{dateDisplay}</span>
               {editingField === 'time' ? (
                 <input
                   autoFocus
@@ -738,7 +738,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                   onMouseDown={(e) => e.stopPropagation()}
                   style={{
                     marginLeft: '0.4em',
-                    color: TIME_COLOR,
+                    color: timeField.color,
                     background: 'rgba(0,0,0,0.5)',
                     border: '1px solid rgba(255,255,255,0.3)',
                     borderRadius: 4,
@@ -752,7 +752,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
                 />
               ) : (
                 <span
-                  style={{ marginLeft: timeForDisplay ? '0.4em' : 0, color: TIME_COLOR, cursor: 'text' }}
+                  style={{ marginLeft: timeForDisplay ? '0.4em' : 0, color: timeField.color, cursor: 'text' }}
                   onClick={(e) => { e.stopPropagation(); setEditingField('time'); }}
                 >
                   {timeForDisplay}

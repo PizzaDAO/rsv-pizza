@@ -36,6 +36,7 @@ const dogeRow = {
   ...brandRow('doge', 'Doge Day', 'Doge Day', ['Doge Day', 'Own The Doge']),
   name: 'Doge Day 2027',
   eventDate: new Date('2027-11-02T00:00:00.000Z'),
+  flyerTemplateKey: 'doge',
 };
 
 // Stand With Crypto: community meetups (streamlined meetup create flow, one evening per event).
@@ -74,6 +75,8 @@ const OPTIONAL_KEYS = ['createFlow', 'nameTemplate'];
     const update = {};
     for (const k of UPDATE_KEYS) if (existing[k] !== row[k]) update[k] = row[k];
     for (const k of OPTIONAL_KEYS) if (row[k] !== undefined && existing[k] !== row[k]) update[k] = row[k];
+    // Only set a template key when the row defines one (never clear a key set in /admin/series).
+    if (row.flyerTemplateKey && existing.flyerTemplateKey !== row.flyerTemplateKey) update.flyerTemplateKey = row.flyerTemplateKey;
     for (const k of DATE_KEYS) {
       if (row[k] && (!existing[k] || existing[k].getTime() !== row[k].getTime())) update[k] = row[k];
     }

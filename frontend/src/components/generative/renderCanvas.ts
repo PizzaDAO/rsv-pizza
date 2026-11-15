@@ -1,7 +1,7 @@
 import type { FormatConfig, CanvasPositions } from './types';
 import {
   fitText, loadImg,
-  CITY_COLOR, TIME_COLOR,
+  CITY_COLOR,
 } from '../flyer/renderFlyer';
 
 export interface RenderCanvasOptions {
@@ -62,13 +62,13 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
     const fullTimeDisplay = timeDisplay ? `${dateDisplay}  ${timeDisplay}` : dateDisplay;
     const timeFontSize = fitText(fullTimeDisplay, 'Hub 191', timeField.maxFontSize * s, timeField.boxWidth * s, (timeField.minFontSize || 14) * s);
     ctx.font = `${timeFontSize}px "Hub 191"`;
-    ctx.fillStyle = CITY_COLOR;
+    ctx.fillStyle = timeField.dateColor ?? CITY_COLOR;
     const dateStr = dateDisplay.toUpperCase();
     ctx.fillText(dateStr, positions.time.x * s, positions.time.y * s);
     const dateWidth = ctx.measureText(dateStr).width;
     const gap = 15 * s;
     if (timeDisplay) {
-      ctx.fillStyle = TIME_COLOR;
+      ctx.fillStyle = timeField.color;
       ctx.fillText(timeDisplay, positions.time.x * s + dateWidth + gap, positions.time.y * s);
     }
   }

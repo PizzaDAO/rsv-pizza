@@ -5,5 +5,7 @@ export { POSTER_CONFIG } from './configs/posterConfig';
 export { ROLLUP_CONFIG } from './configs/rollupConfig';
 export { AVAX_POSTER_CONFIG } from './configs/avaxPosterConfig';
 export { AVAX_ROLLUP_CONFIG } from './configs/avaxRollupConfig';
+export { DOGE_POSTER_CONFIG } from './configs/dogePosterConfig';
+export { DOGE_ROLLUP_CONFIG } from './configs/dogeRollupConfig';
 export { triggerPosterRegen, triggerRollupRegen, cancelPosterRegen, cancelRollupRegen } from './autoRegenPrint';
 export type { FormatConfig, TextFieldConfig, CanvasPositions, CanvasConfig } from './types';
