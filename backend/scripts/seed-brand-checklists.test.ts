@@ -14,7 +14,7 @@ const EXISTING: Record<string, string[]> = {
   doge: ['Create your event', 'Get approved', 'Pick a venue', 'Choose a pizzeria', 'Add a co-host',
     'Share your invite link', 'Post on X with #DogeDay', 'Estimate attendance', 'Upload photos after the party'],
   team1: ['Create your event', 'Get approved', 'Confirm venue', 'Choose a pizzeria', 'Line up a speaker or topic',
-    'Share in your Team1 community chat', 'Estimate attendance', 'Post photos and a recap', 'Schedule the next meetup'],
+    'Share in the Team1 Discord (discord.gg/team1)', 'Estimate attendance', 'Post photos and a recap', 'Schedule the next meetup'],
   monad: ['Create your event', 'Get approved', 'Confirm venue and Wi-Fi/power', 'Set capacity and review applications',
     'Publish tracks, prizes and rules', 'Line up judges and mentors', 'Plan meals per day: choose pizzerias',
     'Add a co-host or volunteers', 'Day-of: check-in and displays', 'Post winners and photos'],
