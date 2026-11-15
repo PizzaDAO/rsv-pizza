@@ -10,6 +10,8 @@ export interface TextFieldConfig {
   maxFontSize: number;
   minFontSize?: number;
   hidden?: boolean;
+  /** Time field only: color of the date part (defaults to the GPP red). */
+  dateColor?: string;
 }
 
 export interface CanvasPositions {

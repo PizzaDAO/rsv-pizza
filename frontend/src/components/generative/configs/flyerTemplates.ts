@@ -3,6 +3,8 @@ import { POSTER_CONFIG } from './posterConfig';
 import { ROLLUP_CONFIG } from './rollupConfig';
 import { AVAX_POSTER_CONFIG } from './avaxPosterConfig';
 import { AVAX_ROLLUP_CONFIG } from './avaxRollupConfig';
+import { DOGE_POSTER_CONFIG } from './dogePosterConfig';
+import { DOGE_ROLLUP_CONFIG } from './dogeRollupConfig';
 
 /**
  * White-label flyer template registry (Phase 2c). A series picks its template by
@@ -18,6 +20,7 @@ export interface FlyerTemplate {
 export const FLYER_TEMPLATES: Record<string, FlyerTemplate> = {
   gpp: { poster: POSTER_CONFIG, rollup: ROLLUP_CONFIG },
   avax: { poster: AVAX_POSTER_CONFIG, rollup: AVAX_ROLLUP_CONFIG },
+  doge: { poster: DOGE_POSTER_CONFIG, rollup: DOGE_ROLLUP_CONFIG },
 };
 
 export const DEFAULT_FLYER_TEMPLATE: FlyerTemplate = FLYER_TEMPLATES.gpp;
