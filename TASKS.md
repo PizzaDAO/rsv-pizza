@@ -7,6 +7,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
+| brioche-61804 | Upgrade frontend vite 6 → 8 + plugin-react 6 (supersedes Dependabot #1306) | review | P3 |  | Snax | deps | plans/brioche-61804.md |  |  |
 | prosciutto-60417 | Upgrade Prisma 6 → 7 (security advisories; Dependabot #1272) | todo | P3 |  |  | security, deps | plans/prosciutto-60417.md |  | Dependabot #1272 open as reference; needs a plan (schema/client changes, migrate deploy in Deploy Backend, CLAUDE.md migration-safety rules); 2026-11-14: the advisory (deepmerge-ts, build-time only) is fixed by an override, so this is no longer urgent. Plan: option A (keep prisma-client-js generator, add adapter-pg) |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |

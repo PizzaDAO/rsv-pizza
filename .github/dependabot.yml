@@ -19,6 +19,10 @@ updates:
       # prisma and @prisma/client must move together (first group listed wins).
       prisma:
         patterns: ['prisma', '@prisma/*']
+      # vite and its @vitejs/* plugins must move together, majors included (vite 8 needs
+      # plugin-react 6); listed above dev-and-build so it wins (first matching group).
+      vite:
+        patterns: ['vite', '@vitejs/*']
       # Group low-risk dev/build-chain bumps into one PR to reduce noise.
       dev-and-build:
         patterns: ['*']
@@ -60,8 +64,6 @@ updates:
       - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
       - dependency-name: "eslint"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "i18next"
         update-types: ["version-update:semver-major"]
