@@ -66,7 +66,7 @@ const makeEvent = (overrides?: Partial<PublicEvent>): PublicEvent => ({
   guestCount: 5,
   userId: null,
   ...overrides,
-});
+}) as PublicEvent;
 
 const makeExistingGuest = (overrides?: Partial<ExistingGuestData>): ExistingGuestData => ({
   id: 'guest-1',
@@ -82,7 +82,7 @@ const makeExistingGuest = (overrides?: Partial<ExistingGuestData>): ExistingGues
   dislikedBeverages: [],
   pizzeriaRankings: [],
   ...overrides,
-});
+}) as ExistingGuestData;
 
 describe('RSVPModal', () => {
   beforeEach(() => {
@@ -102,7 +102,7 @@ describe('RSVPModal', () => {
       alreadyRegistered: false,
       requireApproval: false,
       updated: true,
-    });
+    } as Awaited<ReturnType<typeof addGuestToParty>>);
 
     const event = makeEvent();
     const existingGuest = makeExistingGuest();

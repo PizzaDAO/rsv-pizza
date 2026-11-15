@@ -266,7 +266,6 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
   // Handle manual phone order
   const handlePhoneOrder = () => {
     const script = generatePhoneOrderScript(
-      pizzeria.name,
       orderItems,
       customerName || 'Customer',
       fulfillmentType.toLowerCase() as 'pickup' | 'delivery',

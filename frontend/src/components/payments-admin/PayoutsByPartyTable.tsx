@@ -3869,7 +3869,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 { label: 'Wallet', at: row.party.walletReminderSentAt },
                 { label: 'Photo', at: row.party.photoReminderSentAt },
                 { label: 'Attendance', at: row.party.attendanceReminderSentAt },
-              ].filter((r) => r.at);
+              ].filter((r): r is { label: string; at: string } => !!r.at);
               const lastReminder = reminders.reduce(
                 (best, r) =>
                   !best || new Date(r.at!) > new Date(best.at!) ? r : best,
@@ -4355,7 +4355,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
             { label: 'Wallet', at: row.party.walletReminderSentAt },
             { label: 'Photo', at: row.party.photoReminderSentAt },
             { label: 'Attendance', at: row.party.attendanceReminderSentAt },
-          ].filter((r) => r.at);
+          ].filter((r): r is { label: string; at: string } => !!r.at);
           const lastReminder = reminders.reduce(
             (best, r) =>
               !best || new Date(r.at!) > new Date(best.at!) ? r : best,

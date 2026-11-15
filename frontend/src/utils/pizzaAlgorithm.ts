@@ -315,7 +315,7 @@ function splitIntoTwoGroups(guests: Guest[]): [Guest[], Guest[]] {
 }
 
 // Determine if half-and-half would improve satisfaction for a group
-function shouldUseHalfAndHalf(guests: Guest[], style: PizzaStyle): boolean {
+function shouldUseHalfAndHalf(guests: Guest[], _style: PizzaStyle): boolean {
   // Don't use half-and-half for very small groups or non-respondent pizzas
   if (guests.length < 2) return false;
 

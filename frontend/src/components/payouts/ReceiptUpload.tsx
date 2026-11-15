@@ -54,7 +54,7 @@ function toReceiptArray(ocr: OcrPreviewResult): OcrReceiptPreview[] {
           exchangeRate: 0,
           confidence: 0,
           items: undefined,
-          lineItems: null,
+          lineItems: undefined,
           ocrRaw: null,
           merchant: null,
           boundingHint: null,

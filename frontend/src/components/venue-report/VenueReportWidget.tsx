@@ -233,7 +233,7 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
         {/* Password option */}
         <Checkbox
           checked={usePassword}
-          onChange={setUsePassword}
+          onChange={() => setUsePassword((v) => !v)}
           label="Require password to view"
         />
         {usePassword && (

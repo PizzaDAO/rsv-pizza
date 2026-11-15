@@ -570,7 +570,7 @@ function UploadModal({
   uploading: boolean;
   dragging: boolean;
   setDragging: (v: boolean) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   onFiles: (files: FileList | File[]) => void;
   onClose: () => void;
 }) {

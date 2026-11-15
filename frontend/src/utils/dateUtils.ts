@@ -156,12 +156,6 @@ export function getDateTimeInTimezone(date: Date | string, timezone: string): { 
  * @returns Date object in UTC
  */
 export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezone: string): Date {
-  // Create a date string that we can parse
-  const dateTimeStr = `${dateStr}T${timeStr}:00`;
-
-  // Create a date in the local timezone first
-  const localDate = new Date(dateTimeStr);
-
   // Get what this date/time would be in the target timezone
   const targetFormatter = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
@@ -175,7 +169,6 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
   });
 
   // Get what the local date looks like in the target timezone
-  const localInTarget = targetFormatter.format(localDate);
 
   // Get what the local date looks like in UTC
   const utcFormatter = new Intl.DateTimeFormat('en-US', {
@@ -188,7 +181,6 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
     second: '2-digit',
     hour12: false,
   });
-  const localInUTC = utcFormatter.format(localDate);
 
   // Calculate the offset between local and target timezones by comparing the formatted strings
   // This is a workaround since JavaScript doesn't have native timezone-aware parsing
@@ -199,8 +191,6 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
     return Date.UTC(+year, +month - 1, +day, +hour, +minute, +second);
   };
 
-  const targetMs = parseFormatted(localInTarget);
-  const utcMs = parseFormatted(localInUTC);
 
   // Now we need to figure out the offset of the target timezone from UTC
   // Create a reference date at the target time
@@ -215,7 +205,6 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
   // The time the user entered is in the target timezone
   // We need to convert it to UTC
   // If target is UTC-5 (EST), then 6pm EST = 11pm UTC, so we ADD the offset
-  const [hours, minutes] = timeStr.split(':').map(Number);
   const targetDate = new Date(`${dateStr}T${timeStr}:00Z`);
 
   // Subtract the target timezone's offset from UTC to get the actual UTC time

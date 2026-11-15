@@ -1007,7 +1007,7 @@ export function EventPage() {
                   <div className="relative aspect-square overflow-hidden">
                     <VenueMap
                       address={event.address}
-                      venueName={event.venueName}
+                      venueName={event.venueName ?? undefined}
                       latitude={event.latitude}
                       longitude={event.longitude}
                       className="w-full h-full"
@@ -1208,7 +1208,7 @@ export function EventPage() {
                     >
                       <VenueMap
                         address={event.address}
-                        venueName={event.venueName}
+                        venueName={event.venueName ?? undefined}
                         latitude={event.latitude}
                         longitude={event.longitude}
                         className="w-full h-full"
@@ -1456,8 +1456,10 @@ export function EventPage() {
                             blockquote: ({ node, ...props }) => (
                               <blockquote {...props} className="border-l-4 border-[#ff393a] pl-4 my-3 italic" />
                             ),
-                            code: ({ node, inline, ...props }) =>
-                              inline ? (
+                            // react-markdown v9+ no longer passes `inline`; fenced blocks
+                            // carry a language-* class or contain a newline.
+                            code: ({ node, ...props }) =>
+                              !/language-/.test(props.className || '') && !String(props.children ?? '').includes('\n') ? (
                                 <code {...props} className="bg-theme-surface-hover px-1.5 py-0.5 rounded text-xs font-mono" />
                               ) : (
                                 <code {...props} className="block bg-theme-surface-hover p-3 rounded text-xs font-mono overflow-x-auto my-3" />
@@ -1537,7 +1539,7 @@ export function EventPage() {
                     <div className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative">
                       <VenueMap
                         address={event.address}
-                        venueName={event.venueName}
+                        venueName={event.venueName ?? undefined}
                         latitude={event.latitude}
                         longitude={event.longitude}
                         className="w-full h-full"

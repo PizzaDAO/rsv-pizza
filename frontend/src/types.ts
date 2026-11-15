@@ -299,6 +299,7 @@ export interface Party {
   eventImageUrl: string | null;
   description: string | null;
   address: string | null;
+  addressIsCityDefault?: boolean;
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;

@@ -17,7 +17,6 @@ import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { Party } from '../../types';
 import { usePizza } from '../../contexts/PizzaContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { parseCsv, ParsedCsvRow } from '../../lib/csvParser';
 import { bulkInviteGuests, BulkInviteResult } from '../../lib/api';
 
@@ -65,7 +64,6 @@ function statusBadgeClass(status: RowStatus): string {
 export const BulkInvite: React.FC<BulkInviteProps> = ({ party }) => {
   const { t } = useTranslation('host');
   const { guests, loadParty } = usePizza();
-  const { user } = useAuth();
 
   const [stage, setStage] = useState<Stage>('upload');
   const [testSending, setTestSending] = useState(false);

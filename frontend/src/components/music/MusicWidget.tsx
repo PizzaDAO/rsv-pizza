@@ -37,7 +37,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
   // Performers state
   const [performers, setPerformers] = useState<Performer[]>([]);
   const [musicEnabled, setMusicEnabled] = useState(false);
-  const [musicNotes, setMusicNotes] = useState<string | null>(null);
+  const [, setMusicNotes] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +64,7 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
   const [savingPlaylist, setSavingPlaylist] = useState(false);
 
   // File upload state for songs
-  const [isSongDragOver, setIsSongDragOver] = useState(false);
+  const [isSongDragOver] = useState(false);
 
   // Share button state
   const [copied, setCopied] = useState(false);
