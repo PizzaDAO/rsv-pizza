@@ -53,12 +53,12 @@ import {
 //
 // The real production weights/tiers are SECRET and live only in private
 // `app_config`; they are intentionally NOT in source (committed `WEIGHTS` is an
-// all-zero placeholder) and NOT here. These TEST values are SYNTHETIC fixtures
-// (not the production numbers) chosen only to drive the scorer deterministically:
+// all-zero placeholder) and NOT here. These TEST values are fixtures
+// chosen only to drive the scorer deterministically:
 // every non-checkin heuristic gets a uniform 9 (so the padded "Ilemela" fixture
 // saturates ≥70) and every checkin heuristic gets 16 (so the 4-flag
-// attendance-fraud roster sums ≥60 → 'high'). The canonical 60/30/10 tier
-// thresholds are reproduced for the boundary assertions.
+// attendance-fraud roster sums ≥60 → 'high'). The tier numbers below are
+// tier fixtures for tests, used for boundary assertions.
 // ============================================
 
 const TEST_TIERS = { high: 60, medium: 30, low: 10 };
@@ -67,27 +67,17 @@ const SYNTH_W = 9; // synthetic weight for every non-checkin heuristic
 const SYNTH_CHECKIN_W = 16; // synthetic weight for every check-in heuristic
 
 const TEST_WEIGHTS: Record<keyof typeof WEIGHTS, number> = {
-  cap_fill_no_waitlist: SYNTH_W,
   low_domain_entropy: SYNTH_W,
   wallet_too_low: SYNTH_W,
-  wallet_too_high_reuse: SYNTH_W,
-  wallet_reuse: SYNTH_W,
   host_self_rsvp_mismatch: SYNTH_W,
   pizzeria_fields_blank: SYNTH_W,
   wallet_source_all_null: SYNTH_W,
-  one_word_name: SYNTH_W,
   firstname_digits_email: SYNTH_W,
   day_gap_pattern: SYNTH_W,
   low_hour_entropy: SYNTH_W,
   rapid_intersubmission: SYNTH_W,
-  cross_event_wallet: SYNTH_W,
   low_funnel_coverage: SYNTH_W,
-  high_per_visitor_rsvp_saturation: SYNTH_W,
   mailing_list_opt_in_extreme: SYNTH_W,
-  name_token_zscore: SYNTH_W,
-  lsh_field_sig_cluster: SYNTH_W,
-  email_digit_benford: SYNTH_W,
-  co_host_twitter_handles_missing: SYNTH_W,
   repeat_session_rsvp_count: SYNTH_W,
   high_bounce_rate: SYNTH_W,
   checkin_velocity_superhuman: SYNTH_CHECKIN_W,
@@ -393,11 +383,33 @@ describe('checkOneWordName', () => {
 });
 
 describe('checkFirstnameDigitsEmail', () => {
-  it('fires when >95% of emails match firstname+digits and domains low entropy', () => {
+  it('fires when >70% of emails match firstname+digits and domains low entropy', () => {
     const guests = Array.from({ length: 30 }, (_, i) =>
       makeGuest({ email: `mario${i}@spam.com` }),
     );
     expect(checkFirstnameDigitsEmail(guests).fired).toBe(true);
+  });
+  it('fires at a 0.75 match ratio (23 nameNN + 7 first.last on one domain)', () => {
+    const guests = [
+      ...Array.from({ length: 23 }, (_, i) => makeGuest({ email: `mario${i}@spam.com` })),
+      ...Array.from({ length: 7 }, (_, i) => makeGuest({ email: `first.last${i}@spam.com` })),
+    ];
+    expect(checkFirstnameDigitsEmail(guests).fired).toBe(true);
+  });
+  it('does not fire at a 0.65 match ratio', () => {
+    const guests = [
+      ...Array.from({ length: 13 }, (_, i) => makeGuest({ email: `mario${i}@spam.com` })),
+      ...Array.from({ length: 7 }, (_, i) => makeGuest({ email: `first.last${i}@spam.com` })),
+    ];
+    expect(checkFirstnameDigitsEmail(guests).fired).toBe(false);
+  });
+  it('does not fire at 0.75 when domain entropy is high', () => {
+    const domains = ['a.com', 'b.com', 'c.com', 'd.com'];
+    const guests = [
+      ...Array.from({ length: 23 }, (_, i) => makeGuest({ email: `mario${i}@${domains[i % 4]}` })),
+      ...Array.from({ length: 7 }, (_, i) => makeGuest({ email: `first.last${i}@${domains[i % 4]}` })),
+    ];
+    expect(checkFirstnameDigitsEmail(guests).fired).toBe(false);
   });
   it('does not fire when emails are realistic', () => {
     const guests = Array.from({ length: 30 }, (_, i) =>
@@ -434,6 +446,14 @@ describe('checkLowHourEntropy', () => {
   it('fires when all submissions cluster into one hour', () => {
     const guests = Array.from({ length: 30 }, () =>
       makeGuest({ submittedAt: new Date('2026-04-01T12:30:00Z') }),
+    );
+    expect(checkLowHourEntropy(guests, makeParty({ timezone: null })).fired).toBe(true);
+  });
+  it('fires when submissions spread over only 3 hours (H ~ 1.58 < 2.0)', () => {
+    const guests = Array.from({ length: 30 }, (_, i) =>
+      makeGuest({
+        submittedAt: new Date(`2026-04-01T${(10 + (i % 3)).toString().padStart(2, '0')}:00:00Z`),
+      }),
     );
     expect(checkLowHourEntropy(guests, makeParty({ timezone: null })).fired).toBe(true);
   });
@@ -495,12 +515,26 @@ describe('checkLowFunnelCoverage', () => {
     expect(result.evidence?.uniqueVisitors).toBe(7);
     expect(result.evidence?.linkRsvpCount).toBe(100);
   });
-  it('does not fire for Lilongwe-like healthy funnel (8 unique visitors / 44 RSVPs = 0.18)', () => {
+  it('does not fire for Lilongwe-like healthy funnel (14 unique visitors / 44 RSVPs = 0.32)', () => {
+    const guests = Array.from({ length: 44 }, () => makeGuest());
+    const funnel = Array.from({ length: 14 }, (_, i) =>
+      makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_opened' }),
+    );
+    expect(checkLowFunnelCoverage(guests, funnel).fired).toBe(false);
+  });
+  it('fires at 0.18 coverage (8 unique visitors / 44 RSVPs)', () => {
     const guests = Array.from({ length: 44 }, () => makeGuest());
     const funnel = Array.from({ length: 8 }, (_, i) =>
       makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_opened' }),
     );
-    expect(checkLowFunnelCoverage(guests, funnel).fired).toBe(false);
+    expect(checkLowFunnelCoverage(guests, funnel).fired).toBe(true);
+  });
+  it('boundary: 0.24 fires, 0.26 does not (n=100)', () => {
+    const guests = Array.from({ length: 100 }, () => makeGuest());
+    const mk = (k: number) =>
+      Array.from({ length: k }, (_, i) => makeFunnelEvent({ visitorHash: `v${i}`, step: 'rsvp_opened' }));
+    expect(checkLowFunnelCoverage(guests, mk(24)).fired).toBe(true);
+    expect(checkLowFunnelCoverage(guests, mk(26)).fired).toBe(false);
   });
   it('ignores non-opened steps in coverage count', () => {
     const guests = Array.from({ length: 40 }, () => makeGuest());
@@ -987,7 +1021,7 @@ describe('checkCoHostTwitterHandlesMissing', () => {
 
 describe('checkRepeatSessionRsvpCount', () => {
   // romana-30802: cookie-based padding detector. Min-n=20 non-null sessions;
-  // fires when max session repeat ≥ 5.
+  // fires when max session repeat ≥ 10.
 
   it('does not fire below min-n (only 10 guests with session_id)', () => {
     const guests = Array.from({ length: 10 }, (_, i) =>
@@ -1007,9 +1041,18 @@ describe('checkRepeatSessionRsvpCount', () => {
     expect(result.evidence?.maxRepeats).toBe(1);
   });
 
-  it('fires when one session_id repeats 5+ times', () => {
-    // 5 guests share "padder-session"; 20 others are distinct → maxRepeats=5
-    const padder = Array.from({ length: 5 }, () =>
+  it('boundary: 9 repeats does not fire, 10 does', () => {
+    const build = (k: number) => [
+      ...Array.from({ length: k }, () => makeGuest({ visitorSessionId: 'padder-session' })),
+      ...Array.from({ length: 20 }, (_, i) => makeGuest({ visitorSessionId: `legit-${i}` })),
+    ];
+    expect(checkRepeatSessionRsvpCount(build(9)).fired).toBe(false);
+    expect(checkRepeatSessionRsvpCount(build(10)).fired).toBe(true);
+  });
+
+  it('fires when one session_id repeats 10+ times', () => {
+    // 10 guests share "padder-session"; 20 others are distinct → maxRepeats=10
+    const padder = Array.from({ length: 10 }, () =>
       makeGuest({ visitorSessionId: 'padder-session-aaaa-bbbb-cccc' }),
     );
     const others = Array.from({ length: 20 }, (_, i) =>
@@ -1017,8 +1060,8 @@ describe('checkRepeatSessionRsvpCount', () => {
     );
     const result = checkRepeatSessionRsvpCount([...padder, ...others]);
     expect(result.fired).toBe(true);
-    expect(result.evidence?.maxRepeats).toBe(5);
-    expect(result.evidence?.sessionsWithData).toBe(25);
+    expect(result.evidence?.maxRepeats).toBe(10);
+    expect(result.evidence?.sessionsWithData).toBe(30);
   });
 
   it('ignores null session IDs in the count', () => {
@@ -1108,6 +1151,51 @@ describe('checkHighBounceRate', () => {
   });
 });
 
+describe('removed heuristics (jalapeno-61805)', () => {
+  const removedIds = [
+    'cap_fill_no_waitlist',
+    'wallet_too_high_reuse',
+    'wallet_reuse',
+    'one_word_name',
+    'cross_event_wallet',
+    'high_per_visitor_rsvp_saturation',
+    'name_token_zscore',
+    'lsh_field_sig_cluster',
+    'email_digit_benford',
+    'co_host_twitter_handles_missing',
+  ];
+
+  it('removed ids are not in WEIGHTS and never appear in scoreEvent flags', () => {
+    const party = makeParty();
+    const guests = Array.from({ length: 40 }, (_, i) => makeGuest({ name: `Guest${i}`, email: `guest${i}@spam.com` }));
+    const row = scoreEvent(party, guests, [], new Set(['0xabc']), party.maxGuests, [], TEST_SCORING);
+    const flagIds = row.flags.map(f => f.id);
+    for (const id of removedIds) {
+      expect(id in WEIGHTS).toBe(false);
+      expect(flagIds).not.toContain(id);
+    }
+  });
+
+  it('deprecated checkXxx functions still run and always report weight 0', () => {
+    const guests = Array.from({ length: 40 }, (_, i) => makeGuest({ name: `Guest${i}`, email: `guest${i}@spam.com` }));
+    const party = makeParty();
+    const results = [
+      checkCapFillNoWaitlist(guests, 40),
+      checkWalletTooHighReuse(guests),
+      checkWalletReuse(guests),
+      checkOneWordName(guests),
+      checkCrossEventWallet(guests, new Set()),
+      checkHighPerVisitorRsvpSaturation(guests, []),
+      checkNameTokenZscore(guests),
+      checkLshFieldSigCluster(guests),
+      checkEmailDigitBenford(guests),
+      checkCoHostTwitterHandlesMissing(party),
+    ];
+    expect(results.map(r => r.id).sort()).toEqual([...removedIds].sort());
+    for (const r of results) expect(r.weight).toBe(0);
+  });
+});
+
 describe('buildSybilWalletSet', () => {
   it('includes wallets with ≥4 parties AND ≥2 distinct names', () => {
     const rows = [
@@ -1161,8 +1249,8 @@ describe('tierFromScore', () => {
 
 describe('resolveWeights / resolveScoring (marinara-71630 P3)', () => {
   it('merges config weights over the all-zero placeholder', () => {
-    const w = resolveWeights({ cap_fill_no_waitlist: 42 });
-    expect(w.cap_fill_no_waitlist).toBe(42);
+    const w = resolveWeights({ low_domain_entropy: 42 });
+    expect(w.low_domain_entropy).toBe(42);
     // Unspecified keys fall back to the placeholder (0).
     expect(w.high_bounce_rate).toBe(0);
   });
@@ -1170,10 +1258,10 @@ describe('resolveWeights / resolveScoring (marinara-71630 P3)', () => {
   it('ignores unknown keys and non-finite values', () => {
     const w = resolveWeights({
       not_a_real_heuristic: 99,
-      cap_fill_no_waitlist: Number.NaN,
+      low_domain_entropy: Number.NaN,
     } as Record<string, number>);
     expect((w as Record<string, number>).not_a_real_heuristic).toBeUndefined();
-    expect(w.cap_fill_no_waitlist).toBe(0); // NaN rejected → placeholder
+    expect(w.low_domain_entropy).toBe(0); // NaN rejected → placeholder
   });
 
   it('falls back to all-zero placeholder weights + tiers when config is empty', () => {
@@ -1280,12 +1368,10 @@ describe('scoreEvent — integration fixtures', () => {
       makeFunnelEvent({ visitorHash: 'v4', step: 'rsvp_opened', createdAt: new Date(base) }),
     ];
     const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel, TEST_SCORING);
-    // Should fire: cap_fill, low_domain_entropy, wallet_too_low, host_self,
-    // pizzeria_blank, wallet_source_null, one_word_name, firstname_digits,
+    // Should fire: low_domain_entropy, wallet_too_low, host_self,
+    // pizzeria_blank, wallet_source_null, firstname_digits,
     // low_hour_entropy, rapid_intersubmission, low_funnel_coverage,
-    // mailing_list_opt_in_extreme (all default=false), lsh_field_sig_cluster
-    // (identical sigs).
-    // (sig_collapse no longer in scoreEvent list — replaced by lsh_field_sig_cluster.)
+    // mailing_list_opt_in_extreme (all default=false).
     // parmesan-67529: high_per_visitor_rsvp_saturation no longer fires here
     // because all 5 funnel visitors line up at the same `base` timestamp →
     // each matches the same large set of RSVPs → max == secondMax (ratio 1.0,
@@ -1295,12 +1381,14 @@ describe('scoreEvent — integration fixtures', () => {
     expect(row.score).toBeGreaterThanOrEqual(70);
     expect(row.tier).toBe('high');
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
-    expect(firedIds).toContain('cap_fill_no_waitlist');
+    expect(firedIds).toContain('low_domain_entropy');
     expect(firedIds).not.toContain('sig_collapse'); // removed from scoreEvent
-    expect(firedIds).toContain('lsh_field_sig_cluster'); // replaces sig_collapse
     expect(firedIds).toContain('mailing_list_opt_in_extreme');
     expect(firedIds).toContain('host_self_rsvp_mismatch');
     expect(firedIds).toContain('low_funnel_coverage');
+    // Removed heuristics (jalapeno-61805) never appear; at least 8 flags at
+    // SYNTH_W each are needed to clear 70.
+    expect(firedIds.length).toBeGreaterThanOrEqual(8);
     expect(firedIds).not.toContain('high_per_visitor_rsvp_saturation');
   });
 
