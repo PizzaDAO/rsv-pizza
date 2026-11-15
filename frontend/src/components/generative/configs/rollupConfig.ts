@@ -52,10 +52,12 @@ export const ROLLUP_CONFIG: FormatConfig = {
     defaultX: 60,
     defaultY: 2350,
     width: 960,
-    height: 540,
+    height: 300,
     defaultRows: 3,
     logoScale: 1.5,
   },
+  // Bottom white band under the art; centered below the sponsor grid.
+  qr: { x: 410, y: 2650, size: 260, tileColor: '#FFFFFF', dark: '#0B1F33', caption: 'SCAN TO RSVP', radius: 18 },
   dbImageField: 'rollup_image_url',
   dbTimestampField: 'rollup_generated_at',
   storageKey: (partyId: string) => `rollup-${partyId}`,

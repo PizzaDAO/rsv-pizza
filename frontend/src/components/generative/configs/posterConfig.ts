@@ -48,10 +48,13 @@ export const POSTER_CONFIG: FormatConfig = {
   sponsorBox: {
     defaultX: 35,
     defaultY: 1080,
-    width: 640,
+    // Narrowed so the QR tile fits bottom-right of the sponsor column (clear of the parachutes).
+    width: 400,
     height: 350,
     defaultRows: 3,
   },
+  // White tile on the sky gradient, clear of the truck/parachutes. 200 canvas px = ~3.3in at 18x24in.
+  qr: { x: 450, y: 1225, size: 200, tileColor: '#FFFFFF', dark: '#0B1F33', caption: 'SCAN TO RSVP', radius: 16 },
   dbImageField: 'poster_image_url',
   dbTimestampField: 'poster_generated_at',
   storageKey: (partyId: string) => `poster-${partyId}`,

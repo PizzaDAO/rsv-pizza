@@ -1,4 +1,5 @@
 import type { FormatConfig, CanvasPositions } from './types';
+import { drawFlyerQr } from './flyerQr';
 import { drawDogeSpeak, ensureDogeFont, type DogePhrase } from './dogeSpeak';
 import {
   fitText, loadImg,
@@ -22,6 +23,8 @@ export interface RenderCanvasOptions {
   scaleFactor?: number;
   /** Doge templates only (config.dogeSpeak): phrases from buildDogePhrases. */
   dogePhrases?: DogePhrase[];
+  /** Event URL to encode in the config.qr tile. Omit to skip the QR. */
+  qrUrl?: string | null;
 }
 
 /**
@@ -30,7 +33,7 @@ export interface RenderCanvasOptions {
  * for full-resolution output.
  */
 export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanvasElement> {
-  const { config, positions, textValues, sponsors, sponsorBoxSize, logoSizes, poppedLogos, scaleFactor = 1, dogePhrases } = opts;
+  const { config, positions, textValues, sponsors, sponsorBoxSize, logoSizes, poppedLogos, scaleFactor = 1, dogePhrases, qrUrl } = opts;
   const { city, dateDisplay, timeDisplay, venueName, streetAddress } = textValues;
 
   const w = Math.round(config.canvasWidth * scaleFactor);
@@ -178,6 +181,11 @@ export async function renderCanvas(opts: RenderCanvasOptions): Promise<HTMLCanva
         drawY += row.height + gap;
       }
     }
+  }
+
+  // 6) QR code to the event page (config.qr; skipped when no url)
+  if (config.qr && qrUrl) {
+    drawFlyerQr(ctx, config.qr, qrUrl, s);
   }
 
   return canvas;

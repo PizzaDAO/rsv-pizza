@@ -26,7 +26,26 @@ export interface DogeSpeakSlot {
   maxWidth: number;
 }
 
+/** QR code tile linking to the event page (canvas px, top-left anchored, square). */
+export interface FlyerQrConfig {
+  x: number;
+  y: number;
+  /** Tile width/height. The QR (with a 4-module quiet zone) fills the tile above the caption band. */
+  size: number;
+  /** Tile fill behind the code (the quiet zone). Keep high contrast with `dark`. */
+  tileColor: string;
+  /** Module color. */
+  dark: string;
+  /** Optional caption under the code, e.g. "SCAN TO RSVP". */
+  caption?: string;
+  captionColor?: string;
+  /** Tile corner radius in canvas px. */
+  radius?: number;
+}
+
 export interface FormatConfig {
+  /** Draw a QR code to the event page at this spot (user can toggle it off). */
+  qr?: FlyerQrConfig;
   /** Doge templates only: draw Much-Wow style doge-speak phrases at these slots. */
   dogeSpeak?: { slots: DogeSpeakSlot[] };
   id: string;

@@ -13,6 +13,9 @@ import {
 } from '../flyer/renderFlyer';
 import { useCanvasDrag } from './useCanvasDrag';
 import { renderCanvas } from './renderCanvas';
+import { flyerEventUrl, qrCaptionBandHeight, QR_QUIET_MODULES } from './flyerQr';
+import { QRCode } from '../QRCode';
+import { Checkbox } from '../Checkbox';
 import type { FormatConfig, CanvasPositions, DogeSpeakSlot } from './types';
 import { buildDogePhrases, drawDogeSpeak, ensureDogeFont, type DogePhrase } from './dogeSpeak';
 
@@ -100,6 +103,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [wowShuffle, setWowShuffle] = useState(0);
+  const [showQr, setShowQr] = useState(true);
 
   // Popped-out logos
   const [poppedLogos, setPoppedLogos] = useState<Record<string, { x: number; y: number }>>(
@@ -422,6 +426,8 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const streetAddress = editStreetAddress !== null ? editStreetAddress : defaultStreetAddress;
   const city = editCity !== null ? editCity : defaultCity;
 
+  const qrUrl = flyerEventUrl(party);
+
   // Doge-speak (doge templates only): deterministic per event + city; "Shuffle wow" bumps the seed.
   const dogePhrases = config.dogeSpeak
     ? buildDogePhrases(`${party.id}|${wowShuffle}`, city)
@@ -489,6 +495,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
       positions,
       textValues: { city, dateDisplay, timeDisplay: effectiveTimeDisplay, venueName, streetAddress },
       dogePhrases,
+      qrUrl: showQr ? flyerEventUrl(party) : null,
       sponsors: sponsors.map(s => ({ id: s.id, logoUrl: s.logoUrl! })),
       sponsorBoxSize,
       logoSizes,
@@ -583,6 +590,37 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
             height={config.canvasHeight}
           />
         )}
+
+        {/* Event QR code (matches drawFlyerQr in the full-res render) */}
+        {config.qr && showQr && qrUrl && (() => {
+          const q = config.qr!;
+          const band = qrCaptionBandHeight(q);
+          return (
+            <div
+              style={{
+                position: 'absolute', left: q.x, top: q.y, width: q.size, height: q.size,
+                background: q.tileColor, borderRadius: q.radius ?? 0, pointerEvents: 'none',
+              }}
+            >
+              <QRCode
+                value={qrUrl}
+                size={q.size - band}
+                margin={QR_QUIET_MODULES}
+                dark={q.dark}
+                light={q.tileColor}
+                alt="Event QR code"
+                className="block"
+              />
+              {q.caption && (
+                <div style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0, height: band, textAlign: 'center',
+                  lineHeight: `${band}px`, fontSize: band * 0.62, color: q.captionColor ?? q.dark,
+                  fontFamily: '"Hub 191", "Comic Sans MS", sans-serif',
+                }}>{q.caption}</div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* City name */}
         {(() => {
@@ -1331,6 +1369,9 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
           <Plus className="w-4 h-4" />
           Add Logo
         </button>
+        {config.qr && (
+          <Checkbox checked={showQr} onChange={() => setShowQr(v => !v)} label="QR code" labelClassName="text-sm text-white/70" className="px-2" />
+        )}
         {config.dogeSpeak && (
           <button
             onClick={() => setWowShuffle(n => n + 1)}
