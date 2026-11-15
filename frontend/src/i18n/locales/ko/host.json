@@ -875,5 +875,29 @@
     "rollupSubmitted": "{{date}}에 제출됨",
     "rollupReceiptCount_one": "영수증 {{count}}장",
     "rollupReceiptCount_other": "영수증 {{count}}장"
+  },
+  "pressRelease": {
+    "title": "보도자료 생성기",
+    "subtitle": "지역 언론사에 보낼 보도자료를 생성합니다",
+    "eventDetails": "이벤트 상세 정보",
+    "hostNamePlaceholder": "호스트 이름",
+    "phonePlaceholder": "전화번호 (언론 문의용)",
+    "pizzeriaPlaceholder": "피자 가게 이름",
+    "cityPlaceholder": "도시 이름",
+    "venuePlaceholder": "장소 / 주소",
+    "sponsorsPlaceholder": "지역 스폰서 (쉼표로 구분)",
+    "autoFilled": "이벤트 정보에서 자동으로 채워졌습니다. 필요하면 수정하세요.",
+    "template": "템플릿",
+    "resetTemplate": "기본값으로 되돌리기",
+    "templatePlaceholder": "보도자료 템플릿...",
+    "templateHelp": "위의 템플릿을 수정하세요. {city} 같은 자리 표시자는 생성할 때 입력한 값으로 바뀝니다.",
+    "generate": "보도자료 생성",
+    "generated": "생성된 보도자료",
+    "copy": "클립보드에 복사",
+    "copied": "복사됨!",
+    "copyButton": "클립보드에 복사",
+    "download": ".txt로 다운로드",
+    "dateTbd": "미정",
+    "defaultTemplate": "즉시 배포용\n\n글로벌 피자 파티, {date} {city}에서 개최\n\n{city} — {host_name}은(는) {city}가 {date}에 피자와 커뮤니티를 기념하는 전 세계적인 행사인 글로벌 피자 파티에 참여한다는 소식을 알리게 되어 기쁩니다. 행사는 {venue}에서 열립니다.\n\n글로벌 피자 파티는 PizzaDAO가 주최하는 연례 행사로, 전 세계 도시의 피자 애호가들이 모여 무료 피자와 커뮤니티, 즐거움을 함께 나누는 하루입니다.\n\n{city} 행사에서는 {pizzeria}의 피자가 제공되어 지역 최고의 맛을 선보입니다.\n\n이 행사는 {sponsors} 등 지역 스폰서의 아낌없는 후원으로 열립니다.\n\n행사는 무료이며 누구나 참여할 수 있습니다. 참석자는 {rsvp_url}에서 RSVP해 주시기 바랍니다.\n\n자세한 내용이나 언론 문의는 아래로 연락해 주세요.\n{host_name}\n전화: {host_phone}\n\n###"
   }
 }

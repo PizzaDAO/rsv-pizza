@@ -922,5 +922,29 @@
     "rollupSubmitted": "Soumis le {{date}}",
     "rollupReceiptCount_one": "{{count}} reçu",
     "rollupReceiptCount_other": "{{count}} reçus"
+  },
+  "pressRelease": {
+    "title": "Générateur de communiqué de presse",
+    "subtitle": "Génère un communiqué de presse à envoyer aux médias locaux",
+    "eventDetails": "Détails de l'événement",
+    "hostNamePlaceholder": "Nom de l'hôte",
+    "phonePlaceholder": "Numéro de téléphone (pour les demandes des médias)",
+    "pizzeriaPlaceholder": "Nom de la pizzeria",
+    "cityPlaceholder": "Ville",
+    "venuePlaceholder": "Lieu / Adresse",
+    "sponsorsPlaceholder": "Sponsors locaux (séparés par des virgules)",
+    "autoFilled": "Rempli automatiquement à partir des données de votre événement. Modifiez si besoin.",
+    "template": "Modèle",
+    "resetTemplate": "Rétablir par défaut",
+    "templatePlaceholder": "Modèle de communiqué de presse...",
+    "templateHelp": "Modifiez le modèle ci-dessus. Les variables comme {city} seront remplacées par vos valeurs lors de la génération.",
+    "generate": "Générer le communiqué de presse",
+    "generated": "Communiqué de presse généré",
+    "copy": "Copier dans le presse-papiers",
+    "copied": "Copié !",
+    "copyButton": "Copier dans le presse-papiers",
+    "download": "Télécharger en .txt",
+    "dateTbd": "à confirmer",
+    "defaultTemplate": "POUR DIFFUSION IMMÉDIATE\n\nLA GLOBAL PIZZA PARTY ARRIVE À {city} LE {date}\n\n{city} — {host_name} a le plaisir d'annoncer que {city} participera, le {date}, à la Global Pizza Party, une célébration mondiale de la pizza et de la communauté. L'événement se tiendra à {venue}.\n\nLa Global Pizza Party est un événement annuel organisé par PizzaDAO, qui réunit les amateurs de pizza dans des villes du monde entier pour une journée de pizza gratuite, de vie communautaire et de convivialité.\n\nL'événement de {city} proposera des pizzas de {pizzeria}, pour apporter les meilleures saveurs locales à la fête.\n\nL'événement est rendu possible grâce au généreux soutien de sponsors locaux, dont {sponsors}.\n\nL'événement est gratuit et ouvert au public. Les participants sont invités à s'inscrire sur {rsvp_url}.\n\nPour plus d'informations ou pour toute demande des médias, contactez :\n{host_name}\nTéléphone : {host_phone}\n\n###"
   }
 }

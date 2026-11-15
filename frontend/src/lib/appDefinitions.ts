@@ -16,6 +16,7 @@ import {
   Receipt,
   Zap,
   Trophy,
+  Newspaper,
 } from 'lucide-react';
 
 /**
@@ -43,6 +44,7 @@ export const PINNABLE_APPS: PinnableApp[] = [
   { id: 'party-guide', name: 'Party Guide', tab: 'party-guide', icon: Zap },
   { id: 'party-kit', name: 'Party Kit', tab: 'gpp', icon: Package },
   { id: 'marketing-promo', name: 'Promo', tab: 'promo', icon: Megaphone },
+  { id: 'press-release', name: 'Press Release', tab: 'press-release', icon: Newspaper },
   { id: 'flyer', name: 'Flyer', tab: 'flyer', icon: FileImage },
   { id: 'print-nametags', name: 'Print', tab: 'print', icon: Printer },
   { id: 'payments', name: 'Payments', tab: 'payments', icon: Receipt },
@@ -82,4 +84,5 @@ export const BROADCAST_APPS: BroadcastApp[] = [
   { name: 'Reports', tab: 'report' },
   { name: 'Payments', tab: 'payments' },
   { name: 'Hackathon', tab: 'hackathon' },
+  { name: 'Press Release', tab: 'press-release' },
 ];

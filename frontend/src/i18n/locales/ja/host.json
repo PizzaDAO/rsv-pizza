@@ -919,5 +919,29 @@
     "rollupSubmitted": "{{date}} に提出",
     "rollupReceiptCount_one": "領収書 {{count}} 枚",
     "rollupReceiptCount_other": "領収書 {{count}} 枚"
+  },
+  "pressRelease": {
+    "title": "プレスリリース作成ツール",
+    "subtitle": "地元メディアに送るプレスリリースを作成します",
+    "eventDetails": "イベント詳細",
+    "hostNamePlaceholder": "主催者名",
+    "phonePlaceholder": "電話番号（メディアからの問い合わせ用）",
+    "pizzeriaPlaceholder": "ピザ店の名前",
+    "cityPlaceholder": "都市名",
+    "venuePlaceholder": "会場 / 住所",
+    "sponsorsPlaceholder": "地元スポンサー（カンマ区切り）",
+    "autoFilled": "イベント情報から自動入力されています。必要に応じて編集してください。",
+    "template": "テンプレート",
+    "resetTemplate": "初期設定に戻す",
+    "templatePlaceholder": "プレスリリースのテンプレート...",
+    "templateHelp": "上のテンプレートを編集できます。{city} などのプレースホルダーは、生成時に入力した内容に置き換えられます。",
+    "generate": "プレスリリースを生成",
+    "generated": "生成されたプレスリリース",
+    "copy": "クリップボードにコピー",
+    "copied": "コピーしました！",
+    "copyButton": "クリップボードにコピー",
+    "download": ".txt としてダウンロード",
+    "dateTbd": "未定",
+    "defaultTemplate": "即時発表\n\nグローバル・ピザ・パーティーが{date}に{city}で開催\n\n{city} — {host_name}は、{city}が{date}に、ピザとコミュニティを祝う世界的イベント「グローバル・ピザ・パーティー」に参加することをお知らせします。会場は{venue}です。\n\nグローバル・ピザ・パーティーは、PizzaDAOが主催する毎年恒例のイベントで、世界各地の街でピザ好きが集まり、無料のピザ、コミュニティづくり、楽しい時間を一日かけて楽しみます。\n\n{city}のイベントでは{pizzeria}のピザが提供され、地元ならではの味をお届けします。\n\n本イベントは、{sponsors}をはじめとする地元スポンサーの温かいご支援により開催されます。\n\n参加は無料で、どなたでもご参加いただけます。ご参加の方は{rsvp_url}からRSVPをお願いします。\n\n詳細やメディアからのお問い合わせは下記までご連絡ください。\n{host_name}\n電話：{host_phone}\n\n###"
   }
 }

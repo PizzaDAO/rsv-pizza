@@ -919,5 +919,29 @@
     "rollupSubmitted": "已于 {{date}} 提交",
     "rollupReceiptCount_one": "{{count}} 张收据",
     "rollupReceiptCount_other": "{{count}} 张收据"
+  },
+  "pressRelease": {
+    "title": "新闻稿生成器",
+    "subtitle": "生成一份新闻稿，发送给本地媒体",
+    "eventDetails": "活动详情",
+    "hostNamePlaceholder": "主办人姓名",
+    "phonePlaceholder": "电话号码（供媒体咨询）",
+    "pizzeriaPlaceholder": "披萨店名称",
+    "cityPlaceholder": "城市名称",
+    "venuePlaceholder": "场地 / 地址",
+    "sponsorsPlaceholder": "本地赞助商（用逗号分隔）",
+    "autoFilled": "已根据你的活动数据自动填写，可按需修改。",
+    "template": "模板",
+    "resetTemplate": "恢复默认",
+    "templatePlaceholder": "新闻稿模板...",
+    "templateHelp": "请编辑上方模板。生成时，{city} 等占位符会被替换为你填写的内容。",
+    "generate": "生成新闻稿",
+    "generated": "已生成的新闻稿",
+    "copy": "复制到剪贴板",
+    "copied": "已复制！",
+    "copyButton": "复制到剪贴板",
+    "download": "下载为 .txt",
+    "dateTbd": "待定",
+    "defaultTemplate": "即时发布\n\n全球披萨派对将于 {date} 来到 {city}\n\n{city} — {host_name} 很荣幸地宣布，{city} 将于 {date} 参加全球披萨派对，这是一场庆祝披萨与社区的全球盛会。活动将在 {venue} 举行。\n\n全球披萨派对是由 PizzaDAO 组织的年度活动，汇聚世界各地城市的披萨爱好者，共度一个充满免费披萨、社区交流和欢乐的日子。\n\n{city} 的活动将提供来自 {pizzeria} 的披萨，为庆典带来最地道的本地风味。\n\n本次活动得益于本地赞助商的慷慨支持，包括 {sponsors}。\n\n活动免费，向公众开放。欢迎参加者通过 {rsvp_url} 报名。\n\n如需了解更多信息或媒体咨询，请联系：\n{host_name}\n电话：{host_phone}\n\n###"
   }
 }
