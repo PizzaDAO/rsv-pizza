@@ -3803,7 +3803,7 @@ export async function updateExpectedGuests(
 }
 
 // Bulk update underboss status (underboss auth)
-export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pending' | 'approved' | 'rejected'): Promise<void> {
+export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pending' | 'approved' | 'rejected' | 'hidden'): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-status', {
     method: 'PATCH',
     body: { partyIds, status },

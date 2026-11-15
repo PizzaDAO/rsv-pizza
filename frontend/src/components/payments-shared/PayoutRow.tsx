@@ -304,14 +304,15 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
               size={14}
               className="text-emerald-500 shrink-0"
               aria-label="Flagged ready for payment"
-              title={
-                `Flagged ready` +
-                (admin.flaggedReadyBy ? ` by ${admin.flaggedReadyBy}` : '') +
-                (admin.flaggedReadyAt
-                  ? ` on ${new Date(admin.flaggedReadyAt).toLocaleString()}`
-                  : '')
-              }
-            />
+            >
+              <title>
+                {`Flagged ready` +
+                  (admin.flaggedReadyBy ? ` by ${admin.flaggedReadyBy}` : '') +
+                  (admin.flaggedReadyAt
+                    ? ` on ${new Date(admin.flaggedReadyAt).toLocaleString()}`
+                    : '')}
+              </title>
+            </Flag>
           )}
         </div>
       </td>

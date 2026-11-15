@@ -65,7 +65,7 @@ export function PhotosFeedPage() {
 
   // Feed
   const [photos, setPhotos] = useState<FeedPhoto[]>([]);
-  const [hasMore, setHasMore] = useState(true);
+  const [, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);

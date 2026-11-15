@@ -354,11 +354,11 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <IconInput
-                        icon={() => (
+                        customIcon={
                           <span className="text-theme-text-muted text-xs font-mono">
                             {selectedToken.token.symbol}
                           </span>
-                        )}
+                        }
                         type="number"
                         min={0}
                         step="any"

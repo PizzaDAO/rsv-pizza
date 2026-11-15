@@ -195,7 +195,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           caption: caption || undefined,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
           photoYear: photoYear || undefined,
-          duration: isVideo && 'duration' in uploadResult ? uploadResult.duration : undefined,
+          duration: isVideo && 'duration' in uploadResult ? (uploadResult as { duration?: number }).duration : undefined,
         };
 
         const result = await uploadPhotoApi(partyId, photoData);

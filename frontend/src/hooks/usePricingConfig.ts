@@ -27,6 +27,7 @@ export const NEUTRAL_PRICING_CONFIG: PricingConfig = {
   cityTiers: { tier1: [], tier2: [] },
   sponsorshipPricing: { tierConfig: {}, base: 0, roundTo: 50 },
   reimbursement: { perHeadRates: { '1': 0, '2': 0, '3': 0 }, ceilingUsd: 0, attendanceRsvpCoefficient: 0 },
+  reimbursementCapBands: { bands: {}, roundingIncrementUsd: 25 },
 };
 
 // Module-level cache: shared across every hook consumer for the page lifetime.

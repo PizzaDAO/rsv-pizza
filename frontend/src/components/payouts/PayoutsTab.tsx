@@ -577,7 +577,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         <AlertCircle className="w-12 h-12 text-[#ff393a] mx-auto mb-4" />
         <p className="text-theme-text-secondary mb-4">{error}</p>
         <button
-          onClick={loadMine}
+          onClick={() => loadMine()}
           className="btn-secondary inline-flex items-center gap-2"
         >
           <RefreshCw size={16} />

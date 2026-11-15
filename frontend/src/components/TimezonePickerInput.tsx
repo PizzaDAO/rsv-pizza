@@ -23,7 +23,7 @@ const POPULAR_TIMEZONES = [
 ];
 
 // Get all IANA timezones with fallback for older browsers
-const ALL_TIMEZONES = (() => {
+const ALL_TIMEZONES: string[] = (() => {
   try {
     // @ts-ignore - supportedValuesOf may not be in older TypeScript definitions
     return Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [

@@ -1,10 +1,9 @@
-name: Typecheck (non-blocking)
+name: Typecheck
 
-# Reports `tsc --noEmit` errors for frontend + backend on PRs. NON-BLOCKING for
-# now (continue-on-error) because the frontend carries a large pre-existing error
-# baseline and `vite build` doesn't type-check — so a type break can currently
-# ship and black-screen at runtime. This surfaces the counts in CI; once the
-# baseline is driven to 0, flip continue-on-error to false to make it a real gate.
+# Runs `tsc --noEmit` for frontend + backend on PRs. BLOCKING for both: both are at 0
+# errors, and `vite build` doesn't type-check, so without this a type break (or an
+# unused local/param under noUnusedLocals/noUnusedParameters) can ship and
+# black-screen at runtime. Keep them at 0.
 on:
   pull_request:
     paths:
@@ -33,12 +32,10 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install
         run: npm ci
+      # BLOCKING: frontend is at 0 tsc errors — keep it there.
       - name: tsc --noEmit (frontend)
         working-directory: frontend
-        continue-on-error: true
-        run: |
-          npx tsc --noEmit -p tsconfig.app.json 2>&1 | tee /tmp/fe.txt || true
-          echo "frontend tsc errors: $(grep -c 'error TS' /tmp/fe.txt || echo 0)"
+        run: npx tsc --noEmit -p tsconfig.app.json
 
   backend:
     runs-on: ubuntu-latest

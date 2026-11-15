@@ -200,7 +200,10 @@ function intakeDataToFormData(data: PartnerIntakeResponse['sponsor']): PartnerFo
 
 interface PartnerFormProps {
   mode?: 'crm' | 'partner' | 'intake';
-  onSubmit: (data: PartnerFormData) => Promise<void>;
+  onSubmit: (
+    data: PartnerFormData,
+    coHostData?: { name: string; website: string; twitter: string; instagram: string; logoUrl: string; avatarUrl?: string },
+  ) => Promise<void>;
   onClose?: () => void;
   isLoading?: boolean;
   logoOnly?: boolean;

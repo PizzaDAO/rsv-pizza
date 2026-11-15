@@ -412,11 +412,11 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <IconInput
-                        icon={() => (
+                        customIcon={
                           <span className="text-white/40 text-xs font-mono">
                             {selectedToken.token.symbol}
                           </span>
-                        )}
+                        }
                         type="number"
                         min={0}
                         step="any"

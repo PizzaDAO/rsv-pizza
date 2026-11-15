@@ -91,10 +91,6 @@ export interface PublicSeries {
   themeClass: string | null;
   logoUrl: string | null;
   ogImageUrl: string | null;
-  /** Create-flow preset key: 'global_day' | 'meetup' | 'hackathon', or null (generic flow). */
-  createFlow: string | null;
-  /** Optional event-name template override ({city} {brand} {series}); null = preset default. */
-  nameTemplate: string | null;
   description: string | null;
   eventType: string | null;
   publicTags: string[];
@@ -107,7 +103,9 @@ export interface PublicSeries {
   eventEndTime: string | null;
   // Streamlined create flow (wl-create-backend). Optional: absent on older backends,
   // which means the generic create form.
+  /** Create-flow preset key: 'global_day' | 'meetup' | 'hackathon', or null (generic flow). */
   createFlow?: string | null;
+  /** Optional event-name template override ({city} {brand} {series}); null = preset default. */
   nameTemplate?: string | null;
   brandName?: string | null;
 }

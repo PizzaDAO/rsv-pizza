@@ -44,7 +44,7 @@ export const EventDetailsTab: React.FC = () => {
   const [password, setPassword] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   const [customUrlValid, setCustomUrlValid] = useState(true);
-  const [customUrlError, setCustomUrlError] = useState<string | undefined>();
+  const [, setCustomUrlError] = useState<string | undefined>();
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -98,9 +98,7 @@ export const EventDetailsTab: React.FC = () => {
 
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
-  const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   // porchetta-81402: cancel state (was `deleting` / `showDeleteConfirm` before
   // the destructive delete was converted to a non-destructive soft-cancel).
   const [cancelling, setCancelling] = useState(false);

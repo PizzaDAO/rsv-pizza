@@ -181,7 +181,7 @@ function fetchGlobalConfig(): Promise<RsvpCheckboxConfig[]> {
         console.warn('[useRsvpCheckboxConfig] global fetch failed, using fallback:', error);
         return FALLBACK_CONFIG;
       }
-      return data as RsvpCheckboxConfig[];
+      return data as unknown as RsvpCheckboxConfig[];
     } catch (e) {
       console.warn('[useRsvpCheckboxConfig] global fetch threw, using fallback:', e);
       return FALLBACK_CONFIG;
@@ -199,7 +199,7 @@ async function fetchOverrides(partyId: string): Promise<RsvpCheckboxConfig[]> {
       .eq('active', true)
       .order('position');
     if (error || !data) return [];
-    return data as RsvpCheckboxConfig[];
+    return data as unknown as RsvpCheckboxConfig[];
   } catch {
     return [];
   }
