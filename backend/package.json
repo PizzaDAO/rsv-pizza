@@ -9,8 +9,6 @@
     "start": "node dist/index.js",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "test": "vitest run",
     "gen:pizza-mcp": "openapi-typescript openapi/pizza-mcp.openapi.json -o src/services/pizzaMcp.types.ts",
@@ -64,5 +62,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.5.3",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
   }
 }

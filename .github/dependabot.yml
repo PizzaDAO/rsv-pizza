@@ -2,8 +2,8 @@ version: 2
 # Automated dependency updates. The repo had 62 open alerts (33 high) with no
 # automation; this generates testable, grouped update PRs so bumps go through CI
 # (build + typecheck + schema/rls/migration guards) instead of piling up.
-# Majors with no advisory/EOL are ignored to cut noise (2026-10-15). wagmi and prisma
-# majors are deliberately NOT ignored: they carry real advisories and should keep resurfacing.
+# Majors with no advisory/EOL are ignored to cut noise (2026-10-15). wagmi majors are
+# deliberately NOT ignored: they carry real advisories and should keep resurfacing.
 # npm: ONE entry at "/" for the whole npm-workspaces repo (frontend + backend + root).
 # There is a single lockfile (root package-lock.json); the workspace dirs have none, so
 # per-directory entries ("/frontend", "/backend") would have no lockfile to update.
@@ -16,6 +16,9 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
+      # prisma and @prisma/client must move together (first group listed wins).
+      prisma:
+        patterns: ['prisma', '@prisma/*']
       # Group low-risk dev/build-chain bumps into one PR to reduce noise.
       dev-and-build:
         patterns: ['*']
@@ -75,6 +78,12 @@ updates:
       - dependency-name: "@anthropic-ai/sdk"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # Prisma 7 is planned separately (prosciutto-60417); the advisory that prompted it
+      # (deepmerge-ts, build-time only) is fixed by an override in package.json.
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/*"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
