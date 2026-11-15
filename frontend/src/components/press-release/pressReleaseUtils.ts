@@ -38,17 +38,23 @@ export function cleanCity(city: string): string {
 export function formatPressReleaseDate(party: Party, locale = 'en-US', tbd = 'TBD'): string {
   if (!party.date) return tbd;
 
-  const d = new Date(party.date);
-  const tz = party.timezone || 'UTC';
-  const { dateStr } = getDateTimeInTimezone(d, tz);
+  try {
+    const tz = party.timezone || 'UTC';
+    const { dateStr } = getDateTimeInTimezone(new Date(party.date), tz);
 
-  const dateObj = new Date(dateStr + 'T12:00:00');
-  return dateObj.toLocaleDateString(locale, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: tz,
-  });
+    // dateStr is the event's local calendar date (YYYY-MM-DD). Build it at noon UTC and
+    // format in UTC so the viewer's own timezone can never shift the day.
+    const dateObj = new Date(dateStr + 'T12:00:00Z');
+    if (Number.isNaN(dateObj.getTime())) return tbd;
+    return dateObj.toLocaleDateString(locale, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  } catch {
+    return tbd;
+  }
 }
 
 /**

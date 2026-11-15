@@ -31,6 +31,7 @@ export const BROADCAST_APP_TABS: readonly string[] = [
   'payments',
   'pizza',
   'hackathon',
+  'press-release',
 ] as const;
 
 export function isValidAppTab(tab: unknown): tab is string {

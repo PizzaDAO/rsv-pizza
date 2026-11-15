@@ -84,4 +84,5 @@ export const BROADCAST_APPS: BroadcastApp[] = [
   { name: 'Reports', tab: 'report' },
   { name: 'Payments', tab: 'payments' },
   { name: 'Hackathon', tab: 'hackathon' },
+  { name: 'Press Release', tab: 'press-release' },
 ];

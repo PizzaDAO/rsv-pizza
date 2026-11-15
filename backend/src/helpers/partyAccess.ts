@@ -51,6 +51,7 @@ export const VALID_TAB_IDS = [
   'print',
   'apps',
   'hackathon',
+  'press-release',
 ] as const;
 
 export type TabId = typeof VALID_TAB_IDS[number];

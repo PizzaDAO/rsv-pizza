@@ -40,6 +40,18 @@ describe('pressReleaseUtils', () => {
     expect(formatPressReleaseDate(asParty({ date: '2026-05-10T18:00:00Z', timezone: 'UTC' }))).toBe('May 10, 2026');
   });
 
+  it('formatPressReleaseDate keeps the event-local day regardless of the viewer TZ', () => {
+    // 2026-05-10 23:30 in Los Angeles (UTC-7) is already 05-11 in UTC.
+    expect(formatPressReleaseDate(asParty({ date: '2026-05-11T06:30:00Z', timezone: 'America/Los_Angeles' }))).toBe('May 10, 2026');
+    expect(formatPressReleaseDate(asParty({ date: '2026-05-10T23:30:00Z', timezone: 'Pacific/Kiritimati' }))).toBe('May 11, 2026');
+    expect(formatPressReleaseDate(asParty({ date: '2026-05-10T12:00:00Z', timezone: 'UTC' }))).toBe('May 10, 2026');
+  });
+
+  it('formatPressReleaseDate falls back to TBD on an invalid timezone or date', () => {
+    expect(formatPressReleaseDate(asParty({ date: '2026-05-10T12:00:00Z', timezone: 'Not/AZone' }), 'en-US', 'TBD')).toBe('TBD');
+    expect(formatPressReleaseDate(asParty({ date: 'garbage', timezone: 'UTC' }), 'en-US', 'TBD')).toBe('TBD');
+  });
+
   it('exposes the nine placeholder keys', () => {
     expect(PLACEHOLDER_KEYS).toHaveLength(9);
   });
