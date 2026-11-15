@@ -21,10 +21,13 @@ describe('isAllowedOrigin', () => {
     'https://rsvpizza-team1-abc123xyz-pizza-dao.vercel.app',
     'https://rsvpizza-monad-git-foo-pizza-dao.vercel.app',
     'https://rsvpizza-monad-abc123xyz-pizza-dao.vercel.app',
-    'https://rsvpizza.vercel.app',
+    'https://rsvpizza-swc-git-foo-pizza-dao.vercel.app',
+    'https://rsvpizza-doge-abc123xyz-pizza-dao.vercel.app',
   ])('allows %s', (o) => expect(isAllowedOrigin(o, ALLOWED)).toBe(true));
 
   it.each([
+    'https://rsvpizza.vercel.app', // foreign app, not ours
+    'https://rsvpizza-pizza-dao.vercel.app', // foreign app, not ours
     'https://rsvpizza-evil.vercel.app',
     'https://rsvpizza-git-x-attacker-team.vercel.app',
     'https://rsvpizza.evil.com',
