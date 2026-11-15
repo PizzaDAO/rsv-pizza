@@ -155,7 +155,9 @@ export interface UserPartyListItem {
 }
 
 export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
-  const res = await apiRequest<{ parties: UserPartyListItem[] }>('/api/parties/my-events');
+  // White-label: a series-scoped build asks the server for only its series' events.
+  const qs = BRAND.seriesSlug ? `?seriesSlug=${encodeURIComponent(BRAND.seriesSlug)}` : '';
+  const res = await apiRequest<{ parties: UserPartyListItem[] }>(`/api/parties/my-events${qs}`);
   return res.parties;
 }
 

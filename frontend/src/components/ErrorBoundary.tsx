@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { BRAND } from '../config/brand';
 
 interface Props {
   children: ReactNode;
@@ -31,9 +32,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.hasError) return this.props.children;
     if (this.props.fallback !== undefined) return this.props.fallback;
+    // Light brand themes (doge/monad/swc) set --eb-* in index.css; the fallbacks keep
+    // the default dark look. App's effect removes the <html> theme class when the tree
+    // unmounts on a crash, so the fallback re-applies the brand theme class itself.
     return (
       <div
         role="alert"
+        className={BRAND.themeClass || undefined}
         style={{
           minHeight: '100vh',
           display: 'flex',
@@ -44,8 +49,8 @@ export class ErrorBoundary extends Component<Props, State> {
           padding: 24,
           textAlign: 'center',
           fontFamily: 'system-ui, sans-serif',
-          background: '#111',
-          color: '#fff',
+          background: 'var(--eb-bg, #111)',
+          color: 'var(--eb-fg, #fff)',
         }}
       >
         <h1 style={{ fontSize: 20, margin: 0 }}>Something went wrong</h1>
@@ -59,8 +64,8 @@ export class ErrorBoundary extends Component<Props, State> {
             padding: '10px 20px',
             borderRadius: 8,
             border: 'none',
-            background: '#ff393a',
-            color: '#fff',
+            background: 'var(--eb-btn-bg, #ff393a)',
+            color: 'var(--eb-btn-fg, #fff)',
             fontSize: 16,
             cursor: 'pointer',
           }}

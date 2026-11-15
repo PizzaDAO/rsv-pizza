@@ -110,9 +110,19 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       _count: { select: { guests: true } },
     };
 
+    // White-label: optional ?seriesSlug=<slug> scopes every list below to that series
+    // (series-scoped brand builds). Unknown slug => empty result. Omitted => unchanged.
+    const seriesSlug = typeof req.query.seriesSlug === 'string' ? req.query.seriesSlug.trim() : '';
+    let seriesScope: { eventSeriesId: string } | Record<string, never> = {};
+    if (seriesSlug) {
+      const series = await prisma.eventSeries.findUnique({ where: { slug: seriesSlug }, select: { id: true } });
+      if (!series) return res.json({ parties: [] });
+      seriesScope = { eventSeriesId: series.id };
+    }
+
     // 1. Owned parties
     const ownedParties = await prisma.party.findMany({
-      where: { userId },
+      where: { userId, ...seriesScope },
       select: slimSelect,
       orderBy: { date: 'asc' },
     });
@@ -127,7 +137,7 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
     let guestParties: typeof ownedParties = [];
     if (guestPartyIds.length > 0) {
       guestParties = await prisma.party.findMany({
-        where: { id: { in: guestPartyIds } },
+        where: { id: { in: guestPartyIds }, ...seriesScope },
         select: slimSelect,
         orderBy: { date: 'asc' },
       });
@@ -143,7 +153,7 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
     let cohostParties: typeof ownedParties = [];
     if (cohostPartyIds.length > 0) {
       cohostParties = await prisma.party.findMany({
-        where: { id: { in: cohostPartyIds } },
+        where: { id: { in: cohostPartyIds }, ...seriesScope },
         select: slimSelect,
         orderBy: { date: 'asc' },
       });
@@ -154,7 +164,7 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
     const gppEditors = await getGppGlobalEditors();
     if (userEmail && gppEditors.some(e => e.toLowerCase() === userEmail!.toLowerCase())) {
       gppEditorParties = await prisma.party.findMany({
-        where: { eventType: 'gpp' },
+        where: { eventType: 'gpp', ...seriesScope },
         select: slimSelect,
         orderBy: { date: 'asc' },
       });

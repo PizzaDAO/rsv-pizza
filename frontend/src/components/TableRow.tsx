@@ -277,7 +277,7 @@ export const TableRow: React.FC<TableRowProps> = ({
 
         {/* Content */}
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-theme-text">{guest.name}</span>
+          <span className="font-semibold text-theme-text whitespace-nowrap truncate max-w-full">{guest.name}</span>
           {guest.email && (
             <span className="text-theme-text-muted text-sm truncate">{guest.email}</span>
           )}
@@ -328,7 +328,7 @@ export const TableRow: React.FC<TableRowProps> = ({
       {variant === 'basic' ? (
         // Basic variant: Name & Email
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-theme-text">{guest.name}</span>
+          <span className="font-semibold text-theme-text whitespace-nowrap truncate max-w-full">{guest.name}</span>
           {guest.email && (
             <ClickableEmail email={guest.email} className="text-theme-text-muted text-sm truncate" />
           )}
