@@ -85,7 +85,7 @@ const BRAND_CHECKLISTS = {
     ['Add a co-host', 'team_built', 'details'],
     ['Estimate attendance', 'attendance_estimated', 'attendance'], // existing
     ['Choose a pizzeria', 'pizzerias_selected', 'pizza'], // existing
-    ['Share in your Team1 community chat', null, null], // existing
+    ['Share in the Team1 Discord (discord.gg/team1)', null, null], // existing
     ['Post to socials', null, 'social-post'],
     ['Remind guests the day before', null, 'guests'],
     ['Print name tags for check-in', null, 'print'],

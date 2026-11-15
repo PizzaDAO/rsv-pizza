@@ -28,7 +28,7 @@ const MEETUP = [
   ['Confirm venue', 'venue_added', 'venue'],
   ['Choose a pizzeria', 'pizzerias_selected', 'pizza'],
   ['Line up a speaker or topic', null, null],
-  ['Share in your Team1 community chat', null, null],
+  ['Share in the Team1 Discord (discord.gg/team1)', null, null],
   ['Estimate attendance', 'attendance_estimated', 'attendance'],
   ['Post photos and a recap', null, 'photos'],
   ['Schedule the next meetup', null, null],

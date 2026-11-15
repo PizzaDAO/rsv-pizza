@@ -45,7 +45,7 @@ export const BRAND_DUE_OFFSETS: Record<CreateFlowKey, Record<string, DueOffset>>
     'Line up a speaker or topic': { days: -21 },
     'Add a co-host': { days: -21 },
     'Get approved': { days: -14 },
-    'Share in your Team1 community chat': { days: -14 },
+    'Share in the Team1 Discord (discord.gg/team1)': { days: -14 },
     'Post to socials': { days: -10 },
     'Estimate attendance': { days: -7 },
     'Choose a pizzeria': { days: -7 },
