@@ -1665,3 +1665,13 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   --eb-btn-bg: var(--accent);
   --eb-btn-fg: var(--text-inverted);
 }
+
+/* Host Staff / Displays QA (brand-leftovers): neutral gray-400/500 text and tinted green status pills
+ * (Staff "Invited" / "Confirmed", stat counters) were under 4.5:1 on the light brand themes. */
+.doge-theme .text-gray-400, .doge-theme .text-gray-500, .doge-theme .text-neutral-400, .doge-theme .text-slate-400 { color: var(--text-muted); }
+.monad-theme .text-gray-400, .monad-theme .text-gray-500, .monad-theme .text-neutral-400, .monad-theme .text-slate-400 { color: var(--text-muted); }
+.swc-theme .text-gray-400, .swc-theme .text-gray-500, .swc-theme .text-neutral-400, .swc-theme .text-slate-400 { color: var(--text-muted); }
+.doge-theme [class*="bg-green-500/"].text-green-400, .monad-theme [class*="bg-green-500/"].text-green-400,
+.swc-theme [class*="bg-green-500/"].text-green-400 { color: #17663a; }
+.doge-theme [class*="bg-gray-500/"].text-gray-400, .monad-theme [class*="bg-gray-500/"].text-gray-400,
+.swc-theme [class*="bg-gray-500/"].text-gray-400 { color: var(--text-primary); }
