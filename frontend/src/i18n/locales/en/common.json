@@ -26,5 +26,10 @@
     "partyNotFoundDesc": "Party not found. The invite link may be invalid or expired.",
     "incorrectPassword": "Incorrect password. Please try again.",
     "invalidWallet": "Enter a valid address (0x...) or ENS name (.eth)"
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "description": "This page doesn't exist. The link may be wrong or out of date.",
+    "goHome": "Go to Home"
   }
 }

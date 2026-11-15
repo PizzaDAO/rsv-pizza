@@ -26,5 +26,10 @@
     "partyNotFoundDesc": "未找到派对。邀请链接可能无效或已过期。",
     "incorrectPassword": "密码错误，请重试。",
     "invalidWallet": "请输入有效地址 (0x...) 或 ENS 名称 (.eth)"
+  },
+  "notFound": {
+    "title": "未找到页面",
+    "description": "此页面不存在。链接可能有误或已过期。",
+    "goHome": "返回首页"
   }
 }

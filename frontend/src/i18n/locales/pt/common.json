@@ -26,5 +26,10 @@
     "partyNotFoundDesc": "Festa não encontrada. O link do convite pode ser inválido ou expirado.",
     "incorrectPassword": "Senha incorreta. Tente novamente.",
     "invalidWallet": "Insira um endereço válido (0x...) ou nome ENS (.eth)"
+  },
+  "notFound": {
+    "title": "Página Não Encontrada",
+    "description": "Esta página não existe. O link pode estar errado ou desatualizado.",
+    "goHome": "Ir para Início"
   }
 }
