@@ -27,5 +27,10 @@
     "partyNotFoundDesc": "Party nicht gefunden. Der Einladungslink ist möglicherweise ungültig oder abgelaufen.",
     "incorrectPassword": "Falsches Passwort. Bitte versuchen Sie es erneut.",
     "invalidWallet": "Geben Sie eine gültige Adresse (0x...) oder einen ENS-Namen (.eth) ein"
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "description": "Diese Seite existiert nicht. Der Link ist möglicherweise falsch oder veraltet.",
+    "goHome": "Zur Startseite"
   }
 }

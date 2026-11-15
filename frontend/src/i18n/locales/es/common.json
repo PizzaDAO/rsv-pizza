@@ -26,5 +26,10 @@
     "partyNotFoundDesc": "Evento no encontrado. El enlace de invitación puede ser inválido o haber expirado.",
     "incorrectPassword": "Contraseña incorrecta. Intenta de nuevo.",
     "invalidWallet": "Ingresa una dirección válida (0x...) o nombre ENS (.eth)"
+  },
+  "notFound": {
+    "title": "Página No Encontrada",
+    "description": "Esta página no existe. Puede que el enlace sea incorrecto o esté desactualizado.",
+    "goHome": "Ir al Inicio"
   }
 }

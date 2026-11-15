@@ -9,6 +9,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 const DayOfRunPage = React.lazy(() => import('./pages/DayOfRunPage').then(m => ({ default: m.DayOfRunPage })));
 const ArtDisplayPage = React.lazy(() => import('./pages/ArtDisplayPage').then(m => ({ default: m.ArtDisplayPage })));
 import { EventPage } from './pages/EventPage';
@@ -235,6 +236,8 @@ function App() {
             <Route path="/:slug/projects" element={<Suspense fallback={null}><HackathonGalleryPage /></Suspense>} />
             <Route path="/:slug/projects/:projectSlug" element={<Suspense fallback={null}><HackathonProjectPage /></Suspense>} />
             <Route path="/:slug" element={<EventPage />} />
+            {/* Unknown multi-segment paths used to render nothing. */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </Suspense>
         </BrowserRouter>

@@ -26,5 +26,10 @@
     "partyNotFoundDesc": "Événement introuvable. Le lien d'invitation est peut-être invalide ou expiré.",
     "incorrectPassword": "Mot de passe incorrect. Veuillez réessayer.",
     "invalidWallet": "Entrez une adresse valide (0x...) ou un nom ENS (.eth)"
+  },
+  "notFound": {
+    "title": "Page introuvable",
+    "description": "Cette page n'existe pas. Le lien est peut-être erroné ou obsolète.",
+    "goHome": "Retour à l'accueil"
   }
 }

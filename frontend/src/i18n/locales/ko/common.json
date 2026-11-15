@@ -26,5 +26,10 @@
     "partyNotFoundDesc": "파티를 찾을 수 없습니다. 초대 링크가 유효하지 않거나 만료되었을 수 있습니다.",
     "incorrectPassword": "비밀번호가 올바르지 않습니다. 다시 시도해 주세요.",
     "invalidWallet": "유효한 주소(0x...) 또는 ENS 이름(.eth)을 입력하세요"
+  },
+  "notFound": {
+    "title": "페이지를 찾을 수 없습니다",
+    "description": "이 페이지는 존재하지 않습니다. 링크가 잘못되었거나 만료되었을 수 있습니다.",
+    "goHome": "홈으로 이동"
   }
 }
