@@ -8,7 +8,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | prosciutto-60417 | Upgrade Prisma 6 → 7 (security advisories; Dependabot #1272) | todo | P3 |  |  | security, deps | plans/prosciutto-60417.md |  | Dependabot #1272 open as reference; needs a plan (schema/client changes, migrate deploy in Deploy Backend, CLAUDE.md migration-safety rules); 2026-11-14: the advisory (deepmerge-ts, build-time only) is fixed by an override, so this is no longer urgent. Plan: option A (keep prisma-client-js generator, add adapter-pg) |
-| ciabatta-61803 | Upgrade react-router-dom 6 → 7 (security advisories; Dependabot #1280) | review | P2 |  | Snax | security, deps | plans/ciabatta-61803.md | #1308 | react-router advisories are fixed only in 7.x; #1280 open as reference |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
@@ -76,6 +75,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 | deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | P1 | 2026-11-14 |  | 2026-10-29: superseded for ordering by openpizza/plans/rsv-pizza-ordering.md (host pays at pickup, reimbursed); PR #164 not needed for that skipped: superseded by openpizza/plans/rsv-pizza-ordering.md (2026-10-29); PR #164 closed |
+| ciabatta-61803 | Upgrade react-router-dom 6 → 7 (security advisories; Dependabot #1280) | P2 | 2026-11-14 | #1308 | react-router 7.18.5; open-redirect fix shipped separately in #1302 |
 | focaccia-61802 | Upgrade frontend vite 5 → 6 (security advisories; dev/build only) | P2 | 2026-11-14 | #1297 | vite 6.4.6; Safe connector lazy chunk +658 kB accepted (see plan) |
 | blackolive-76568 | Add Google Maps geocoding fallback in VenueMap when Nominatim returns no results (e.g. Chinese addresses like Shenzhen) | P2 | 2026-11-14 |  | skipped: Nominatim already resolves 203/204 venues; PR #273 closed |
 | onion-42535 | iphone 8 couldn't load page | P2 | 2026-10-29 |  | duplicate of forno-81402 (#1164) |
