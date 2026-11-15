@@ -439,6 +439,7 @@ describe('queue + scope', () => {
   it('conflict of interest: a judge whose (RSVP) email is on the team never sees or scores it', async () => {
     const q = await api().get(`${jbase()}/queue`).set('Authorization', auth('carol'));
     expect(q.body.queue.map((x: Row) => x.id)).toEqual([S_C, S_A]);
+    expect(q.body.ownTeamHidden).toBe(1);
     const d = await api().get(`${jbase()}/submissions/${S_B}`).set('Authorization', auth('carol'));
     expect(d.status).toBe(403);
     expect(d.body.error.code).toBe('CONFLICT_OF_INTEREST');

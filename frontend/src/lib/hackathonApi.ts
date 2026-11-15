@@ -376,6 +376,8 @@ export interface JudgeQueueResponse {
   tracks: HackathonTrack[];
   queue: JudgeQueueItem[];
   progress: { scored: number; total: number };
+  /** Submitted projects hidden because the judge is on that team (conflict of interest). */
+  ownTeamHidden?: number;
 }
 
 export interface JudgeSubmissionResponse {

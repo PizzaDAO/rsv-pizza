@@ -163,6 +163,8 @@ router.get('/:partyId/queue', requireAuth, async (req: AuthRequest, res: Respons
       tracks: inScope.map(publicTrack),
       queue,
       progress: { scored: queue.filter((q) => q.scored).length, total: queue.length },
+      // Count only: the judge already knows their own team, so this leaks nothing new.
+      ownTeamHidden: subs.length - visible.length,
     });
   } catch (error) {
     next(error);
