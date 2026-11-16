@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries } from '../lib/api';
+import { prepareSquareImage } from '../lib/squareImage';
 
 export function EventForm() {
   const { t } = useTranslation('account');
@@ -164,8 +165,9 @@ export function EventForm() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
 
     if (imagePreview && imagePreview.startsWith('blob:')) {
@@ -174,40 +176,18 @@ export function EventForm() {
 
     setImageError(null);
 
-    if (!file.type.startsWith('image/')) {
-      setImageError(t('eventForm.imageSelectError'));
-      return;
+    try {
+      const squareFile = await prepareSquareImage(file);
+      setEventImageFile(squareFile);
+      setImagePreview(URL.createObjectURL(squareFile));
+    } catch (err) {
+      setEventImageFile(null);
+      setImagePreview(null);
+      setImageError(err instanceof Error ? err.message : t('eventForm.imageLoadError'));
+    } finally {
+      // allow re-picking the same file
+      input.value = '';
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError(t('eventForm.imageSizeError'));
-      return;
-    }
-
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const aspectRatio = img.width / img.height;
-
-      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
-        setImageError(t('eventForm.imageAspectError'));
-        setEventImageFile(null);
-        setImagePreview(null);
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-
-      setEventImageFile(file);
-      setImagePreview(objectUrl);
-    };
-
-    img.onerror = () => {
-      setImageError(t('eventForm.imageLoadError'));
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.src = objectUrl;
   };
 
   const removeImage = () => {

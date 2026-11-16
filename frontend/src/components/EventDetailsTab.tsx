@@ -21,6 +21,7 @@ import { DescriptionEditor } from './DescriptionEditor';
 import { triggerFlyerRegen } from './flyer/autoRegenFlyer';
 import { getUnderbossContact } from '../utils/underbossContacts';
 import type { Party } from '../types';
+import { prepareSquareImage } from '../lib/squareImage';
 
 // tigella-58513: GPP events may not exceed 3 hours. Compared with a tiny
 // epsilon so an exactly-3h block (from floating-point ms math) isn't rejected.
@@ -240,53 +241,29 @@ export const EventDetailsTab: React.FC = () => {
     }
   }, [party]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
 
-    // Revoke previous preview URL if it exists
     if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
     }
 
     setImageError(null);
 
-    if (!file.type.startsWith('image/')) {
-      setImageError('Please select an image file');
-      return;
+    try {
+      const squareFile = await prepareSquareImage(file);
+      setEventImageFile(squareFile);
+      setImagePreview(URL.createObjectURL(squareFile));
+    } catch (err) {
+      setEventImageFile(null);
+      setImagePreview(null);
+      setImageError(err instanceof Error ? err.message : 'Failed to load image');
+    } finally {
+      // allow re-picking the same file
+      input.value = '';
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError('Image must be less than 5MB');
-      return;
-    }
-
-    // Validate square aspect ratio
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const aspectRatio = img.width / img.height;
-
-      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
-        setImageError('Image must be square (1:1 aspect ratio)');
-        setEventImageFile(null);
-        setImagePreview(null);
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-
-      setEventImageFile(file);
-      setImagePreview(objectUrl);
-      // Don't revoke URL - we need it for the preview
-    };
-
-    img.onerror = () => {
-      setImageError('Failed to load image');
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.src = objectUrl;
   };
 
   const removeImage = () => {
@@ -1382,7 +1359,7 @@ export const EventDetailsTab: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
                     <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
-                    <span className="text-xs text-theme-text-muted mt-1">Max 5MB • 1:1 aspect ratio</span>
+                    <span className="text-xs text-theme-text-muted mt-1">Square images work best; others are center-cropped</span>
                   </label>
                 </div>
               )}

@@ -5,6 +5,7 @@ import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
 import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
+import { prepareSquareImage } from '../lib/squareImage';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, getInviteLink, getHostLink } = usePizza();
@@ -31,52 +32,29 @@ export const PartyHeader: React.FC = () => {
 
   const [creating, setCreating] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
+
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
 
     setImageError(null);
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setImageError('Please select an image file');
-      return;
+    try {
+      const squareFile = await prepareSquareImage(file);
+      setEventImageFile(squareFile);
+      setImagePreview(URL.createObjectURL(squareFile));
+    } catch (err) {
+      setEventImageFile(null);
+      setImagePreview(null);
+      setImageError(err instanceof Error ? err.message : 'Failed to load image');
+    } finally {
+      // allow re-picking the same file
+      input.value = '';
     }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError('Image must be less than 5MB');
-      return;
-    }
-
-    // Validate square aspect ratio
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const aspectRatio = img.width / img.height;
-
-      // Allow some tolerance (0.9 to 1.1 is considered square)
-      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
-        setImageError('Image must be square (1:1 aspect ratio)');
-        setEventImageFile(null);
-        setImagePreview(null);
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-
-      // Image is valid
-      setEventImageFile(file);
-      setImagePreview(objectUrl);
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.onerror = () => {
-      setImageError('Failed to load image');
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.src = objectUrl;
   };
 
   const removeImage = () => {
@@ -543,7 +521,7 @@ export const PartyHeader: React.FC = () => {
                         >
                           <Upload className="w-8 h-8 text-theme-text-muted mb-2" />
                           <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
-                          <span className="text-xs text-theme-text-muted mt-1">Max 5MB • 1:1 aspect ratio</span>
+                          <span className="text-xs text-theme-text-muted mt-1">Square images work best; others are center-cropped</span>
                         </label>
                       </div>
                     )}
