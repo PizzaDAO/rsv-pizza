@@ -1,0 +1,28 @@
+{
+  "version": "1.3.0",
+  "commit": "b8c6d9659b617b07bc008ac97c9a80c5fb8cb089",
+  "integrity": "sha384-mGubjLfaUXSojIyFAtj790+uGVH42bRGzP0p8oYg9P3tcD5zQYhS4/UkW+X0aNFY",
+  "files": {
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "NOTICE": "d2a4415429f7c91b4e485215300609b1a3f70c3dd6249f8c843252325268ecce",
+    "fonts/LICENSES.md": "9cdf8b5ce64c1d934cbb06dd2caae348bd0af1f10b66f515b066296c8a46d37f",
+    "fonts/asap-condensed-latin-800-normal.woff2": "c2871b7c9e370a81fee0c4c8aa3547ea2a2115dcf8c01091b4b9c81e575335e4",
+    "fonts/bebas-neue-latin-400-normal.woff2": "02f5dfc0c21e92f3c724260f035833e627513a1b91230cc490a1ea756c95e5e5",
+    "fonts/caveat-latin-700-normal.woff2": "8ac2e65ad54d1facf37cc3d3f4b52302a37ca04229dcccf1671abf4ff612f89e",
+    "fonts/cinzel-latin-700-normal.woff2": "f763485b99e209a68b3242ffd83cdf30805fec91a112c8928c4f2e08daa962e2",
+    "fonts/cinzel-latin-900-normal.woff2": "e96f6ae075e7c65689c8843e4c785ff982334f29ce2217ae451a9cfdfc3fe247",
+    "fonts/ibm-plex-mono-latin-500-normal.woff2": "756026ff72eb76fd971ac4b7504cec55eef62109d2684c2cad8da32170b80b37",
+    "fonts/ibm-plex-mono-latin-600-normal.woff2": "c4d3deb734a27e6d0dc7a6b464779f70ba1c272e26287860a14e35e85acb5b76",
+    "fonts/ibm-plex-mono-latin-700-normal.woff2": "a51b6594bdda5d76e047259fb1fcaf7af2eb227cac553b4eb1cffa8328784c9c",
+    "fonts/inter-latin-400-normal.woff2": "dd05e326cf8eac3b55acecf29c842ed73e6e6dd06491cf47f7e8800680ab3e33",
+    "fonts/inter-latin-500-normal.woff2": "b0e7558f4710a1e255b93e3deefe3aebb19f3bb41c150f685a74d3b1a1c79e87",
+    "fonts/inter-latin-600-normal.woff2": "62553d159189834af73c9a6264704be5b2bee9a08da66a14768d8e5c6ffd2cdb",
+    "fonts/inter-latin-700-normal.woff2": "aac638f7503cebb084ec494cf00f75f7d8260d50c2f4e7820bccabba09626a3a",
+    "fonts/inter-latin-800-normal.woff2": "e4a6db93190ce6c09e9871496bc63a2b7a59838435e8ec23996afd9619bc3883",
+    "fonts/inter-latin-900-italic.woff2": "5cb995077acc88a3fc22048f0679b6315716cf41fb4171b442e6986d27b07a9c",
+    "fonts/inter-latin-900-normal.woff2": "08a195a0cb54f0aa04e00d7a57f175d8cad0923b62f99268d7279b4e982cb3e8",
+    "fonts/permanent-marker-latin-400-normal.woff2": "4884fec2c73aa52a2461073c1b87d1ceb80f400520391b43f97ca7d3c39eeb24",
+    "fonts/playfair-display-latin-800-italic.woff2": "32c186500857805a419fbcafc0a3c30ab129e2edc4cc48c6e3ef99f789e7fcf2",
+    "questpass-booth.js": "f07b0e35513c97493e1d954e5dc6b9aae34c192e4259aee59ef9e9200523c1b7"
+  }
+}

@@ -47,6 +47,7 @@ export type TabId =
   | 'gpp'
   | 'promo'
   | 'press-release'
+  | 'booth'
   | 'flyer'
   | 'print'
   | 'payments'
@@ -84,6 +85,7 @@ export const ALL_HOST_TABS: HostTab[] = [
   { id: 'gpp', label: 'Party Kit', icon: Package },
   { id: 'promo', label: 'Promo', icon: Megaphone },
   { id: 'press-release', label: 'Press Release', icon: Newspaper },
+  { id: 'booth', label: 'Photo Booth', icon: Camera },
   { id: 'flyer', label: 'Flyer', icon: FileImage },
   { id: 'print', label: 'Print', icon: Printer },
   { id: 'payments', label: 'Payments', icon: Coins },

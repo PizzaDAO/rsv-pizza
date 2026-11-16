@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "title": "Global Pizza Party",
+  "place": "",
+  "dates": "22 May",
+  "brand": {
+    "name": "PizzaDAO",
+    "website": "https://pizzadao.org",
+    "logo": "",
+    "colors": {
+      "accent": "#FF393A",
+      "highlight": "#FFD23D",
+      "base": "#0B0B10",
+      "text": "#FEFDFA"
+    },
+    "headingFont": "condensed"
+  },
+  "showBrand": true,
+  "credit": true,
+  "frames": {
+    "allow": "all",
+    "default": "pizza-box",
+    "first": [
+      "pizza-box",
+      "pizza-mafia",
+      "pizza-nft",
+      "pizza-receipt",
+      "pizza-whole",
+      "pizza-table",
+      "neon",
+      "polaroid",
+      "booth"
+    ]
+  },
+  "words": {
+    "neon.sign": {
+      "mode": "fixed",
+      "text": "PIZZA TIME"
+    },
+    "neon.below": {
+      "mode": "edit",
+      "text": "Pizza the Planet."
+    },
+    "magazine.cover": {
+      "mode": "edit",
+      "text": "Pizza the Planet."
+    },
+    "newspaper.headline": {
+      "mode": "edit",
+      "text": "PIZZA THE PLANET"
+    },
+    "newspaper.story": {
+      "mode": "edit",
+      "text": "It started with 10,000 BTC for two pizzas. Now hundreds of cities throw the same party on the same day."
+    },
+    "postcard.message": {
+      "mode": "edit",
+      "text": "Wish you were here! 🍕"
+    },
+    "comic.caption": {
+      "mode": "edit",
+      "text": "MEANWHILE… PIZZA PARTY!"
+    },
+    "pass.from": {
+      "mode": "edit",
+      "text": "Home"
+    },
+    "pass.to": {
+      "mode": "fixed",
+      "text": "Pizza Party"
+    },
+    "pass.gate": {
+      "mode": "edit",
+      "text": "GPP"
+    },
+    "pass.seat": {
+      "mode": "edit",
+      "text": "XL"
+    },
+    "passport.country": {
+      "mode": "fixed",
+      "text": "Republic of Pizza"
+    },
+    "passport.stamps": {
+      "mode": "edit",
+      "text": "Extra cheese, Pizza Mafia, 10,000 BTC, Slice approved"
+    },
+    "ticket.line": {
+      "mode": "fixed",
+      "text": "Pepperoni line"
+    },
+    "ticket.stops": {
+      "mode": "edit",
+      "text": "Dough, Sauce, Cheese"
+    },
+    "lanyard.role": {
+      "mode": "edit",
+      "text": "Pizza Mafia"
+    },
+    "lanyard.org": {
+      "mode": "edit",
+      "text": "PizzaDAO"
+    },
+    "gamecard.class": {
+      "mode": "edit",
+      "text": "Pizza Mafia"
+    },
+    "gamecard.power": {
+      "mode": "edit",
+      "text": "Eats 10,000 BTC of pizza"
+    }
+  },
+  "video": {
+    "enabled": true,
+    "qr": true,
+    "showBrand": true
+  },
+  "share": {
+    "text": "Pizza the Planet 🍕 Made at the Global Pizza Party {link}",
+    "link": "https://globalpizza.party"
+  },
+  "camera": {
+    "idleSeconds": 30,
+    "timer": true
+  },
+  "maxPhotos": 9,
+  "packs": [
+    "pizza"
+  ],
+  "person": {
+    "wholeName": true,
+    "nameLabel": "Your mafia name",
+    "lineLabel": "Your line",
+    "names": [],
+    "suggest": {
+      "first": [
+        "Pepperoni",
+        "Mozz",
+        "Basil",
+        "Chorizo",
+        "Salami",
+        "Calzone",
+        "Olive",
+        "Provolone",
+        "Garlic",
+        "Anchovies",
+        "Margherita",
+        "Pineapple",
+        "Crusty",
+        "Capo",
+        "Don",
+        "Sister",
+        "Papa",
+        "Oregano",
+        "Burrata",
+        "Marinara",
+        "Ricotta",
+        "Prosciutto",
+        "Gorgonzola",
+        "Pesto",
+        "Jalapeño",
+        "Funghi",
+        "Diavola",
+        "Doughboy",
+        "Big Cheese",
+        "Little Slice"
+      ],
+      "last": [
+        "Corleone",
+        "Capone",
+        "Gambino",
+        "Montana",
+        "Bambino",
+        "Sicilian",
+        "Calabrese",
+        "Napoli",
+        "Romano",
+        "Lombardi",
+        "Vesuvio",
+        "Fettuccine",
+        "Al Forno",
+        "Della Crosta",
+        "Mozzarella",
+        "Pomodoro",
+        "Bianchi",
+        "Ferrari",
+        "Esposito",
+        "Rizzo",
+        "Marino",
+        "Greco",
+        "Bruno",
+        "Conti",
+        "Barone",
+        "Costa",
+        "Fontana",
+        "Moretti",
+        "Russo",
+        "Ricci"
+      ]
+    },
+    "handle": {
+      "ask": true,
+      "label": "Your username",
+      "networks": [
+        "telegram",
+        "x",
+        "instagram"
+      ]
+    },
+    "picture": true
+  }
+}

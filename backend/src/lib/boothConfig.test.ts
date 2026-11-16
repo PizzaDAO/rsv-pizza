@@ -53,8 +53,8 @@ describe('sanitizeBoothConfig', () => {
   });
 
   it('keeps only https for share.link and brand.website', () => {
-    expect(ok({ share: { link: 'https://rsv.pizza/x' } }).share.link).toBe('https://rsv.pizza/x');
-    expect(ok({ share: { link: 'http://rsv.pizza/x' } }).share.link).toBe('');
+    expect(ok({ share: { link: 'https://example.test/x' } }).share.link).toBe('https://example.test/x');
+    expect(ok({ share: { link: 'http://example.test/x' } }).share.link).toBe('');
     expect(ok({ share: { link: 'javascript:alert(1)' } }).share.link).toBe('');
     expect(ok({ brand: { website: 'http://a.test' } }).brand.website).toBe('');
     expect(ok({ brand: { website: 'https://a.test' } }).brand.website).toBe('https://a.test');

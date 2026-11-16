@@ -11,7 +11,7 @@ export const BOOTH_ENABLED_SETTING: SettingDef = {
   key: 'booth.enabled',
   area: 'features',
   label: 'Photo booth',
-  help: 'Phone photo booth at rsv.pizza/<party>/booth. 0 = off (hosts can still preview), 1 = on for every party whose host has not turned it off. Also the kill switch.',
+  help: 'Phone photo booth at /<party>/booth. 0 = off (hosts can still preview), 1 = on for every party whose host has not turned it off. Also the kill switch.',
   min: 0,
   max: 1,
   default: 0,

@@ -41,6 +41,7 @@ import { SurveyTab } from '../components/SurveyTab';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { PressReleaseWidget } from '../components/press-release';
+import { BoothTab } from '../components/booth/BoothTab';
 import { FlyerTab } from '../components/flyer';
 import { PrintTab } from '../components/print';
 import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
@@ -52,9 +53,9 @@ import { DayOfTab } from '../components/day-of';
 
 const HackathonTab = lazy(() => import('../components/hackathon/HackathonTab'));
 
-type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'survey' | 'gpp' | 'promo' | 'press-release' | 'flyer' | 'print' | 'payments' | 'hackathon' | 'apps';
+type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'survey' | 'gpp' | 'promo' | 'press-release' | 'booth' | 'flyer' | 'print' | 'payments' | 'hackathon' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'survey', 'gpp', 'promo', 'press-release', 'flyer', 'print', 'payments', 'hackathon', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'survey', 'gpp', 'promo', 'press-release', 'booth', 'flyer', 'print', 'payments', 'hackathon', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
@@ -611,6 +612,10 @@ function HostPageContent() {
 
               {activeTab === 'press-release' && party && (
                 <PressReleaseWidget />
+              )}
+
+              {activeTab === 'booth' && party && (
+                <BoothTab party={party} />
               )}
 
               {activeTab === 'flyer' && party && (

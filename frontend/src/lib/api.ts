@@ -1132,6 +1132,8 @@ export interface PublicEvent {
   photoModeration?: boolean;
   photosEnabled?: boolean;
   photosPublic?: boolean;
+  // Photo booth: global rollout flag AND the host's toggle AND not cancelled (server-computed).
+  boothEnabled?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
   hiddenGppPhotos?: string[];
@@ -1194,6 +1196,31 @@ export async function getEventBySlug(
     console.error('Error fetching event:', error);
     return null;
   }
+}
+
+// Photo booth setup (plans/photo-booth.md)
+export interface BoothSetup {
+  /** Global flag AND the host's toggle AND not cancelled. */
+  enabled: boolean;
+  /** The host's own toggle (the global flag is separate). */
+  hostEnabled: boolean;
+  globalEnabled: boolean;
+  /** The host's saved config, or null for the PizzaDAO default. */
+  config: Record<string, any> | null;
+  updatedAt: string | null;
+  canEdit: boolean;
+}
+
+export async function getBooth(partyId: string): Promise<BoothSetup> {
+  return apiRequest<BoothSetup>(`/api/parties/${partyId}/booth`, { method: 'GET', requireAuth: false });
+}
+
+/** Host-only. `config: null` resets to the PizzaDAO default; omit a field to leave it unchanged. */
+export async function saveBooth(
+  partyId: string,
+  body: { enabled?: boolean; config?: Record<string, any> | null },
+): Promise<BoothSetup> {
+  return apiRequest<BoothSetup>(`/api/parties/${partyId}/booth`, { method: 'PUT', body, requireAuth: true });
 }
 
 // One Sheet interest form
