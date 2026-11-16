@@ -66,7 +66,7 @@ const PhotosFeedPage = React.lazy(() => import('./pages/PhotosFeedPage').then(m 
 const PhotosSlideshowPage = React.lazy(() => import('./pages/PhotosSlideshowPage').then(m => ({ default: m.PhotosSlideshowPage })));
 const SurveyPage = React.lazy(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
 const NftClaimPage = React.lazy(() => import('./pages/NftClaimPage').then(m => ({ default: m.NftClaimPage })));
-const HostSurveyPage =React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
+const HostSurveyPage = React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().

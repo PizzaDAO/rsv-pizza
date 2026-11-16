@@ -175,12 +175,21 @@ export async function issueClaim(
         tokenExpiresAt: new Date(now.getTime() + (opts.ttlDays ?? CLAIM_TTL_DAYS) * 24 * 60 * 60 * 1000),
       }
     : {};
-  const claim = existing
-    ? await prisma.nftClaim.update({ where: { guestId: guest.id }, data: tokenData })
-    : await prisma.nftClaim.create({
-        data: { guestId: guest.id, partyId: guest.partyId, source, ...tokenData },
-      });
-  return { claim, token };
+  if (existing) {
+    return { claim: await prisma.nftClaim.update({ where: { guestId: guest.id }, data: tokenData }), token };
+  }
+  try {
+    const claim = await prisma.nftClaim.create({
+      data: { guestId: guest.id, partyId: guest.partyId, source, ...tokenData },
+    });
+    return { claim, token };
+  } catch (err) {
+    // A concurrent caller created the row first (P2002): use theirs, and don't hand out our token.
+    if ((err as { code?: string })?.code !== 'P2002') throw err;
+    const claim = await prisma.nftClaim.findUnique({ where: { guestId: guest.id } });
+    if (!claim) throw err;
+    return { claim, token: null };
+  }
 }
 
 /** Claim + guest + party by plaintext token. Null for unknown, malformed, revoked or expired tokens. */
@@ -242,7 +251,10 @@ export async function startMint(
     });
     const current = guest?.ethereumAddress?.trim().toLowerCase() || null;
     if (current !== recipient) {
-      await tx.nftClaim.update({ where: { guestId }, data: { previousAddress: current } });
+      // Only remember the first wallet we replaced (never overwrite it, never write NULL).
+      if (current) {
+        await tx.nftClaim.updateMany({ where: { guestId, previousAddress: null }, data: { previousAddress: current } });
+      }
       await tx.guest.update({
         where: { id: guestId },
         data: { ethereumAddress: recipient, walletSource: 'claim' },
@@ -357,7 +369,7 @@ export function usableWalletOnFile(guest: { ethereumAddress: string | null; wall
 
 /** What the event page needs for the claim card (self only). */
 export async function claimStateForGuest(guestId: string) {
-  const none = { eligible: false, status: null as string | null, txHash: null as string | null };
+  const none = { eligible: false, status: null as string | null, txHash: null as string | null, paused: false };
   try {
     const ctx = await loadEligibility(guestId);
     if (!ctx) return none;
@@ -366,6 +378,8 @@ export async function claimStateForGuest(guestId: string) {
       eligible: !!ctx.eligible,
       status: minted ? 'minted' : (ctx.claim?.status ?? null),
       txHash: ctx.claim?.txHash ?? ctx.guest.nftTransactionHash ?? null,
+      /** NFT_MINT_DAILY_CAP unset: the card stays hidden until minting is switched on. */
+      paused: dailyMintCap() === 0,
     };
   } catch (err) {
     // Never break my-guest over the claim card (e.g. nft_claims not applied yet).

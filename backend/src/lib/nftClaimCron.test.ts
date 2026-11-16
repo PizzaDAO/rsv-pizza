@@ -72,6 +72,36 @@ describe('runNftClaimCron', () => {
     expect(email.sendNftClaimEmail).not.toHaveBeenCalled();
   });
 
+  it('includes pending (NULL approved) guests: the guest query uses OR, not { not: false }', async () => {
+    await runNftClaimCron({ now: NOW });
+    const where = mockPrisma.guest.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([{ approved: true }, { approved: null }]);
+    expect(where).not.toHaveProperty('approved');
+  });
+
+  it('does not create a wallet_on_file row once the daily cap is used up', async () => {
+    claimLib.mintBudget
+      .mockResolvedValueOnce({ cap: 50, used: 0, remaining: 50 }) // paused check
+      .mockResolvedValue({ cap: 50, used: 50, remaining: 0 });
+    mockPrisma.guest.findMany.mockResolvedValue([walletGuest]);
+    const r = await runNftClaimCron({ now: NOW });
+    expect(claimLib.issueClaim).not.toHaveBeenCalled();
+    expect(r.issued).toBe(0);
+  });
+
+  it('retries a stranded wallet_on_file row (issued, no recipient) with the wallet on file', async () => {
+    mockPrisma.nftClaim.findMany.mockResolvedValueOnce([
+      { guestId: 'g9', recipientAddress: null, guest: { ethereumAddress: A, walletSource: 'manual' } },
+      { guestId: 'g8', recipientAddress: null, guest: { ethereumAddress: null, walletSource: null } },
+    ]);
+    mockPrisma.party.findMany.mockResolvedValue([]);
+    const r = await runNftClaimCron({ now: NOW });
+    expect(r.retried).toBe(1);
+    expect(claimLib.executeClaimMint).toHaveBeenCalledWith('g9', A, null, undefined);
+    const where = mockPrisma.nftClaim.findMany.mock.calls[0][0].where;
+    expect(where.OR).toContainEqual({ status: 'issued', source: 'wallet_on_file', recipientAddress: null });
+  });
+
   it('skips branded-series parties', async () => {
     site.brandedSiteForParty.mockResolvedValue({ url: 'https://team1.example', name: 'Team1', fromEmail: 'x' });
     const r = await runNftClaimCron({ now: NOW });
@@ -87,7 +117,7 @@ describe('runNftClaimCron', () => {
   });
 
   it('retries failed claims with their locked recipient', async () => {
-    mockPrisma.nftClaim.findMany.mockResolvedValueOnce([{ guestId: 'g9', recipientAddress: A }]);
+    mockPrisma.nftClaim.findMany.mockResolvedValueOnce([{ guestId: 'g9', recipientAddress: A, guest: {} }]);
     mockPrisma.party.findMany.mockResolvedValue([]);
     const r = await runNftClaimCron({ now: NOW });
     expect(r.retried).toBe(1);
@@ -121,12 +151,13 @@ describe('runNftClaimCron', () => {
       process.env.NFT_CLAIM_EMAILS = 'on';
       mockPrisma.party.findMany.mockResolvedValue([]);
       mockPrisma.nftClaim.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([pending]);
-      claimLib.issueClaim.mockResolvedValue({ claim: {}, token: 'T'.repeat(43) });
+      const expires = new Date('2027-02-15T12:00:00Z');
+      claimLib.issueClaim.mockResolvedValue({ claim: { tokenExpiresAt: expires }, token: 'T'.repeat(43) });
       email.sendNftClaimEmail.mockResolvedValue('resend-1');
       const r = await runNftClaimCron({ now: NOW, sleep: async () => {} });
       expect(r.emailed).toBe(1);
       expect(claimLib.issueClaim).toHaveBeenCalledWith(noWalletGuest, 'claim_link', expect.objectContaining({ withToken: true }));
-      expect(email.sendNftClaimEmail).toHaveBeenCalledWith(party, { name: 'Ann', email: 'cy@x.com' }, 'T'.repeat(43), undefined);
+      expect(email.sendNftClaimEmail).toHaveBeenCalledWith(party, { name: 'Ann', email: 'cy@x.com' }, 'T'.repeat(43), expires, undefined);
       expect(mockPrisma.nftClaim.update).toHaveBeenCalledWith({
         where: { guestId: 'g3' },
         data: { emailSentAt: NOW, emailResendId: 'resend-1' },
@@ -136,6 +167,15 @@ describe('runNftClaimCron', () => {
 });
 
 describe('buildNftClaimEmail', () => {
+  it('derives the days left from the expiry (and omits the sentence when unknown)', () => {
+    const now = new Date('2026-11-17T12:00:00Z');
+    const f = (exp: Date | null) => buildNftClaimEmail({ name: 'P' }, { name: 'Ann' }, 'https://claims.example.test/x', exp, now).html;
+    expect(f(new Date('2027-02-15T12:00:00Z'))).toContain('claim within 90 days');
+    expect(f(new Date('2027-03-17T12:00:00Z'))).toContain('claim within 120 days');
+    expect(f(new Date('2026-11-17T20:00:00Z'))).toContain('claim within 1 day.');
+    expect(f(null)).not.toContain('claim within');
+  });
+
   it('escapes the party name and links to the claim URL', () => {
     const { subject, html } = buildNftClaimEmail({ name: '<b>Pizza</b>', eventImageUrl: null }, { name: 'Ann Lee' }, 'https://claims.example.test/nft/claim/abc');
     expect(subject).toContain('Claim your');

@@ -1347,7 +1347,7 @@ export function EventPage() {
 
                 {/* claim-later-nft: attendee who hasn't claimed their NFT yet (hidden on branded builds) */}
                 {BRAND_FEATURES.nftMinting && event.nftEnabled && user && existingGuestData?.nftClaim?.eligible
-                  && existingGuestData.nftClaim.status !== 'minted' && (
+                  && !existingGuestData.nftClaim.paused && existingGuestData.nftClaim.status !== 'minted' && (
                   <NftClaimCard
                     guestId={existingGuestData.id}
                     guestToken={existingGuestData.guestToken}

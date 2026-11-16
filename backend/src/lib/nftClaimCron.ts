@@ -66,21 +66,24 @@ export async function runNftClaimCron(
   // a. retries
   const retryable = await prisma.nftClaim.findMany({
     where: {
-      recipientAddress: { not: null },
       attempts: { lt: MAX_ATTEMPTS },
       OR: [
-        { status: 'failed' },
-        { status: 'minting', mintingStartedAt: { lt: new Date(now.getTime() - MINTING_STALE_MS) } },
+        { status: 'failed', recipientAddress: { not: null } },
+        { status: 'minting', recipientAddress: { not: null }, mintingStartedAt: { lt: new Date(now.getTime() - MINTING_STALE_MS) } },
+        // Stranded before startMint (cap hit, crash): the recipient is still the wallet on file.
+        { status: 'issued', source: 'wallet_on_file', recipientAddress: null },
       ],
     },
-    select: { guestId: true, recipientAddress: true },
+    select: { guestId: true, recipientAddress: true, guest: { select: { ethereumAddress: true, walletSource: true } } },
     orderBy: { updatedAt: 'asc' },
     take: MAX_RETRIES_PER_RUN,
   });
   for (const row of retryable) {
     if (outOfTime()) return result;
+    const recipient = row.recipientAddress ?? usableWalletOnFile(row.guest);
+    if (!recipient) continue;
     result.retried += 1;
-    if (!(await tryMint(row.guestId, row.recipientAddress!))) return result;
+    if (!(await tryMint(row.guestId, recipient))) return result;
   }
 
   // b. new eligible guests at parties that ended 12h-7d ago
@@ -105,7 +108,8 @@ export async function runNftClaimCron(
         partyId: party.id,
         checkedInAt: { not: null },
         nftTokenId: null,
-        approved: { not: false },
+        // `{ not: false }` would drop NULL (pending) rows in Prisma; same trap as survey.routes.ts.
+        OR: [{ approved: true }, { approved: null }],
         nftClaim: { is: null },
       },
     });
@@ -115,6 +119,8 @@ export async function runNftClaimCron(
       const ctx = await loadEligibility(g.id, now);
       if (!ctx?.eligible) continue;
       const wallet = usableWalletOnFile(g);
+      // Check the budget before creating a wallet_on_file row, so a full cap never strands one.
+      if (wallet && (await mintBudget(now)).remaining <= 0) return result;
       await issueClaim(g, wallet ? 'wallet_on_file' : 'claim_link', { withToken: false, now });
       result.issued += 1;
       if (wallet && !(await tryMint(g.id, wallet))) return result;
@@ -143,9 +149,9 @@ export async function runNftClaimCron(
       pending.slice(i, i + EMAIL_BATCH_SIZE).map(async (c) => {
         // Re-check eligibility (a mint or edit may have landed since the row was created).
         if (!isNftEligible(c.guest, c.party, { now, branded: false, duplicateMinted: false }).eligible) return;
-        const { token } = await issueClaim(c.guest, 'claim_link', { withToken: true, now });
+        const { claim, token } = await issueClaim(c.guest, 'claim_link', { withToken: true, now });
         if (!token) return;
-        const id = await sendNftClaimEmail(c.party, { name: c.guest.name, email: c.guest.email! }, token, opts.fetchImpl);
+        const id = await sendNftClaimEmail(c.party, { name: c.guest.name, email: c.guest.email! }, token, claim.tokenExpiresAt, opts.fetchImpl);
         if (!id) {
           result.failed += 1;
           return;

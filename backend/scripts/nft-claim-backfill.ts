@@ -12,7 +12,9 @@
  *   --mint-wallets-on-file   direct mints for eligible guests with a self-entered 0x wallet
  *   --issue-claims           create claim rows + tokens (120-day links) for everyone else; never
  *                            rotates a token that already exists, no email
- *   --send-emails            email claim links (rotates the token); also needs NFT_CLAIM_EMAILS=on.
+ *   --print-token --guest <id>   test-only: rotate ONE guest's token and print the claim URL (no email);
+ *                            refuses without --guest and --apply
+ *   --send-emails           email claim links (rotates the token); also needs NFT_CLAIM_EMAILS=on.
  *                            Send in waves: --party <id> first, then --limit 100, then all.
  * Filters: --party <id>   --limit N (per action, across parties)   --since YYYY-MM-DD
  *
@@ -30,6 +32,7 @@ import {
   usableWalletOnFile,
 } from '../src/lib/nftClaim.js';
 import { nftClaimEmailsEnabled, sendNftClaimEmail } from '../src/lib/nftClaimEmail.js';
+import { siteForParty } from '../src/lib/siteBrand.js';
 
 function arg(name: string): string | null {
   const i = process.argv.indexOf(name);
@@ -47,7 +50,28 @@ const SINCE = new Date(`${arg('--since') || '2026-05-11'}T00:00:00Z`);
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/**
+ * --print-token --guest <id> --apply: test-only. Rotates ONE guest's claim token (creating the row
+ * if needed) and prints just the claim URL on stdout, so the claim page can be tried without email.
+ */
+async function printToken() {
+  const guestId = arg('--guest');
+  if (!guestId) throw new Error('--print-token requires --guest <id>');
+  if (!APPLY) throw new Error('--print-token rotates a token (a write): add --apply');
+  const ctx = await loadEligibility(guestId);
+  if (!ctx) throw new Error('guest not found');
+  if (!ctx.eligible) throw new Error(`guest is not eligible (${ctx.reason})`);
+  if (ctx.claim && ctx.claim.status !== 'issued' && ctx.claim.status !== 'failed') {
+    throw new Error(`claim is ${ctx.claim.status}; not rotating`);
+  }
+  const { token } = await issueClaim(ctx.guest, 'backfill', { withToken: true, ttlDays: BACKFILL_TTL_DAYS });
+  if (!token) throw new Error('could not issue a token');
+  const site = await siteForParty(ctx.party, 'https://rsv.pizza'); // brand-check-ignore-line
+  console.log(`${site.url}/nft/claim/${token}`);
+}
+
 async function main() {
+  if (has('--print-token')) return printToken();
   console.log(`\n=== nft-claim-backfill (${APPLY ? 'APPLY' : 'DRY RUN'}) since ${SINCE.toISOString().slice(0, 10)}${PARTY ? ` party ${PARTY}` : ''} ===`);
   if ((MINT || ISSUE || EMAIL) && !APPLY) console.log('(action flags given without --apply: dry run only)');
   const budget = await mintBudget();
@@ -73,7 +97,7 @@ async function main() {
 
   for (const party of parties) {
     const guests = await prisma.guest.findMany({
-      where: { partyId: party.id, checkedInAt: { not: null }, nftTokenId: null, approved: { not: false } },
+      where: { partyId: party.id, checkedInAt: { not: null }, nftTokenId: null, OR: [{ approved: true }, { approved: null }] },
     });
     const counts = { eligible: 0, walletOnFile: 0, needsClaim: 0, privy: 0 };
     for (const g of guests) {
@@ -132,9 +156,9 @@ async function main() {
       console.log(`\n${pending.length} claim link(s) awaiting email`);
       for (const c of pending) {
         if (emailsLeft <= 0) break;
-        const { token } = await issueClaim(c.guest, c.source as 'backfill' | 'claim_link', { withToken: true, ttlDays: BACKFILL_TTL_DAYS });
+        const { claim, token } = await issueClaim(c.guest, c.source as 'backfill' | 'claim_link', { withToken: true, ttlDays: BACKFILL_TTL_DAYS });
         if (!token) continue;
-        const id = await sendNftClaimEmail(c.party, { name: c.guest.name, email: c.guest.email! }, token);
+        const id = await sendNftClaimEmail(c.party, { name: c.guest.name, email: c.guest.email! }, token, claim.tokenExpiresAt);
         if (!id) {
           totals.failed += 1;
           continue;

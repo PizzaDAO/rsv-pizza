@@ -19,7 +19,12 @@ export function buildNftClaimEmail(
   party: { name: string; eventImageUrl?: string | null },
   guest: { name: string },
   claimUrl: string,
+  /** token_expires_at of the link; the copy says how many days are left (omitted when unknown). */
+  expiresAt: Date | null = null,
+  now: Date = new Date(),
 ): { subject: string; html: string } {
+  const days = expiresAt ? Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))) : null;
+  const expiryCopy = days ? ` You can claim within ${days} day${days === 1 ? '' : 's'}.` : '';
   const firstName = (guest.name || '').trim().split(/\s+/)[0] || 'there';
 
   const flyerBlock = party.eventImageUrl
@@ -42,7 +47,7 @@ export function buildNftClaimEmail(
           ${flyerBlock}
           <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
             <h2 style="color: #1a1a2e; margin-top: 0;">Thanks for coming, ${escape(firstName)}!</h2>
-            <p style="margin: 0; color: #333; font-size: 15px;">You were at <strong>${escape(party.name)}</strong>, so your attendance NFT is waiting. No wallet? Any wallet works. You can claim within 90 days.</p>
+            <p style="margin: 0; color: #333; font-size: 15px;">You were at <strong>${escape(party.name)}</strong>, so your attendance NFT is waiting. No wallet? Any wallet works.${expiryCopy}</p>
           </div>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${claimUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Claim your NFT</a>
@@ -60,13 +65,14 @@ export async function sendNftClaimEmail(
   party: { name: string; eventImageUrl?: string | null; eventSeriesId?: string | null },
   guest: { name: string; email: string },
   token: string,
+  expiresAt: Date | null,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) return null;
   try {
     const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
-    const { subject, html } = buildNftClaimEmail(party, guest, `${site.url}/nft/claim/${token}`);
+    const { subject, html } = buildNftClaimEmail(party, guest, `${site.url}/nft/claim/${token}`, expiresAt);
     const resp = await fetchImpl('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendApiKey}` },

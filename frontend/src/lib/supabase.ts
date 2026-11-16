@@ -1940,7 +1940,7 @@ export interface ExistingGuestData {
   /** rsvp-overwrite-fix: capability token, only present on the owner's own row (my-guest). */
   guestToken?: string | null;
   /** claim-later-nft: own claim state (self only, from my-guest); drives the event-page claim card. */
-  nftClaim?: { eligible: boolean; status: string | null; txHash: string | null } | null;
+  nftClaim?: { eligible: boolean; status: string | null; txHash: string | null; paused: boolean } | null;
 }
 
 function mapExistingGuest(guest: any): ExistingGuestData {
@@ -1968,6 +1968,7 @@ function mapExistingGuest(guest: any): ExistingGuestData {
           eligible: guest.nftClaim.eligible === true,
           status: typeof guest.nftClaim.status === 'string' ? guest.nftClaim.status : null,
           txHash: typeof guest.nftClaim.txHash === 'string' ? guest.nftClaim.txHash : null,
+          paused: guest.nftClaim.paused === true,
         }
       : null,
   };

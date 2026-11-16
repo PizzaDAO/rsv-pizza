@@ -24,7 +24,7 @@ import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
-import { siteForParty, brandedSeriesBySlug } from '../lib/siteBrand.js';
+import { siteForParty, brandedSeriesBySlug, brandedSiteForParty } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
@@ -613,7 +613,12 @@ router.get('/:id/my-guest', async (req: AuthRequest, res: Response, next: NextFu
     // rsvp-overwrite-fix: the owner also gets their guest token (the capability guest-scoped
     // endpoints like raffle/quiz/discount/NFT require), since they're logged in as the guest.
     // claim-later-nft: lets the event page show the "claim your NFT" card (self only).
-    const nftClaim = guest ? await claimStateForGuest(guest.id) : null;
+    // Skipped for parties without NFTs and for branded-series parties (no extra work there).
+    let nftClaim = null;
+    if (guest) {
+      const nftParty = await prisma.party.findUnique({ where: { id }, select: { nftEnabled: true, eventSeriesId: true } });
+      if (nftParty?.nftEnabled && !(await brandedSiteForParty(nftParty))) nftClaim = await claimStateForGuest(guest.id);
+    }
     res.json({ guest: guest ? { ...guest, guestToken: signGuestToken(guest.id), nftClaim } : null });
   } catch (error) {
     next(error);

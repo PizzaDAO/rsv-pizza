@@ -153,6 +153,24 @@ describe('claim tokens', () => {
   });
 });
 
+describe('issueClaim races', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('re-reads the row on a concurrent create (P2002) instead of failing, and hands out no token', async () => {
+    const row = { guestId: 'g1', status: 'issued' };
+    mockPrisma.nftClaim.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(row);
+    mockPrisma.nftClaim.create.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
+    const r = await issueClaim({ id: 'g1', partyId: 'p1' }, 'claim_link', { withToken: true, now: NOW });
+    expect(r).toEqual({ claim: row, token: null });
+  });
+
+  it('rethrows other create errors', async () => {
+    mockPrisma.nftClaim.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.nftClaim.create.mockRejectedValueOnce(new Error('boom'));
+    await expect(issueClaim({ id: 'g1', partyId: 'p1' }, 'claim_link')).rejects.toThrow('boom');
+  });
+});
+
 describe('startMint (the lock)', () => {
   const addr = '0x' + 'b'.repeat(40);
   beforeEach(() => vi.clearAllMocks());
@@ -178,11 +196,20 @@ describe('startMint (the lock)', () => {
     mockPrisma.nftClaim.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.guest.findUnique.mockResolvedValue({ ethereumAddress: '0xPRIVY' });
     await startMint('g1', addr, null);
-    expect(mockPrisma.nftClaim.update).toHaveBeenCalledWith({ where: { guestId: 'g1' }, data: { previousAddress: '0xprivy' } });
+    // only fills previous_address while it is still null, and never writes NULL
+    expect(mockPrisma.nftClaim.updateMany).toHaveBeenLastCalledWith({ where: { guestId: 'g1', previousAddress: null }, data: { previousAddress: '0xprivy' } });
     expect(mockPrisma.guest.update).toHaveBeenCalledWith({
       where: { id: 'g1' },
       data: { ethereumAddress: addr, walletSource: 'claim' },
     });
+  });
+
+  it('does not touch previous_address when the guest had no wallet', async () => {
+    mockPrisma.nftClaim.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.guest.findUnique.mockResolvedValue({ ethereumAddress: null });
+    await startMint('g1', addr, null);
+    expect(mockPrisma.nftClaim.updateMany).toHaveBeenCalledTimes(1); // only the lock
+    expect(mockPrisma.guest.update).toHaveBeenCalled();
   });
 
   it('leaves the guest alone when the recipient is already their wallet', async () => {
