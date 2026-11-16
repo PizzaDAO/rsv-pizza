@@ -24,7 +24,7 @@ export interface BuildBoothConfigInput {
   /** The host's saved config (already sanitized server-side), or null for the PizzaDAO default. */
   hostConfig?: BoothConfig | null;
   event: BoothEventInfo;
-  /** e.g. https://rsv.pizza (no trailing slash). */
+  /** e.g. https://example.test (no trailing slash). */
   origin: string;
   whiteLabel?: BoothWhiteLabel | null;
 }
