@@ -4,6 +4,7 @@
     "guests",
     "user_preferences",
     "auth_rate_events",
+    "nft_claims",
     "hackathons",
     "hackathon_tracks",
     "hackathon_prizes",

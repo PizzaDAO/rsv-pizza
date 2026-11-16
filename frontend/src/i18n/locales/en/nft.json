@@ -1,0 +1,61 @@
+{
+  "title": "Claim your NFT",
+  "subtitle": "Your proof of attendance for {{name}}",
+  "loading": "Loading...",
+  "chain": {
+    "base": "Base",
+    "monad": "Monad"
+  },
+  "walletPlaceholder": "Wallet address or ENS name (0x... or name.eth)",
+  "help": "Any wallet works. No wallet yet? Install one, then paste its address here.",
+  "connect": "Connect wallet",
+  "clear": "Clear",
+  "claim": "Claim NFT",
+  "confirm": {
+    "title": "Mint to this address?",
+    "body": "{{address}} on {{chain}}",
+    "warning": "NFTs can't be moved back once minted. Double-check the address.",
+    "yes": "Confirm and mint",
+    "back": "Change address"
+  },
+  "minting": "Minting, this can take about 30 seconds...",
+  "success": {
+    "title": "It's yours!",
+    "body": "Your NFT was minted to {{address}}.",
+    "view": "View transaction"
+  },
+  "minted": {
+    "title": "Already claimed",
+    "body": "This NFT was already minted{{to}}."
+  },
+  "errors": {
+    "invalid": "Enter a valid 0x address or an ENS name that resolves.",
+    "generic": "Something went wrong. Please try again in a moment.",
+    "mintFailed": "The mint didn't go through. We'll retry automatically, check back in a few minutes.",
+    "conflict": "A claim for this NFT is already in progress or locked to another address.",
+    "rateLimited": "Too many attempts. Please wait an hour and try again.",
+    "notEligible": "This NFT can't be claimed."
+  },
+  "states": {
+    "notFound": {
+      "title": "This link isn't valid",
+      "body": "It may have expired or been mistyped. Check your email for the latest link."
+    },
+    "paused": {
+      "title": "Claiming opens soon",
+      "body": "NFT claims are paused right now. Your link stays valid, so please check back soon."
+    },
+    "capReached": {
+      "title": "Please try again later",
+      "body": "We've minted a lot of NFTs today. Your link stays valid, so come back tomorrow."
+    },
+    "unavailable": {
+      "title": "Not available here",
+      "body": "NFT claims aren't available on this site."
+    }
+  },
+  "card": {
+    "title": "Claim your attendance NFT",
+    "body": "You were checked in at this event. Claim your NFT to any wallet."
+  }
+}

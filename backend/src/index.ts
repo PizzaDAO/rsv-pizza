@@ -25,6 +25,7 @@ import rsvpRoutes from './routes/rsvp.routes.js';
 import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
+import { nftClaimRouter, nftClaimCronRouter } from './routes/nftClaim.routes.js'; // claim-later-nft
 import photoRoutes from './routes/photo.routes.js';
 import { reelRouter, adminReelRouter } from './routes/reel.routes.js';
 import photoFeedRoutes from './routes/photo-feed.routes.js';
@@ -305,6 +306,7 @@ app.use('/api/events', funnelRoutes); // RSVP funnel tracking (public)
 app.use('/api/events', quizPublicRouter); // Public quiz endpoints (before eventRoutes)
 app.use('/api/events', onesheetRoutes); // One Sheet interest form (public, before eventRoutes)
 app.use('/api/events', eventRoutes);
+app.use('/api/nft/claim', nftClaimRouter); // claim-later-nft: token/guest claim endpoints, before /api/nft
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-gated create flow, budget, agreement, publish gates
@@ -325,6 +327,7 @@ app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based 
 app.use('/api/host-survey', hostSurveyPublicRouter); // panzerotti-58527: public token-based host survey (no auth)
 app.use('/api/cron', pizzaSubmissionCronRouter); // sfincione-40417: orphaned submission upload cleanup (CRON_SECRET)
 app.use('/api/cron', hackathonCronRouter); // hackathon PR 3: abandoned tmp upload cleanup in hackathon-media (CRON_SECRET)
+app.use('/api/cron', nftClaimCronRouter); // claim-later-nft: hourly post-event NFT mint/issue/email (CRON_SECRET)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/bizdev', bizdevRoutes); // soppressata-72251: per-partner BizDev industry report (auth-gated per-route)

@@ -65,7 +65,8 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 const PhotosFeedPage = React.lazy(() => import('./pages/PhotosFeedPage').then(m => ({ default: m.PhotosFeedPage })));
 const PhotosSlideshowPage = React.lazy(() => import('./pages/PhotosSlideshowPage').then(m => ({ default: m.PhotosSlideshowPage })));
 const SurveyPage = React.lazy(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
-const HostSurveyPage = React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
+const NftClaimPage = React.lazy(() => import('./pages/NftClaimPage').then(m => ({ default: m.NftClaimPage })));
+const HostSurveyPage =React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -226,6 +227,8 @@ function App() {
             <Route path="/cmohhr0640003jp047krjarz0" element={gppOnly("/cmohhr0640003jp047krjarz0", <Navigate to="/nashville" replace />)} />
             {/* romana-61204: post-event survey — must come before /:slug catch-all */}
             <Route path="/survey/:token" element={<SurveyPage />} />
+            {/* claim-later-nft: private attendance-NFT claim link — before /:slug catch-all */}
+            <Route path="/nft/claim/:token" element={<NftClaimPage />} />
             {/* panzerotti-58527: post-event host survey — before /:slug catch-all */}
             <Route path="/host-survey/:token" element={<HostSurveyPage />} />
             {/* white-label: public series landing — before /:slug catch-all */}
