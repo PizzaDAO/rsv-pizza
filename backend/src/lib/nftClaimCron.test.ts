@@ -137,9 +137,9 @@ describe('runNftClaimCron', () => {
 
 describe('buildNftClaimEmail', () => {
   it('escapes the party name and links to the claim URL', () => {
-    const { subject, html } = buildNftClaimEmail({ name: '<b>Pizza</b>', eventImageUrl: null }, { name: 'Ann Lee' }, 'https://rsv.pizza/nft/claim/abc');
+    const { subject, html } = buildNftClaimEmail({ name: '<b>Pizza</b>', eventImageUrl: null }, { name: 'Ann Lee' }, 'https://claims.example.test/nft/claim/abc');
     expect(subject).toContain('Claim your');
-    expect(html).toContain('href="https://rsv.pizza/nft/claim/abc"');
+    expect(html).toContain('href="https://claims.example.test/nft/claim/abc"');
     expect(html).toContain('&lt;b&gt;Pizza&lt;/b&gt;');
     expect(html).not.toContain('<b>Pizza</b>');
     expect(html).toContain('Thanks for coming, Ann!');
