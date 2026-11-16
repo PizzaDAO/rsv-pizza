@@ -1,4 +1,5 @@
 import { prisma } from '../config/database.js';
+import { callMintEdge } from './nftMint.js';
 
 // buffalo-35201: mint the attendance NFT when the host approves a guest on an
 // approval-required event. Calls the same `mint-nft` Supabase edge function the
@@ -17,9 +18,7 @@ export async function mintNftOnApproval(
   fetchImpl: typeof fetch = fetch,
 ): Promise<MintOnApprovalResult> {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return { minted: false, reason: 'supabase-not-configured' };
     }
 
@@ -35,37 +34,16 @@ export async function mintNftOnApproval(
       return { minted: false, reason: 'already-minted' };
     }
 
-    const res = await fetchImpl(`${supabaseUrl}/functions/v1/mint-nft`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({
-        recipient: guest.ethereumAddress,
-        partyId,
-        guestId,
-        guestName: guest.name,
-        partyName: party.name,
-        partyDate: party.date ? party.date.toISOString().split('T')[0] : null,
-        partyVenue: party.venueName || null,
-        partyAddress: party.address || null,
-        imageUrl: party.eventImageUrl,
-        inviteCode: party.customUrl || party.inviteCode,
-        chain: party.nftChain || 'base',
-      }),
-    });
-    const data: any = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error(`[mintOnApproval] mint failed for guest ${guestId}:`, data.error || res.statusText);
+    const result = await callMintEdge(party, guest, guest.ethereumAddress, fetchImpl);
+    if (!result.ok) {
+      console.error(`[mintOnApproval] mint failed for guest ${guestId}:`, result.error);
       return { minted: false, reason: 'mint-failed' };
     }
 
-    const tokenId = data.tokenId !== undefined && data.tokenId !== null ? parseInt(data.tokenId, 10) : NaN;
-    if (data.txHash && Number.isInteger(tokenId)) {
+    if (result.txHash && result.tokenId !== undefined) {
       await prisma.guest.update({
         where: { id: guestId },
-        data: { nftTokenId: tokenId, nftTransactionHash: data.txHash, nftMintedAt: new Date() },
+        data: { nftTokenId: result.tokenId, nftTransactionHash: result.txHash, nftMintedAt: new Date() },
       });
     }
     return { minted: true };

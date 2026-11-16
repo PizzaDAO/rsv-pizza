@@ -42,6 +42,8 @@ import { GuestScorecard } from '../components/scorecard';
 import { uploadPhoto } from '../lib/api';
 import { uploadEventPhoto } from '../lib/supabase';
 import { BRAND, brandUrl } from '../config/brand';
+import { BRAND_FEATURES } from '../config/brandScope';
+import { NftClaimCard } from '../components/NftClaimCard';
 import { captureInviteToken } from '../lib/inviteToken';
 import { HackathonSection } from '../components/hackathon/HackathonSection';
 
@@ -1341,6 +1343,16 @@ export function EventPage() {
                   <p className="text-theme-text-muted text-sm">
                     {t('rsvpsClosed')}
                   </p>
+                )}
+
+                {/* claim-later-nft: attendee who hasn't claimed their NFT yet (hidden on branded builds) */}
+                {BRAND_FEATURES.nftMinting && event.nftEnabled && user && existingGuestData?.nftClaim?.eligible
+                  && !existingGuestData.nftClaim.paused && existingGuestData.nftClaim.status !== 'minted' && (
+                  <NftClaimCard
+                    guestId={existingGuestData.id}
+                    guestToken={existingGuestData.guestToken}
+                    chain={event.nftChain}
+                  />
                 )}
 
                 {/* Guest Scorecard - shown after check-in on event day */}

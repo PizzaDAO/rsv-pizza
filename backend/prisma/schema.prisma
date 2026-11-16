@@ -348,6 +348,7 @@ model Party {
   reimbursementCapAudits  ReimbursementCapAudit[]
   fastPassApproval        HostFastPassApproval?
   surveyResponses         SurveyResponse[]
+  nftClaims               NftClaim[]
   hostSurveyResponse      HostSurveyResponse?
   // suppli-58533: non-host Telegram contributors (photo-only submitters) who
   // tapped a `submit_<token>` group link. Verified hosts use host_telegram_chat_id.
@@ -598,6 +599,7 @@ model Guest {
   notableAttendees NotableAttendee[]
   quizAnswers      QuizAnswer[]
   scorecardItems   GuestScorecardItem[]
+  nftClaim         NftClaim?
   superlativeSubmissions SuperlativeSubmission[]
 
   // provolone-39042: peer/host/self attestations for check-in attribution
@@ -3135,6 +3137,40 @@ model AuthRateEvent {
   @@index([bucket, key, createdAt])
   @@index([createdAt])
   @@map("auth_rate_events")
+}
+
+// claim-later-nft: backend-minted attendance NFTs (direct mint to a wallet on file, or a private
+// claim link / logged-in claim to any address). token_hash is sha256 of the emailed token
+// (null for direct mints); recipient_address is locked at the first mint attempt. Backend only:
+// RLS on, no anon/authenticated grants (scripts/anon-no-access-tables.json).
+model NftClaim {
+  guestId          String    @id @map("guest_id") @db.Uuid
+  partyId          String    @map("party_id") @db.Uuid
+  tokenHash        String?   @unique @map("token_hash")
+  tokenExpiresAt   DateTime? @map("token_expires_at") @db.Timestamptz
+  status           String    @default("issued") // issued | minting | minted | failed | revoked
+  source           String // wallet_on_file | claim_link | logged_in | backfill
+  recipientAddress String?   @map("recipient_address")
+  recipientInput   String?   @map("recipient_input")
+  previousAddress  String?   @map("previous_address")
+  attempts         Int       @default(0)
+  lastError        String?   @map("last_error")
+  mintingStartedAt DateTime? @map("minting_started_at") @db.Timestamptz
+  mintedAt         DateTime? @map("minted_at") @db.Timestamptz
+  txHash           String?   @map("tx_hash")
+  tokenId          Int?      @map("token_id")
+  emailSentAt      DateTime? @map("email_sent_at") @db.Timestamptz
+  emailResendId    String?   @map("email_resend_id")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@index([partyId])
+  @@index([status, mintingStartedAt])
+  @@index([mintedAt])
+  @@map("nft_claims")
 }
 
 // ============================================

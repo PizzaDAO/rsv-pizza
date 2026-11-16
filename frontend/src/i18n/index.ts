@@ -13,6 +13,7 @@ import enCheckin from './locales/en/checkin.json';
 import enHost from './locales/en/host.json';
 import enAdmin from './locales/en/admin.json';
 import enPartner from './locales/en/partner.json';
+import enNft from './locales/en/nft.json'; // claim-later-nft (other locales fall back to en)
 import esCommon from './locales/es/common.json';
 import esRsvp from './locales/es/rsvp.json';
 import esEvent from './locales/es/event.json';
@@ -108,6 +109,7 @@ i18n
         host: enHost,
         admin: enAdmin,
         partner: enPartner,
+        nft: enNft,
       },
       es: {
         common: esCommon,

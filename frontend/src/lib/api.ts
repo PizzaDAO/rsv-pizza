@@ -7577,6 +7577,72 @@ export async function submitSurvey(
   });
 }
 
+// claim-later-nft: attendance NFT claim (token link or logged-in guest). The backend answers
+// `{ error, status }`, where status is a machine state (paused, cap_reached, conflict, ...).
+export interface NftClaimInfo {
+  partyName: string;
+  eventImageUrl: string | null;
+  chain: string;
+  expiresAt: string | null;
+  /** NFT_MINT_DAILY_CAP is unset: nothing mints yet. */
+  paused: boolean;
+  status: 'issued' | 'minting' | 'minted' | 'failed' | string;
+  txHash: string | null;
+  explorerUrl: string | null;
+  maskedRecipient: string | null;
+}
+
+export interface NftClaimResult {
+  status: string;
+  txHash: string | null;
+  explorerUrl: string | null;
+  maskedRecipient: string | null;
+}
+
+export class NftClaimError extends Error {
+  constructor(message: string, public state: string, public http: number) {
+    super(message);
+    this.name = 'NftClaimError';
+  }
+}
+
+async function nftClaimRequest<T>(endpoint: string, init: { method: 'GET' | 'POST'; body?: unknown; headers?: Record<string, string> }): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...init.headers };
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    method: init.method,
+    headers,
+    body: init.body ? JSON.stringify(init.body) : undefined,
+    // A mint waits on the chain (~30s); give it room.
+    signal: timeoutSignal(120_000),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const state = typeof data.status === 'string' ? data.status : res.status === 404 ? 'not_found' : 'error';
+    throw new NftClaimError(typeof data.error === 'string' ? data.error : 'Request failed', state, res.status);
+  }
+  return data as T;
+}
+
+export function getNftClaim(token: string): Promise<NftClaimInfo> {
+  return nftClaimRequest<NftClaimInfo>(`/api/nft/claim/${encodeURIComponent(token)}`, { method: 'GET' });
+}
+
+export function submitNftClaim(token: string, address: string): Promise<NftClaimResult> {
+  return nftClaimRequest<NftClaimResult>(`/api/nft/claim/${encodeURIComponent(token)}`, { method: 'POST', body: { address } });
+}
+
+export function submitNftClaimAsGuest(guestId: string, address: string, guestToken?: string | null): Promise<NftClaimResult> {
+  const headers: Record<string, string> = {};
+  const auth = getAuthToken();
+  if (auth) headers['Authorization'] = `Bearer ${auth}`;
+  if (guestToken) headers['X-Guest-Token'] = guestToken;
+  return nftClaimRequest<NftClaimResult>(`/api/nft/claim/guest/${encodeURIComponent(guestId)}`, {
+    method: 'POST',
+    body: { address },
+    headers,
+  });
+}
+
 // Host — send the survey email to the chosen audience of guests with an email.
 export async function sendSurvey(
   partyId: string,
