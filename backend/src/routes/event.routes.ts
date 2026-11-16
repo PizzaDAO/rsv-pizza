@@ -8,6 +8,7 @@ import { resolveGppByYear, isGpp27Hidden } from '../helpers/gpp27.js';
 import { isEventHiddenFrom } from '../helpers/eventVisibility.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { publicTags } from '../lib/eventTags.js';
+import { isBoothGloballyOn } from '../lib/boothSettings.js';
 
 const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
 
@@ -105,6 +106,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         nftChain: true,
         quizEnabled: true,
         photosEnabled: true,
+        booth: { select: { enabled: true } },
         photosPublic: true,
         hiddenGppPhotos: true,
         extraGppPhotos: true,
@@ -189,6 +191,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
           nftChain: true,
           quizEnabled: true,
           photosEnabled: true,
+          booth: { select: { enabled: true } },
           photosPublic: true,
           hiddenGppPhotos: true,
           extraGppPhotos: true,
@@ -335,6 +338,9 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
       } : null;
     }
 
+    // Photo booth: global rollout flag AND the host's per-party toggle (no row = on) AND not cancelled.
+    const boothEnabled = !party.cancelledAt && party.booth?.enabled !== false && (await isBoothGloballyOn());
+
     res.json({
       event: {
         id: party.id,
@@ -384,6 +390,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         nftChain: party.nftChain,
         quizEnabled: party.quizEnabled,
         photosEnabled: party.photosEnabled,
+        boothEnabled,
         photosPublic: party.photosPublic,
         hiddenGppPhotos: party.hiddenGppPhotos || [],
         extraGppPhotos: party.extraGppPhotos || [],

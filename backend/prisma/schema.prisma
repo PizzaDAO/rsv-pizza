@@ -354,6 +354,7 @@ model Party {
   telegramContributors    PartyTelegramContributor[]
   telegramHosts           PartyTelegramHost[]
   hackathon               Hackathon?
+  booth                   PartyBooth?
 
   @@index([coHosts(ops: JsonbPathOps)], type: Gin, map: "idx_parties_co_hosts_gin")
   @@index([eventSeriesId])
@@ -3468,4 +3469,18 @@ model HackathonVote {
   @@index([trackId])
   @@index([voterUserId])
   @@map("hackathon_votes")
+}
+
+// Photo booth setup, one row per party (plans/photo-booth.md). No row = booth on with the PizzaDAO
+// default. Kept out of `parties` so a logo data URL in `config` is never loaded by the many queries
+// that read every party column.
+model PartyBooth {
+  partyId   String   @id @map("party_id") @db.Uuid
+  enabled   Boolean  @default(true)
+  config    Json?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?  @map("updated_by")
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@map("party_booths")
 }

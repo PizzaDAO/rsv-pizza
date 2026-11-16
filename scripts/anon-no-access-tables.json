@@ -17,6 +17,7 @@
     "hackathon_scores",
     "hackathon_awards",
     "hackathon_voting",
-    "hackathon_votes"
+    "hackathon_votes",
+    "party_booths"
   ]
 }
