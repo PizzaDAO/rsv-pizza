@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, Globe, Instagram, Youtube, Linkedin } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { normalizeUrl } from '../lib/utils';
+import { dedupeCoHosts } from '../lib/dedupeCoHosts';
 
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [500, 1500]; // delay BEFORE retry attempt N (0-indexed)
@@ -131,7 +132,7 @@ export const HostsList: React.FC<HostsListProps> = ({
   onLinkClick,
 }) => {
   const displayHost = hostProfile?.name || hostName;
-  const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false && h.name !== displayHost) || [];
+  const visibleCoHosts = dedupeCoHosts(coHosts?.filter(h => h.showOnEvent !== false), displayHost);
 
   // Size configurations
   const sizeConfig = {
@@ -253,8 +254,8 @@ export const HostsList: React.FC<HostsListProps> = ({
         )}
 
         {/* Co-Hosts */}
-        {visibleCoHosts.map((coHost) => (
-          <div key={coHost.id} className={`flex items-center ${config.gap}`}>
+        {visibleCoHosts.map((coHost, i) => (
+          <div key={`${coHost.id}-${i}`} className={`flex items-center ${config.gap}`}>
             {coHost.avatar_url ? (
               <AvatarImg
                 src={coHost.avatar_url}
@@ -328,7 +329,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
   maxVisible = 6,
 }) => {
   const displayHostName = hostProfile?.name || hostName;
-  const visibleCoHosts = coHosts?.filter(h => h.showOnEvent !== false && h.name !== displayHostName) || [];
+  const visibleCoHosts = dedupeCoHosts(coHosts?.filter(h => h.showOnEvent !== false), displayHostName);
   const displayCoHosts = visibleCoHosts.slice(0, maxVisible);
   const remainingCount = visibleCoHosts.length > maxVisible ? visibleCoHosts.length - maxVisible : 0;
 
@@ -358,7 +359,7 @@ export const HostsAvatars: React.FC<HostsAvatarsProps> = ({
         )}
         {/* Co-host avatars */}
         {displayCoHosts.map((coHost, index) => (
-          <div key={coHost.id} className="flex-shrink-0" style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
+          <div key={`${coHost.id}-${index}`} className="flex-shrink-0" style={{ zIndex: 9 - index, marginLeft: '-8px' }}>
             {coHost.avatar_url ? (
               <AvatarImg
                 src={coHost.avatar_url}
