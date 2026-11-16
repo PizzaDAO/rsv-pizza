@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 import { uploadDescriptionImage } from '../lib/supabase';
@@ -6,7 +6,8 @@ import { uploadDescriptionImage } from '../lib/supabase';
 interface DescriptionEditorProps {
   value: string;
   onChange: (val: string) => void;
-  onSave: () => void;
+  /** Called with the final text so the parent never saves a stale value. */
+  onSave: (finalValue: string) => void;
   onClose: () => void;
   saving: boolean;
   partyId: string;
@@ -23,6 +24,35 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  // Keep keystrokes in local state so typing/resizing doesn't re-render the
+  // (very large) parent tab. The parent is synced on blur, save, close, unmount.
+  const [text, setText] = useState(value);
+  const textRef = useRef(value);
+  const syncedRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
+  const update = (next: string) => {
+    textRef.current = next;
+    setText(next);
+  };
+
+  const flush = () => {
+    if (textRef.current !== syncedRef.current) {
+      syncedRef.current = textRef.current;
+      onChangeRef.current(textRef.current);
+    }
+  };
+
+  // flush pending edits on unmount
+  useEffect(() => flush, []);
+
+  const handleClose = () => {
+    flush();
+    onClose();
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,10 +85,12 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
 
     // Insert markdown image at cursor position
     const textarea = textareaRef.current;
-    const cursorPos = textarea?.selectionStart ?? value.length;
+    const current = textRef.current;
+    const cursorPos = textarea?.selectionStart ?? current.length;
     const imageMarkdown = `\n![image](${url})\n`;
-    const newValue = value.slice(0, cursorPos) + imageMarkdown + value.slice(cursorPos);
-    onChange(newValue);
+    const newValue = current.slice(0, cursorPos) + imageMarkdown + current.slice(cursorPos);
+    update(newValue);
+    flush();
 
     setUploading(false);
 
@@ -76,7 +108,7 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-lg w-full p-5"
@@ -114,8 +146,9 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
 
         <textarea
           ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={text}
+          onChange={(e) => update(e.target.value)}
+          onBlur={flush}
           placeholder="Describe your event..."
           className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-3 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] min-h-[200px] resize-y"
           autoFocus
@@ -123,7 +156,10 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
 
         <button
           type="button"
-          onClick={onSave}
+          onClick={() => {
+            flush();
+            onSave(textRef.current);
+          }}
           disabled={saving || uploading}
           className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
         >

@@ -510,8 +510,8 @@ export const EventDetailsTab: React.FC = () => {
   };
 
   // Save description
-  const saveDescription = async () => {
-    const trimmed = description.trim();
+  const saveDescription = async (finalValue?: string) => {
+    const trimmed = (finalValue ?? description).trim();
     const success = await saveField(
       'description',
       { description: trimmed || null },
@@ -1443,8 +1443,8 @@ export const EventDetailsTab: React.FC = () => {
         <DescriptionEditor
           value={description}
           onChange={setDescription}
-          onSave={async () => {
-            await saveDescription();
+          onSave={async (finalValue) => {
+            await saveDescription(finalValue);
             setShowDescriptionModal(false);
           }}
           onClose={() => setShowDescriptionModal(false)}
