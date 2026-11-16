@@ -9,7 +9,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | prosciutto-60417 | Upgrade Prisma 6 → 7 (security advisories; Dependabot #1272) | todo | P3 |  |  | security, deps | plans/prosciutto-60417.md |  | Dependabot #1272 open as reference; needs a plan (schema/client changes, migrate deploy in Deploy Backend, CLAUDE.md migration-safety rules); 2026-11-14: the advisory (deepmerge-ts, build-time only) is fixed by an override, so this is no longer urgent. Plan: option A (keep prisma-client-js generator, add adapter-pg) |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
-| artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
 | basil-14648 | AI ordering | doing | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md P1 shipped in #1172 (behind flag); Bland calls outstanding |
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
@@ -17,8 +16,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | basil-48766 | Create template for gpp hosts | todo | P2 |  |  |  |  |  |  |
 | neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | todo | P2 |  |  |  |  |  | print/stickers app shipped in #228; nametag/table-tent widgets not built |
 | blackolive-70521 | add event tags | todo | P2 |  |  |  |  |  |  |
-| brick-oven-18875 | square image doesn't accept other kinds of images | todo | P2 |  |  |  |  |  |  |
-| sicilian-41954 | expanding the description field is laggy feeling | todo | P2 |  |  |  |  |  |  |
 | pepperoni-26709 | Real-Time Dashboard:<br>Task: Implement Supabase Realtime subscriptions on the Host Dashboard.<br>Why: So hosts can see RSVPs pop in live without refreshing the page. | todo | P2 |  |  |  |  |  |  |
 | truffle-59761 | Merch Implementation on RSVP pages | todo | P2 |  |  |  |  |  |  |
 | crust-55886 | natural language event creation and edits | todo | P2 |  |  |  |  |  |  |
@@ -73,6 +70,9 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 ## Done
 
+| brick-oven-18875 | square image doesn't accept other kinds of images | P2 | 2026-11-16 | #1340 | HEIC (native, heic2any, then authed backend /api/heic/to-jpeg), center-crop, 2048px cap, 25MB input |
+| sicilian-41954 | expanding the description field is laggy feeling | P2 | 2026-11-16 | #1339 | editor keeps local state; parent updated on blur/Done/close |
+| artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | P2 | 2026-11-16 | #1337 | |
 | ID | Task | Priority | Done | PR | Notes |
 | jalapeno-61805 | Re-tune fake-event detection on current data (remove 10 dead heuristics, 4 threshold changes, private weights re-seed) | P2 | 2026-11-15 | #1332 | Supersedes #644. Private config applied separately. |
 | brioche-61804 | Upgrade frontend vite 6 → 8 + plugin-react 6 (supersedes Dependabot #1306) | P3 | 2026-11-15 | #1320 | vite 8.3.8 (Rolldown), plugin-react 6.3.0; entry chunk 4.66→3.91 MB, build ~5× faster; CI Node 20→24 left as follow-up |
