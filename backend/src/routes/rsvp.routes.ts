@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { triggerWebhook } from '../services/webhook.service.js';
-import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
+import { createEmbeddedWalletForGuest, guestWalletsEnabled } from '../services/privy.service.js';
 import { siteForParty } from '../lib/siteBrand.js';
 import { CHECKIN_QR_SRC, checkInQrAttachment } from '../lib/qrCode.js';
 import { verifySecret } from '../lib/secretHash.js';
@@ -557,7 +557,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     // completed by its invitee. Both paths call these, so they get the same wallet and the
     // same confirmation / pending-approval / waitlist email (template, sender, site brand).
     const provisionWalletIfNeeded = async (guestId: string) => {
-      if (normalizedAddress || !email?.trim()) return;
+      if (!guestWalletsEnabled() || normalizedAddress || !email?.trim()) return;
       try {
         const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
         if (walletResult) {
