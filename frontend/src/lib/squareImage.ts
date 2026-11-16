@@ -1,3 +1,5 @@
+import { AUTH_EXPIRED_EVENT } from './api';
+
 /**
  * brick-oven-18875: turn whatever image a host picks into a square image ready to upload.
  * HEIC/HEIF is converted to JPEG (heic2any, already a dependency), non-square images are
@@ -45,6 +47,9 @@ async function decode(file: Blob): Promise<ImageBitmap> {
   return createImageBitmap(file, { imageOrientation: 'from-image' });
 }
 
+/** The backend sits behind Vercel's ~4.5MB request-body limit; bigger files skip the server step. */
+export const SERVER_HEIC_MAX_BYTES = 4.4 * 1024 * 1024;
+const SERVER_TIMEOUT_MS = 45_000;
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
 
 /** Last resort: the authenticated backend converts HEIC with heic-convert (handles iPhone files heic2any can't). */
@@ -60,7 +65,16 @@ async function convertHeicOnServer(file: File): Promise<Blob> {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
     body: file,
+    signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
   });
+  if (res.status === 401) {
+    // same handling as apiRequest: drop the dead session and let AuthContext react
+    try {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+    } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  }
   if (!res.ok) throw new Error(`HEIC conversion failed (${res.status})`);
   return res.blob();
 }
@@ -79,6 +93,10 @@ async function loadBitmap(file: File): Promise<ImageBitmap> {
       return await decode(Array.isArray(out) ? out[0] : out);
     } catch (convErr) {
       console.warn('heic2any failed, trying server conversion:', nativeErr, convErr);
+    }
+    if (file.size > SERVER_HEIC_MAX_BYTES) {
+      console.error('HEIC to JPEG conversion failed (too large for server fallback)');
+      throw new SquareImageError('HEIC_FAILED', 'Could not process this HEIC image. Please convert it to JPEG and try again.');
     }
     try {
       return await decode(await convertHeicOnServer(file));

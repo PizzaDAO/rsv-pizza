@@ -23,6 +23,46 @@ import { AppError } from '../middleware/error.js';
  */
 const router = Router();
 
+// Decoded RGBA is width*height*4 bytes, and a few-KB crafted HEVC can declare a huge canvas, so
+// the declared size is checked (heic-decode's .all() reports it before decode()) before decoding.
+export const HEIC_MAX_PIXELS = 100_000_000;
+
+/** Decode the first image of a HEIC file (size-capped) and encode it as a JPEG capped to maxSide. */
+export async function heicToJpeg(
+  buffer: Buffer,
+  opts: { quality: number; maxSide: number; fitInside?: boolean }
+): Promise<Buffer> {
+  let images: any;
+  try {
+    const decodeHeic = (await import('heic-decode')).default;
+    images = await decodeHeic.all({ buffer });
+  } catch {
+    throw new AppError('HEIC conversion failed', 422, 'HEIC_CONVERT_FAILED');
+  }
+  try {
+    const first = images[0];
+    if (!first) throw new AppError('HEIC conversion failed', 422, 'HEIC_CONVERT_FAILED');
+    if (!(first.width > 0 && first.height > 0) || first.width * first.height > HEIC_MAX_PIXELS) {
+      throw new AppError('Image dimensions are too large (max 100 megapixels)', 413, 'HEIC_DIMENSIONS_TOO_LARGE');
+    }
+    try {
+      const { width, height, data } = await first.decode();
+      return await sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } })
+        .resize({
+          width: opts.maxSide,
+          ...(opts.fitInside ? { height: opts.maxSide, fit: 'inside' as const } : {}),
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: opts.quality })
+        .toBuffer();
+    } catch {
+      throw new AppError('HEIC conversion failed', 422, 'HEIC_CONVERT_FAILED');
+    }
+  } finally {
+    try { images.dispose?.(); } catch { /* ignore */ }
+  }
+}
+
 // Pin server-side fetches to our own public storage objects only.
 const ALLOWED_ORIGIN = 'https://znpiwdvvsqaxuskpfleo.supabase.co';
 const ALLOWED_PATH_PREFIX = '/storage/v1/object/public/';
@@ -68,18 +108,7 @@ router.get(
       // Decode HEIC -> JPEG, then normalize orientation + cap size via sharp.
       // Any failure here (corrupt / unsupported source) -> 422 so the frontend
       // shows its error card.
-      let outJpeg: Buffer;
-      try {
-        const convert = (await import('heic-convert')).default;
-        const jpeg = await convert({ buffer, format: 'JPEG', quality: 0.85 });
-        outJpeg = await sharp(Buffer.from(jpeg))
-          .rotate()
-          .resize({ width: 2400, withoutEnlargement: true })
-          .jpeg({ quality: 85 })
-          .toBuffer();
-      } catch {
-        throw new AppError('HEIC conversion failed', 422, 'HEIC_CONVERT_FAILED');
-      }
+      const outJpeg = await heicToJpeg(buffer, { quality: 85, maxSide: 2400 });
 
       res.set('Content-Type', 'image/jpeg');
       // Deterministic per source URL -- let the CDN + browser cache it so the
@@ -102,7 +131,7 @@ router.get(
 // event square-image picker (heic2any throws on many recent iPhone HEICs). Unlike /convert it
 // takes the file itself, so it requires a signed-in user, a size cap, a HEIF brand check, and a
 // tight per-user rate limit.
-export const HEIC_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const HEIC_UPLOAD_MAX_BYTES = 4.5 * 1024 * 1024; // Vercel serverless request-body limit
 const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1', 'heif']);
 
 /** True when the buffer starts with an ISO-BMFF ftyp box carrying a HEIF/HEIC brand. */
@@ -126,7 +155,7 @@ const heicUploadLimiter = rateLimit({
 const rawBody = (req: Request, res: Response, next: NextFunction) =>
   express.raw({ type: () => true, limit: HEIC_UPLOAD_MAX_BYTES })(req, res, (err?: unknown) => {
     if ((err as { type?: string } | undefined)?.type === 'entity.too.large') {
-      return next(new AppError('File is too large (max 25MB)', 413, 'TOO_LARGE'));
+      return next(new AppError('File is too large (max 4.5MB)', 413, 'TOO_LARGE'));
     }
     next(err);
   });
@@ -145,18 +174,7 @@ router.post(
       if (!looksLikeHeic(buffer)) {
         throw new AppError('Not a HEIC/HEIF file', 415, 'NOT_HEIC');
       }
-      let outJpeg: Buffer;
-      try {
-        const convert = (await import('heic-convert')).default;
-        const jpeg = await convert({ buffer, format: 'JPEG', quality: 0.9 });
-        outJpeg = await sharp(Buffer.from(jpeg))
-          .rotate()
-          .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: 90 })
-          .toBuffer();
-      } catch {
-        throw new AppError('HEIC conversion failed', 422, 'HEIC_CONVERT_FAILED');
-      }
+      const outJpeg = await heicToJpeg(buffer, { quality: 90, maxSide: 2400, fitInside: true });
       res.set('Content-Type', 'image/jpeg');
       res.set('Cache-Control', 'private, no-store');
       res.send(outJpeg);

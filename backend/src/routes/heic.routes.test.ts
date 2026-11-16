@@ -9,7 +9,22 @@ vi.mock('../middleware/auth.js', () => ({
     next();
   },
 }));
-vi.mock('heic-convert', () => ({ default: vi.fn(async () => Buffer.from('jpeg')) }));
+const decodeState = vi.hoisted(() => ({ width: 100, height: 100, decode: vi.fn() }));
+vi.mock('heic-decode', () => {
+  const all = vi.fn(async () => {
+    const list: any = [{
+      width: decodeState.width,
+      height: decodeState.height,
+      decode: async () => {
+        decodeState.decode();
+        return { width: 2, height: 2, data: new Uint8ClampedArray(16) };
+      },
+    }];
+    list.dispose = () => {};
+    return list;
+  });
+  return { default: Object.assign(vi.fn(), { all }) };
+});
 vi.mock('sharp', () => ({
   default: () => {
     const chain: any = { rotate: () => chain, resize: () => chain, jpeg: () => chain, toBuffer: async () => Buffer.from('out-jpeg') };
@@ -62,6 +77,21 @@ describe('POST /api/heic/to-jpeg', () => {
       .set('Content-Type', 'application/octet-stream')
       .send(Buffer.alloc(HEIC_UPLOAD_MAX_BYTES + 1024));
     expect(res.status).toBe(413);
+  });
+
+  it('rejects declared dimensions over 100MP before decoding', async () => {
+    decodeState.width = 20000;
+    decodeState.height = 20000;
+    decodeState.decode.mockClear();
+    const res = await request(app)
+      .post('/api/heic/to-jpeg')
+      .set('x-user-id', 'u1')
+      .set('Content-Type', 'application/octet-stream')
+      .send(heicBytes());
+    decodeState.width = 100;
+    decodeState.height = 100;
+    expect(res.status).toBe(413);
+    expect(decodeState.decode).not.toHaveBeenCalled();
   });
 
   it('converts a valid HEIC to JPEG', async () => {
