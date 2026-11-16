@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries } from '../lib/api';
+import { prepareSquareImage, SquareImageError } from '../lib/squareImage';
 
 export function EventForm() {
   const { t } = useTranslation('account');
@@ -43,6 +44,8 @@ export function EventForm() {
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+  const imageRequestRef = useRef(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
@@ -164,8 +167,9 @@ export function EventForm() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
 
     if (imagePreview && imagePreview.startsWith('blob:')) {
@@ -173,44 +177,36 @@ export function EventForm() {
     }
 
     setImageError(null);
+    const token = ++imageRequestRef.current;
+    setProcessingImage(true);
 
-    if (!file.type.startsWith('image/')) {
-      setImageError(t('eventForm.imageSelectError'));
-      return;
+    try {
+      const squareFile = await prepareSquareImage(file);
+      if (token !== imageRequestRef.current) return; // a newer pick or a removal superseded this one
+      setEventImageFile(squareFile);
+      setImagePreview(URL.createObjectURL(squareFile));
+    } catch (err) {
+      if (token !== imageRequestRef.current) return;
+      setEventImageFile(null);
+      setImagePreview(null);
+      const codeKey: Record<string, string> = {
+        NOT_IMAGE: 'eventForm.imageSelectError',
+        TOO_LARGE: 'eventForm.imageSizeError',
+        HEIC_FAILED: 'eventForm.imageHeicError',
+        LOAD_FAILED: 'eventForm.imageLoadError',
+      };
+      const key = err instanceof SquareImageError ? codeKey[err.code] : undefined;
+      setImageError(t(key ?? 'eventForm.imageLoadError'));
+    } finally {
+      if (token === imageRequestRef.current) setProcessingImage(false);
+      // allow re-picking the same file
+      input.value = '';
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError(t('eventForm.imageSizeError'));
-      return;
-    }
-
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const aspectRatio = img.width / img.height;
-
-      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
-        setImageError(t('eventForm.imageAspectError'));
-        setEventImageFile(null);
-        setImagePreview(null);
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-
-      setEventImageFile(file);
-      setImagePreview(objectUrl);
-    };
-
-    img.onerror = () => {
-      setImageError(t('eventForm.imageLoadError'));
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.src = objectUrl;
   };
 
   const removeImage = () => {
+    imageRequestRef.current++;
+    setProcessingImage(false);
     if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
     }
@@ -489,10 +485,10 @@ export function EventForm() {
               <input
                 type="file"
                 id="eventImage"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 onChange={handleImageChange}
                 className="hidden"
-                disabled={!!eventImageUrl.trim()}
+                disabled={!!eventImageUrl.trim() || processingImage}
               />
               <label
                 htmlFor="eventImage"
@@ -530,6 +526,13 @@ export function EventForm() {
               className="w-full !pl-11"
             />
           </div>
+
+          {processingImage && (
+            <p className="text-xs text-theme-text-muted mt-2 flex items-center gap-1.5" role="status">
+              <Loader2 size={12} className="animate-spin" />
+              {t('eventForm.processingImage')}
+            </p>
+          )}
 
           {imageError && (
             <p className="text-xs text-red-400 mt-2">{imageError}</p>
@@ -639,7 +642,7 @@ export function EventForm() {
         <button
           type="submit"
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4"
-          disabled={creating}
+          disabled={creating || processingImage}
           data-testid="event-form-submit"
         >
           {creating ? (

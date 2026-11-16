@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { BRAND } from '../config/brand';
 import { useNavigate } from 'react-router';
 import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
 import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
+import { prepareSquareImage } from '../lib/squareImage';
 
 export const PartyHeader: React.FC = () => {
   const { party, createParty, getInviteLink, getHostLink } = usePizza();
@@ -23,6 +24,8 @@ export const PartyHeader: React.FC = () => {
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+  const imageRequestRef = useRef(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
@@ -31,55 +34,39 @@ export const PartyHeader: React.FC = () => {
 
   const [creating, setCreating] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
 
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
     setImageError(null);
+    const token = ++imageRequestRef.current;
+    setProcessingImage(true);
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setImageError('Please select an image file');
-      return;
+    try {
+      const squareFile = await prepareSquareImage(file);
+      if (token !== imageRequestRef.current) return; // a newer pick or a removal superseded this one
+      setEventImageFile(squareFile);
+      setImagePreview(URL.createObjectURL(squareFile));
+    } catch (err) {
+      if (token !== imageRequestRef.current) return;
+      setEventImageFile(null);
+      setImagePreview(null);
+      setImageError(err instanceof Error ? err.message : 'Failed to load image');
+    } finally {
+      if (token === imageRequestRef.current) setProcessingImage(false);
+      // allow re-picking the same file
+      input.value = '';
     }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError('Image must be less than 5MB');
-      return;
-    }
-
-    // Validate square aspect ratio
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const aspectRatio = img.width / img.height;
-
-      // Allow some tolerance (0.9 to 1.1 is considered square)
-      if (aspectRatio < 0.9 || aspectRatio > 1.1) {
-        setImageError('Image must be square (1:1 aspect ratio)');
-        setEventImageFile(null);
-        setImagePreview(null);
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-
-      // Image is valid
-      setEventImageFile(file);
-      setImagePreview(objectUrl);
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.onerror = () => {
-      setImageError('Failed to load image');
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    img.src = objectUrl;
   };
 
   const removeImage = () => {
+    imageRequestRef.current++;
+    setProcessingImage(false);
     setEventImageFile(null);
     setImagePreview(null);
     setImageError(null);
@@ -531,10 +518,10 @@ export const PartyHeader: React.FC = () => {
                         <input
                           type="file"
                           id="eventImage"
-                          accept="image/*"
+                          accept="image/*,.heic,.heif"
                           onChange={handleImageChange}
                           className="hidden"
-                          disabled={!!eventImageUrl.trim()}
+                          disabled={!!eventImageUrl.trim() || processingImage}
                         />
                         <label
                           htmlFor="eventImage"
@@ -543,9 +530,16 @@ export const PartyHeader: React.FC = () => {
                         >
                           <Upload className="w-8 h-8 text-theme-text-muted mb-2" />
                           <span className="text-sm text-theme-text-secondary">Click to upload square image</span>
-                          <span className="text-xs text-theme-text-muted mt-1">Max 5MB • 1:1 aspect ratio</span>
+                          <span className="text-xs text-theme-text-muted mt-1">Square images work best; others are center-cropped</span>
                         </label>
                       </div>
+                    )}
+
+                    {processingImage && (
+                      <p className="text-xs text-theme-text-muted mt-2 flex items-center gap-1.5" role="status">
+                        <Loader2 size={12} className="animate-spin" />
+                        Processing image…
+                      </p>
                     )}
 
                     {imageError && (
@@ -604,7 +598,7 @@ export const PartyHeader: React.FC = () => {
                 <button
                   type="submit"
                   className="btn-primary flex-1 flex items-center justify-center gap-2"
-                  disabled={creating}
+                  disabled={creating || processingImage}
                 >
                   {creating ? (
                     <>
