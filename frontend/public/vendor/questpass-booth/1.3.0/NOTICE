@@ -1,0 +1,15 @@
+QuestPass Booth
+Copyright 2026 Simarpreet Singh (https://x.com/simarpreet_019)
+
+Originally built for QuestPass (https://questpass.live), the Devcon 8 Mumbai
+travel board. The frames and video engine come from QuestPass.
+
+This product bundles:
+- qrcode (MIT), Copyright Ryan Day
+- mp4-muxer (MIT), Copyright Vanilagy
+- Fonts under the SIL Open Font License 1.1 (see dist/fonts/LICENSES.md):
+  Asap Condensed,
+  Inter, IBM Plex Mono, Cinzel, Caveat, Permanent Marker, Playfair Display, Bebas Neue
+
+Licensed under the Apache License, Version 2.0 (see LICENSE). If you
+redistribute it, keep this NOTICE file with it.

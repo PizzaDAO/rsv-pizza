@@ -55,6 +55,8 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import { adminFastPassRouter, hostFastPassRouter } from './routes/host-fast-pass.routes.js';
+import { requireAuth } from './middleware/auth.js';
+import boothRoutes, { boothAdminRouter, boothJsonBody } from './routes/booth.routes.js'; // photo booth setup (public read, host write) + global flag admin
 import hostTrustRoutes from './routes/host-trust.routes.js'; // host trust report + settings (read-only; before /api/admin catch-all)
 import payoutRoutes from './routes/payout.routes.js';
 import eventAssistantRoutes from './routes/eventAssistant.routes.js';
@@ -155,6 +157,11 @@ app.use('/.well-known', jwksRoutes);
 // below, or the global 100 KB default fires first.
 app.use('/api/admin/logo-bg-audit', express.json({ limit: '8mb' }));
 
+// Photo booth setup can carry a logo data URL (~1.5 MB); 2 MB route-level limit, 413 when exceeded.
+// Same rule: before the global express.json(). PUT only, and only after the token check, so an
+// anonymous caller never gets a 2 MB body parsed.
+app.put('/api/parties/:partyId/booth', requireAuth, ...boothJsonBody);
+
 app.use(express.json());
 
 // SECURITY: payout receipts live in the PRIVATE payout-receipts bucket. On the
@@ -216,6 +223,7 @@ app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cle
 app.use('/api/admin/tax-form-requests', adminTaxFormRequestRouter); // calzone-70821: before /api/admin catch-all
 app.use('/api/admin/tax-forms', adminTaxFormRouter); // salame-92110: admin tax-form review (before /api/admin catch-all)
 app.use('/api/admin/pizza-index', pizzaIndexRoutes); // sfincione-40417: admin/UB-gated, before /api/admin catch-all
+app.use('/api/admin/booth', boothAdminRouter); // photo booth global flag (super admin; before /api/admin catch-all)
 app.use('/api/admin/host-trust', hostTrustRoutes); // trusted hosts phase 1: read-only report + settings (before /api/admin catch-all)
 app.use('/api/admin/host-fast-pass', adminFastPassRouter); // host fast pass review assist + budget pre-approval (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
@@ -259,6 +267,7 @@ app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
+app.use('/api/parties', boothRoutes); // Photo booth: public read, host/co-host write (auth per route, before partyRoutes)
 app.use('/api/parties', hackathonPublicRoutes); // Hackathon public read (host gets the full setup)
 app.use('/api/parties', hackathonGalleryRoutes); // Hackathon public gallery + project pages (PR 6; host gets a preview)
 app.use('/api/parties', hackathonVotingRoutes); // Hackathon public voting (PR 7; voter + host routes, checks per route)

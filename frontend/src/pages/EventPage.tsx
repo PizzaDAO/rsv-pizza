@@ -1600,6 +1600,21 @@ export function EventPage() {
                   />
                 )}
 
+                {/* Photo booth: only when the server says it is on (global flag + host toggle + not cancelled).
+                    The booth bundle is lazy-loaded on /:slug/booth, so this link costs EventPage nothing. */}
+                {event.boothEnabled && (
+                  <div className="border-t border-theme-stroke pt-6 mt-6">
+                    <Link
+                      to={`/${slug}/booth`}
+                      className="w-full flex items-center justify-center gap-3 py-4 bg-theme-surface hover:bg-theme-surface-hover rounded-xl transition-colors border border-theme-stroke"
+                      data-testid="event-booth-link"
+                    >
+                      <Camera className="w-5 h-5 text-[#ff393a]" />
+                      <span className="text-theme-text font-medium">Photo booth</span>
+                    </Link>
+                  </div>
+                )}
+
                 {/* Photo Gallery Section
                     parmigiano-71294: Drop the CONFIRMED gate so non-RSVP'd visitors see
                     the same photos that already appear on the /photos public feed.

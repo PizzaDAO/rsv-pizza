@@ -23,6 +23,7 @@ import {
   Zap,
   Trophy,
   Newspaper,
+  Camera,
 } from 'lucide-react';
 import { updateParty } from '../lib/supabase';
 import { usePizza } from '../contexts/PizzaContext';
@@ -146,6 +147,15 @@ const apps: AppItem[] = [
   },
 
   // Day-of
+  {
+    id: 'photo-booth',
+    name: 'Photo Booth',
+    description: 'A phone photo booth with pizza frames, plus a QR code for your guests',
+    icon: Camera,
+    status: 'live',
+    category: 'day-of',
+    tab: 'booth',
+  },
   {
     id: 'party-guide',
     name: 'Party Guide',

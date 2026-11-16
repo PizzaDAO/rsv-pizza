@@ -24,6 +24,7 @@ import { CheckInPage } from './pages/CheckInPage';
 const DJPage = React.lazy(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
 const JudgePage = React.lazy(() => import('./pages/JudgePage').then(m => ({ default: m.JudgePage })));
 const HackathonGalleryPage = React.lazy(() => import('./pages/HackathonGalleryPage').then(m => ({ default: m.HackathonGalleryPage })));
+const BoothPage = React.lazy(() => import('./pages/BoothPage').then(m => ({ default: m.BoothPage })));
 const HackathonProjectPage = React.lazy(() => import('./pages/HackathonProjectPage').then(m => ({ default: m.HackathonProjectPage })));
 const PublicReportPage = React.lazy(() => import('./pages/PublicReportPage').then(m => ({ default: m.PublicReportPage })));
 const PublicVenueReportPage = React.lazy(() => import('./pages/PublicVenueReportPage').then(m => ({ default: m.PublicVenueReportPage })));
@@ -233,6 +234,8 @@ function App() {
             {/* Hackathon PR 6: public gallery + project pages (brand sites too; not in GPP_ONLY_PATHS).
                 Two segments, so they never shadow the /:slug catch-all; static first segments
                 (/host/:x, /map/swc, ...) still rank above them. */}
+            {/* Photo booth: above /:slug, same reasoning as /projects */}
+            <Route path="/:slug/booth" element={<Suspense fallback={null}><BoothPage /></Suspense>} />
             <Route path="/:slug/projects" element={<Suspense fallback={null}><HackathonGalleryPage /></Suspense>} />
             <Route path="/:slug/projects/:projectSlug" element={<Suspense fallback={null}><HackathonProjectPage /></Suspense>} />
             <Route path="/:slug" element={<EventPage />} />
