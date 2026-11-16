@@ -24,6 +24,7 @@
       "qs": "6.16.2"
     },
     "deepmerge-ts": "8.0.2",
-    "@walletconnect/ethereum-provider": "2.26.0"
+    "@walletconnect/ethereum-provider": "2.26.0",
+    "zod": "4.6.7"
   }
 }
