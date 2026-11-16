@@ -51,6 +51,16 @@ async function getUserByEmail(client: PrivyClient, email: string): Promise<User 
 }
 
 /**
+ * Auto-provisioning a Privy wallet on every new RSVP is OFF unless PRIVY_GUEST_WALLETS=on.
+ * Privy has refused every create since 2026-05-11 (max_accounts_reached: plan user limit),
+ * so each RSVP was making a pointless call. Read per call so flipping the env var on the
+ * backend project (plus a redeploy) turns it back on without a code change.
+ */
+export function guestWalletsEnabled(): boolean {
+  return process.env.PRIVY_GUEST_WALLETS === 'on';
+}
+
+/**
  * Create an embedded Ethereum wallet for a guest via Privy's create-user API.
  * If the user already exists in Privy (same email), their existing wallet is returned.
  *

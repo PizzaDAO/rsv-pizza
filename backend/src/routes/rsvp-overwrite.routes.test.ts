@@ -38,7 +38,10 @@ vi.mock('@prisma/client', async (orig) => ({
   PrismaClient: vi.fn(function () { return mockPrisma; }),
 }));
 vi.mock('../services/webhook.service.js', () => ({ triggerWebhook: vi.fn() }));
-vi.mock('../services/privy.service.js', () => ({ createEmbeddedWalletForGuest: vi.fn(() => Promise.resolve(null)) }));
+vi.mock('../services/privy.service.js', () => ({
+  createEmbeddedWalletForGuest: vi.fn(() => Promise.resolve(null)),
+  guestWalletsEnabled: vi.fn(() => true),
+}));
 vi.mock('./scorecard.routes.js', () => ({ autoCompleteScorecardItem: vi.fn() }));
 
 const mockFetch = vi.fn();

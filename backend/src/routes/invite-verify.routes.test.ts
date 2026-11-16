@@ -44,7 +44,10 @@ const mockPrisma = vi.hoisted(() => ({
 }));
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 vi.mock('../services/webhook.service.js', () => ({ triggerWebhook: vi.fn() }));
-vi.mock('../services/privy.service.js', () => ({ createEmbeddedWalletForGuest: vi.fn(() => Promise.resolve(null)) }));
+vi.mock('../services/privy.service.js', () => ({
+  createEmbeddedWalletForGuest: vi.fn(() => Promise.resolve(null)),
+  guestWalletsEnabled: vi.fn(() => true),
+}));
 vi.mock('../helpers/partyAccess.js', () => ({ canUserAccessTab: vi.fn(() => Promise.resolve(true)) }));
 
 const mockFetch = vi.fn();
@@ -288,6 +291,17 @@ describe('POST /api/rsvp/:inviteCode/guest: completing a host invite', () => {
         where: { id: EXISTING_ID },
         data: { ethereumAddress: '0xabc', privyUserId: 'p-1', walletSource: 'privy-embedded' },
       });
+    });
+
+    it('skips Privy entirely when guest wallets are switched off', async () => {
+      const privy = await import('../services/privy.service.js');
+      (privy.guestWalletsEnabled as any).mockReturnValueOnce(false);
+      setup();
+      await complete();
+      expect(privy.createEmbeddedWalletForGuest).not.toHaveBeenCalled();
+      expect(mockPrisma.guest.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ walletSource: 'privy-embedded' }) }),
+      );
     });
 
     it('a later re-submit by the owner (row no longer INVITED) does not resend or re-provision', async () => {

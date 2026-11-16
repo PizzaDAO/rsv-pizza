@@ -171,3 +171,21 @@ describe('createEmbeddedWalletForGuest', () => {
     expect(await createEmbeddedWalletForGuest('a@b.com', 'A')).toBeNull();
   });
 });
+
+describe('guestWalletsEnabled', () => {
+  const ORIG = process.env.PRIVY_GUEST_WALLETS;
+  afterEach(() => {
+    if (ORIG === undefined) delete process.env.PRIVY_GUEST_WALLETS;
+    else process.env.PRIVY_GUEST_WALLETS = ORIG;
+  });
+
+  it('is off unless PRIVY_GUEST_WALLETS is exactly "on"', async () => {
+    const { guestWalletsEnabled } = await load({ id: 'app-id', secret: 'secret' });
+    delete process.env.PRIVY_GUEST_WALLETS;
+    expect(guestWalletsEnabled()).toBe(false);
+    process.env.PRIVY_GUEST_WALLETS = 'true';
+    expect(guestWalletsEnabled()).toBe(false);
+    process.env.PRIVY_GUEST_WALLETS = 'on';
+    expect(guestWalletsEnabled()).toBe(true);
+  });
+});
