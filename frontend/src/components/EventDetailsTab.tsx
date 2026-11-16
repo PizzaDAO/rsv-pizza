@@ -48,6 +48,8 @@ export const EventDetailsTab: React.FC = () => {
   const [, setCustomUrlError] = useState<string | undefined>();
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+  const imageRequestRef = useRef(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [maxGuests, setMaxGuests] = useState('');
   const [requireApproval, setRequireApproval] = useState(false);
@@ -251,22 +253,29 @@ export const EventDetailsTab: React.FC = () => {
     }
 
     setImageError(null);
+    const token = ++imageRequestRef.current;
+    setProcessingImage(true);
 
     try {
       const squareFile = await prepareSquareImage(file);
+      if (token !== imageRequestRef.current) return; // a newer pick or a removal superseded this one
       setEventImageFile(squareFile);
       setImagePreview(URL.createObjectURL(squareFile));
     } catch (err) {
+      if (token !== imageRequestRef.current) return;
       setEventImageFile(null);
       setImagePreview(null);
       setImageError(err instanceof Error ? err.message : 'Failed to load image');
     } finally {
+      if (token === imageRequestRef.current) setProcessingImage(false);
       // allow re-picking the same file
       input.value = '';
     }
   };
 
   const removeImage = () => {
+    imageRequestRef.current++;
+    setProcessingImage(false);
     // Revoke the object URL if it exists to free memory
     if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
@@ -1347,9 +1356,10 @@ export const EventDetailsTab: React.FC = () => {
                   <input
                     type="file"
                     id="eventImageModal"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     onChange={handleImageChange}
                     className="hidden"
+                    disabled={processingImage}
                   />
                   <label
                     htmlFor="eventImageModal"
@@ -1386,6 +1396,13 @@ export const EventDetailsTab: React.FC = () => {
                 />
               </div>
 
+              {processingImage && (
+                <p className="text-xs text-theme-text-muted mt-2 flex items-center gap-1.5" role="status">
+                  <Loader2 size={12} className="animate-spin" />
+                  Processing image…
+                </p>
+              )}
+
               {imageError && (
                 <p className="text-xs text-red-400">{imageError}</p>
               )}
@@ -1398,7 +1415,7 @@ export const EventDetailsTab: React.FC = () => {
                 await saveImage();
                 setShowImageModal(false);
               }}
-              disabled={savingField === 'image'}
+              disabled={savingField === 'image' || processingImage}
               className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
             >
               {savingField === 'image' ? (

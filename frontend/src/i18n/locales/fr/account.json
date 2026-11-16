@@ -52,6 +52,8 @@
     "imageSelectError": "Veuillez sélectionner un fichier image",
     "imageSizeError": "L'image doit faire moins de 25 Mo",
     "imageLoadError": "Échec du chargement de l'image",
+    "imageHeicError": "Impossible de traiter cette image HEIC. Convertissez-la en JPEG et réessayez.",
+    "processingImage": "Traitement de l'image…",
     "imageUploadFailed": "Échec du téléchargement de l'image. Veuillez réessayer.",
     "options": "Options",
     "requireApproval": "Approbation requise",

@@ -45,6 +45,26 @@ async function decode(file: Blob): Promise<ImageBitmap> {
   return createImageBitmap(file, { imageOrientation: 'from-image' });
 }
 
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+
+/** Last resort: the authenticated backend converts HEIC with heic-convert (handles iPhone files heic2any can't). */
+async function convertHeicOnServer(file: File): Promise<Blob> {
+  let token: string | null = null;
+  try {
+    token = localStorage.getItem('authToken');
+  } catch {
+    token = null;
+  }
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(`${API_URL}/api/heic/to-jpeg`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`HEIC conversion failed (${res.status})`);
+  return res.blob();
+}
+
 async function loadBitmap(file: File): Promise<ImageBitmap> {
   const heic = isHeicFile(file);
   try {
@@ -52,12 +72,18 @@ async function loadBitmap(file: File): Promise<ImageBitmap> {
     return await decode(file);
   } catch (nativeErr) {
     if (!heic) throw new SquareImageError('LOAD_FAILED', 'Could not read this image. Try a JPEG or PNG.');
+    // Order: native decode (above) -> heic2any in the browser -> authenticated backend.
     try {
       const heic2any = (await import('heic2any')).default;
       const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
       return await decode(Array.isArray(out) ? out[0] : out);
     } catch (convErr) {
-      console.error('HEIC to JPEG conversion failed:', nativeErr, convErr);
+      console.warn('heic2any failed, trying server conversion:', nativeErr, convErr);
+    }
+    try {
+      return await decode(await convertHeicOnServer(file));
+    } catch (serverErr) {
+      console.error('HEIC to JPEG conversion failed:', serverErr);
       throw new SquareImageError('HEIC_FAILED', 'Could not process this HEIC image. Please convert it to JPEG and try again.');
     }
   }

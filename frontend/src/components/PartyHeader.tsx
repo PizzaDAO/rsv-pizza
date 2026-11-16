@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { BRAND } from '../config/brand';
 import { useNavigate } from 'react-router';
 import { usePizza } from '../contexts/PizzaContext';
@@ -24,6 +24,8 @@ export const PartyHeader: React.FC = () => {
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+  const imageRequestRef = useRef(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [eventDescription, setEventDescription] = useState('');
@@ -42,22 +44,29 @@ export const PartyHeader: React.FC = () => {
     }
 
     setImageError(null);
+    const token = ++imageRequestRef.current;
+    setProcessingImage(true);
 
     try {
       const squareFile = await prepareSquareImage(file);
+      if (token !== imageRequestRef.current) return; // a newer pick or a removal superseded this one
       setEventImageFile(squareFile);
       setImagePreview(URL.createObjectURL(squareFile));
     } catch (err) {
+      if (token !== imageRequestRef.current) return;
       setEventImageFile(null);
       setImagePreview(null);
       setImageError(err instanceof Error ? err.message : 'Failed to load image');
     } finally {
+      if (token === imageRequestRef.current) setProcessingImage(false);
       // allow re-picking the same file
       input.value = '';
     }
   };
 
   const removeImage = () => {
+    imageRequestRef.current++;
+    setProcessingImage(false);
     setEventImageFile(null);
     setImagePreview(null);
     setImageError(null);
@@ -509,10 +518,10 @@ export const PartyHeader: React.FC = () => {
                         <input
                           type="file"
                           id="eventImage"
-                          accept="image/*"
+                          accept="image/*,.heic,.heif"
                           onChange={handleImageChange}
                           className="hidden"
-                          disabled={!!eventImageUrl.trim()}
+                          disabled={!!eventImageUrl.trim() || processingImage}
                         />
                         <label
                           htmlFor="eventImage"
@@ -524,6 +533,13 @@ export const PartyHeader: React.FC = () => {
                           <span className="text-xs text-theme-text-muted mt-1">Square images work best; others are center-cropped</span>
                         </label>
                       </div>
+                    )}
+
+                    {processingImage && (
+                      <p className="text-xs text-theme-text-muted mt-2 flex items-center gap-1.5" role="status">
+                        <Loader2 size={12} className="animate-spin" />
+                        Processing image…
+                      </p>
                     )}
 
                     {imageError && (
@@ -582,7 +598,7 @@ export const PartyHeader: React.FC = () => {
                 <button
                   type="submit"
                   className="btn-primary flex-1 flex items-center justify-center gap-2"
-                  disabled={creating}
+                  disabled={creating || processingImage}
                 >
                   {creating ? (
                     <>

@@ -52,6 +52,8 @@
     "imageSelectError": "画像ファイルを選択してください",
     "imageSizeError": "画像は25MB以下にしてください",
     "imageLoadError": "画像の読み込みに失敗しました",
+    "imageHeicError": "このHEIC画像を処理できませんでした。JPEGに変換してもう一度お試しください。",
+    "processingImage": "画像を処理中…",
     "imageUploadFailed": "画像のアップロードに失敗しました。もう一度お試しください。",
     "options": "オプション",
     "requireApproval": "承認を必須にする",

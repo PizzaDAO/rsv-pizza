@@ -52,6 +52,8 @@
     "imageSelectError": "Bitte wählen Sie eine Bilddatei",
     "imageSizeError": "Bild muss kleiner als 25 MB sein",
     "imageLoadError": "Bild konnte nicht geladen werden",
+    "imageHeicError": "Dieses HEIC-Bild konnte nicht verarbeitet werden. Bitte in JPEG umwandeln und erneut versuchen.",
+    "processingImage": "Bild wird verarbeitet…",
     "imageUploadFailed": "Bild konnte nicht hochgeladen werden. Bitte versuchen Sie es erneut.",
     "options": "Optionen",
     "requireApproval": "Genehmigung erforderlich",

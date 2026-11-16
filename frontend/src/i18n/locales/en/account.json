@@ -52,6 +52,8 @@
     "imageSelectError": "Please select an image file",
     "imageSizeError": "Image must be less than 25MB",
     "imageLoadError": "Failed to load image",
+    "imageHeicError": "Could not process this HEIC image. Please convert it to JPEG and try again.",
+    "processingImage": "Processing image…",
     "imageUploadFailed": "Failed to upload image. Please try again.",
     "options": "Options",
     "requireApproval": "Require Approval",

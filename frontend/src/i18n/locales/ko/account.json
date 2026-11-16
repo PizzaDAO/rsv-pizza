@@ -52,6 +52,8 @@
     "imageSelectError": "이미지 파일을 선택해 주세요",
     "imageSizeError": "이미지는 25MB 미만이어야 합니다",
     "imageLoadError": "이미지를 불러오지 못했습니다",
+    "imageHeicError": "이 HEIC 이미지를 처리할 수 없습니다. JPEG로 변환한 후 다시 시도해 주세요.",
+    "processingImage": "이미지 처리 중…",
     "imageUploadFailed": "이미지 업로드에 실패했습니다. 다시 시도해 주세요.",
     "options": "옵션",
     "requireApproval": "승인 필요",

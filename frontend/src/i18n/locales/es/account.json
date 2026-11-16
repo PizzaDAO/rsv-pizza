@@ -52,6 +52,8 @@
     "imageSelectError": "Selecciona un archivo de imagen",
     "imageSizeError": "La imagen debe pesar menos de 25MB",
     "imageLoadError": "No se pudo cargar la imagen",
+    "imageHeicError": "No se pudo procesar esta imagen HEIC. Conviértela a JPEG e inténtalo de nuevo.",
+    "processingImage": "Procesando imagen…",
     "imageUploadFailed": "No se pudo subir la imagen. Inténtalo de nuevo.",
     "options": "Opciones",
     "requireApproval": "Requerir Aprobación",
