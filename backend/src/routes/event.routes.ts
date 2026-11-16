@@ -106,7 +106,6 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         nftChain: true,
         quizEnabled: true,
         photosEnabled: true,
-        booth: { select: { enabled: true } },
         photosPublic: true,
         hiddenGppPhotos: true,
         extraGppPhotos: true,
@@ -191,7 +190,6 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
           nftChain: true,
           quizEnabled: true,
           photosEnabled: true,
-          booth: { select: { enabled: true } },
           photosPublic: true,
           hiddenGppPhotos: true,
           extraGppPhotos: true,
@@ -339,7 +337,17 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
     }
 
     // Photo booth: global rollout flag AND the host's per-party toggle (no row = on) AND not cancelled.
-    const boothEnabled = !party.cancelledAt && party.booth?.enabled !== false && (await isBoothGloballyOn());
+    // Looked up on its own (not in the party select) so a deploy before the party_booths migration
+    // can only turn the booth off, never break event pages.
+    let boothEnabled = false;
+    if (!party.cancelledAt && (await isBoothGloballyOn())) {
+      try {
+        const row = await prisma.partyBooth.findUnique({ where: { partyId: party.id }, select: { enabled: true } });
+        boothEnabled = row?.enabled !== false;
+      } catch (err) {
+        console.warn('[booth] party_booths lookup failed; booth off for this request.', err);
+      }
+    }
 
     res.json({
       event: {

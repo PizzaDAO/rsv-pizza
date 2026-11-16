@@ -11,7 +11,7 @@ import { buildBoothConfig, diffFromDefault, type BoothEventInfo } from '../../li
 import type { EditorElement } from '../../lib/booth/questpass-booth';
 
 interface BoothTabProps {
-  party: BoothEventInfo & { id: string };
+  party: BoothEventInfo & { id: string; cancelledAt?: string | null };
 }
 
 const PRINT_CSS = `
@@ -145,6 +145,19 @@ export function BoothTab({ party }: BoothTabProps) {
     window.addEventListener('afterprint', done);
     window.print();
   }, []);
+
+  // A cancelled party can't save booth changes (the API answers 410), so don't offer a form.
+  if (party.cancelledAt) {
+    return (
+      <div className="space-y-4 max-w-2xl" data-testid="booth-tab-cancelled">
+        <h2 className="text-xl font-bold text-theme-text flex items-center gap-2"><Camera size={20} /> Photo booth</h2>
+        <p className="text-sm text-theme-text-secondary">
+          This party was cancelled, so the photo booth is off and can&apos;t be edited.
+        </p>
+        <BoothCredit />
+      </div>
+    );
+  }
 
   if (!setup && !error) {
     return <div className="flex justify-center py-12" data-testid="booth-tab-loading"><Loader2 className="animate-spin text-theme-text-muted" /></div>;

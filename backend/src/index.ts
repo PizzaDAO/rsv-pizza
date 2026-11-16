@@ -55,6 +55,7 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import { adminFastPassRouter, hostFastPassRouter } from './routes/host-fast-pass.routes.js';
+import { requireAuth } from './middleware/auth.js';
 import boothRoutes, { boothAdminRouter, boothJsonBody } from './routes/booth.routes.js'; // photo booth setup (public read, host write) + global flag admin
 import hostTrustRoutes from './routes/host-trust.routes.js'; // host trust report + settings (read-only; before /api/admin catch-all)
 import payoutRoutes from './routes/payout.routes.js';
@@ -157,8 +158,9 @@ app.use('/.well-known', jwksRoutes);
 app.use('/api/admin/logo-bg-audit', express.json({ limit: '8mb' }));
 
 // Photo booth setup can carry a logo data URL (~1.5 MB); 2 MB route-level limit, 413 when exceeded.
-// Same rule: before the global express.json().
-app.use('/api/parties/:partyId/booth', boothJsonBody);
+// Same rule: before the global express.json(). PUT only, and only after the token check, so an
+// anonymous caller never gets a 2 MB body parsed.
+app.put('/api/parties/:partyId/booth', requireAuth, ...boothJsonBody);
 
 app.use(express.json());
 

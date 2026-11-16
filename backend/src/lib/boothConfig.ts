@@ -96,9 +96,10 @@ function deepClean(v: unknown, depth: number): unknown {
   if (isPlainObject(v)) {
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(v).slice(0, MAX_KEYS)) {
-      if (BAD_KEYS.has(k)) continue;
+      const ck = cleanString(k, 100); // clean first: "__pro\u0000to__" must not become "__proto__"
+      if (BAD_KEYS.has(ck)) continue;
       const c = deepClean(v[k], depth + 1);
-      if (c !== undefined) out[cleanString(k, 100)] = c;
+      if (c !== undefined) Object.defineProperty(out, ck, { value: c, enumerable: true, writable: true, configurable: true });
     }
     return out;
   }
@@ -109,8 +110,9 @@ function cleanColors(v: unknown): Record<string, string> | undefined {
   if (!isPlainObject(v)) return undefined;
   const out: Record<string, string> = {};
   for (const [k, c] of Object.entries(v)) {
-    if (BAD_KEYS.has(k)) continue;
-    if (typeof c === 'string' && HEX_COLOR.test(c)) out[cleanString(k, 40)] = c;
+    const ck = cleanString(k, 40);
+    if (BAD_KEYS.has(ck)) continue;
+    if (typeof c === 'string' && HEX_COLOR.test(c)) Object.defineProperty(out, ck, { value: c, enumerable: true, writable: true, configurable: true });
   }
   return out;
 }

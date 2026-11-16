@@ -84,6 +84,15 @@ describe('sanitizeBoothConfig', () => {
     expect(c.words.a.text).toBe('ok');
   });
 
+  it('drops keys that only become __proto__ after cleaning', () => {
+    const input = JSON.parse('{"words":{"__pro\\u0000to__":{"polluted":true},"ok":{"text":"x"}},"brand":{"colors":{"__pro\\u0000to__":"#FF0000","accent":"#FF393A"}}}');
+    const c = ok(input);
+    expect(Object.keys(c.words)).toEqual(['ok']);
+    expect(Object.getPrototypeOf(c.words)).toBe(Object.prototype);
+    expect(c.words.polluted).toBeUndefined();
+    expect(c.brand.colors).toEqual({ accent: '#FF393A' });
+  });
+
   it('returns 413 over 1.8 MB', () => {
     const r = sanitizeBoothConfig({ title: 'x'.repeat(1.9 * 1024 * 1024) });
     expect(r.ok).toBe(false);

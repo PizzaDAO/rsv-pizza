@@ -73,6 +73,7 @@ router.get('/:partyId/booth', optionalAuth, async (req: AuthRequest, res: Respon
         (await canUserAccessTab(partyId, req.userEmail, req.userId, 'booth'));
     }
     res.set('Cache-Control', authed ? 'private, no-store' : 'public, max-age=60');
+    res.vary('Authorization');
     res.json(await shape(party, canEdit));
   } catch (error) {
     next(error);

@@ -20,8 +20,24 @@ export const BOOTH_ENABLED_SETTING: SettingDef = {
 
 export const BOOTH_SETTINGS: SettingDef[] = [BOOTH_ENABLED_SETTING];
 
-/** True when the global flag is 1. Never throws; a read failure resolves to off. */
+const CACHE_MS = 30_000;
+let cached: { value: boolean; at: number } | null = null;
+
+/** Test hook (and for a flag flip that should show at once on this instance). */
+export function resetBoothFlagCache(): void {
+  cached = null;
+}
+
+/**
+ * True when the global flag is 1. Never throws; a read failure resolves to off.
+ * Cached in-process for 30 s (event pages call this on every view). A failed read is not cached.
+ * Flipping the flag therefore takes up to 30 s to show on each backend instance.
+ */
 export async function isBoothGloballyOn(): Promise<boolean> {
+  const now = Date.now();
+  if (cached && now - cached.at < CACHE_MS) return cached.value;
   const snap = await readSettings([BOOTH_ENABLED_SETTING]);
-  return snap.values[BOOTH_ENABLED_SETTING.key].value === 1;
+  const value = snap.values[BOOTH_ENABLED_SETTING.key].value === 1;
+  if (!snap.readFailed) cached = { value, at: now };
+  return value;
 }

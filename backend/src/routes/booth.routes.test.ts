@@ -28,6 +28,8 @@ vi.mock('../helpers/partyAccess.js', () => ({
 
 import boothRoutes, { boothJsonBody } from './booth.routes.js';
 import { errorHandler } from '../middleware/error.js';
+import { requireAuth } from '../middleware/auth.js';
+import { resetBoothFlagCache } from '../lib/boothSettings.js';
 
 afterAll(() => {
   if (savedSecret === undefined) delete process.env.JWT_SECRET;
@@ -36,7 +38,7 @@ afterAll(() => {
 
 function app() {
   const a = express();
-  a.use('/api/parties/:partyId/booth', boothJsonBody);
+  a.put('/api/parties/:partyId/booth', requireAuth, ...boothJsonBody); // mirrors index.ts
   a.use(express.json());
   a.use('/api/parties', boothRoutes);
   a.use(errorHandler);
@@ -56,6 +58,7 @@ function party(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetBoothFlagCache();
   canEdit.mockResolvedValue(false);
   canTab.mockResolvedValue(true);
   flag(1);
@@ -68,13 +71,22 @@ describe('GET /api/parties/:id/booth', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ enabled: true, hostEnabled: true, globalEnabled: true, config: null, canEdit: false });
     expect(res.headers['cache-control']).toBe('public, max-age=60');
+    expect(res.headers['vary']).toMatch(/Authorization/i);
   });
 
   it('flag 0 (or no setting row) -> enabled false', async () => {
     flag(0);
     expect((await request(app()).get(`/api/parties/${PARTY}/booth`)).body.enabled).toBe(false);
+    resetBoothFlagCache();
     flag(null);
     expect((await request(app()).get(`/api/parties/${PARTY}/booth`)).body.enabled).toBe(false);
+  });
+
+  it('the flag is cached in-process for 30 s', async () => {
+    flag(1);
+    await request(app()).get(`/api/parties/${PARTY}/booth`);
+    await request(app()).get(`/api/parties/${PARTY}/booth`);
+    expect(mockPrisma.appConfig.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('flag read failure -> enabled false', async () => {

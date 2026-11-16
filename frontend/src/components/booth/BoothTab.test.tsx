@@ -52,6 +52,13 @@ describe('BoothTab', () => {
     expect(screen.getByTestId('booth-global-off')).toBeTruthy();
   });
 
+  it('a cancelled party gets a read-only notice, no form', () => {
+    render(<BoothTab party={{ ...PARTY, cancelledAt: '2027-01-01T00:00:00Z' }} />);
+    expect(screen.getByTestId('booth-tab-cancelled').textContent).toMatch(/cancelled/);
+    expect(screen.queryByTestId('booth-save')).toBeNull();
+    expect(document.querySelector('questpass-booth-editor')).toBeNull();
+  });
+
   it('edits mark the form unsaved; Save sends only the changes', async () => {
     const editor = await open();
     await waitFor(() => expect(editor.config?.title).toBe('Slice Night'));
