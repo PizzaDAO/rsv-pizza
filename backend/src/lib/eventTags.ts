@@ -121,20 +121,30 @@ export function mergeHostEventTags(
 ): { tags: string[]; ignoredAdded: string[]; ignoredRemoved: string[]; changed: boolean } {
   const cur = Array.isArray(current) ? current : [];
   const req = requested.filter((t): t is string => typeof t === 'string');
-  const curSet = new Set(cur);
+  const canon = (t: string) => t.trim().toLowerCase();
+  // Host-writable tags the caller wants present (canonical form only).
+  const wanted = new Set(req.filter(isHostWritableTag).map(canon));
   const reqSet = new Set(req);
+  const curSet = new Set(cur);
   const ignoredAdded: string[] = [];
   const ignoredRemoved: string[] = [];
   const tags: string[] = [];
+  const emitted = new Set<string>();
   for (const t of cur) {
-    if (!reqSet.has(t) && isHostWritableTag(t)) continue; // allowed removal
+    if (isHostWritableTag(t)) {
+      const c = canon(t);
+      if (wanted.has(c) && !emitted.has(c)) {
+        emitted.add(c);
+        tags.push(c); // always store the canonical form
+      }
+      continue;
+    }
     if (!reqSet.has(t)) ignoredRemoved.push(t);
     tags.push(t);
   }
+  for (const c of wanted) if (!emitted.has(c)) tags.push(c);
   for (const t of req) {
-    if (curSet.has(t) || tags.includes(t)) continue;
-    if (isHostWritableTag(t)) tags.push(t);
-    else ignoredAdded.push(t);
+    if (!isHostWritableTag(t) && !curSet.has(t) && !ignoredAdded.includes(t)) ignoredAdded.push(t);
   }
   const changed = tags.length !== cur.length || tags.some((t, i) => t !== cur[i]);
   return { tags, ignoredAdded, ignoredRemoved, changed };
