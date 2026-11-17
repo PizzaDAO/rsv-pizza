@@ -120,6 +120,7 @@ function formPage(next: string, failed: boolean): Response {
   return new Response(html, {
     status: 401,
     headers: {
+      ...SECURITY_HEADERS,
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Robots-Tag': 'noindex, nofollow',
@@ -139,7 +140,7 @@ export async function siteGate(request: Request, password: string | undefined): 
 
   if (url.pathname === GATE_PATH) {
     if (request.method !== 'POST') {
-      return new Response(null, { status: 303, headers: { Location: '/', 'Cache-Control': 'no-store' } });
+      return new Response(null, { status: 303, headers: { ...SECURITY_HEADERS, Location: '/', 'Cache-Control': 'no-store' } });
     }
     let submitted = '';
     let next = '/';
@@ -156,6 +157,7 @@ export async function siteGate(request: Request, password: string | undefined): 
     return new Response(null, {
       status: 303,
       headers: {
+        ...SECURITY_HEADERS,
         Location: next,
         'Set-Cookie': `${GATE_COOKIE}=${expected}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE}`,
         'Cache-Control': 'no-store',
@@ -382,6 +384,14 @@ export function homeMeta(cfg: RuntimeBrandCfg): MetaValues {
 }
 
 // ---- Main middleware ----
+// Baseline security headers for the middleware's own responses (vercel.json covers the rest).
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "frame-ancestors 'none'",
+};
+
 export default async function middleware(request: Request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -408,6 +418,7 @@ export default async function middleware(request: Request) {
       return new Response(html, {
         status: 200,
         headers: {
+          ...SECURITY_HEADERS,
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         },
@@ -610,6 +621,7 @@ export default async function middleware(request: Request) {
     return new Response(html, {
       status: 200,
       headers: {
+        ...SECURITY_HEADERS,
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
       },
