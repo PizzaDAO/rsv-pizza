@@ -10,6 +10,7 @@ import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
 import { signGuestToken, verifyGuestToken, guestTokenFromRequest, callerOwnsGuest } from '../lib/guestToken.js';
 import { issueLoginCode, takeCodeSend } from '../lib/loginCode.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
 /**
  * invite-verify: the RSVP endpoint's answer when the submitted email is already on the
@@ -1050,20 +1051,12 @@ async function sendRSVPConfirmationEmail(params: {
     </html>
   `;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
+  const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
       subject: emailSubject,
       html: emailHtml,
       ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
-    }),
-  });
+    } });
 
   if (!response.ok) {
     const error = await response.text();
@@ -1173,20 +1166,12 @@ export async function sendApprovalEmail(params: {
     </html>
   `;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
+  const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
       subject: `You're approved for ${params.partyName}! 🍕`,
       html: emailHtml,
       ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
-    }),
-  });
+    } });
 
   if (!response.ok) {
     const error = await response.text();
@@ -1279,19 +1264,11 @@ async function sendWaitlistConfirmationEmail(params: {
     </html>
   `;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
+  const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
       subject: `You're #${params.waitlistPosition} on the waitlist for ${params.partyName}`,
       html: emailHtml,
-    }),
-  });
+    } });
 
   if (!response.ok) {
     const error = await response.text();
@@ -1402,20 +1379,12 @@ export async function sendPromotionEmail(params: {
     </html>
   `;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
+  const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
       subject: `You're in! A spot opened up at ${params.partyName}`,
       html: emailHtml,
       ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
-    }),
-  });
+    } });
 
   if (!response.ok) {
     const error = await response.text();

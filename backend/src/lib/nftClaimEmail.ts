@@ -2,6 +2,7 @@
 // Only ever sent when NFT_CLAIM_EMAILS=on; branded-series parties are excluded by isNftEligible,
 // so this always uses the PizzaDAO site.
 import { siteForParty } from './siteBrand.js';
+import { sendBrandedEmail } from './resendSend.js';
 
 const escape = (s: string) =>
   s
@@ -73,11 +74,7 @@ export async function sendNftClaimEmail(
   try {
     const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
     const { subject, html } = buildNftClaimEmail(party, guest, `${site.url}/nft/claim/${token}`, expiresAt);
-    const resp = await fetchImpl('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendApiKey}` },
-      body: JSON.stringify({ from: site.fromEmail, to: [guest.email], subject, html }),
-    });
+    const resp = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: { to: [guest.email], subject, html }, fetchImpl });
     if (!resp.ok) return null;
     const data: any = await resp.json().catch(() => ({}));
     return typeof data.id === 'string' ? data.id : 'sent';

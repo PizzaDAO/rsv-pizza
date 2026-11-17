@@ -8,6 +8,7 @@ import { setDeleteContext } from '../../helpers/auditContext.js';
 import { canUserAccessTab } from '../../helpers/partyAccess.js';
 import { siteForParty } from '../../lib/siteBrand.js';
 import { signGuestToken } from '../../lib/guestToken.js';
+import { sendBrandedEmail } from '../../lib/resendSend.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -609,19 +610,11 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
       site.url
     );
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: site.fromEmail,
+    const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
         to: [guest.email],
         subject,
         html,
-      }),
-    });
+      } });
 
     if (!response.ok) {
       const error = await response.text();
@@ -769,19 +762,11 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                 site.url
               );
 
-              const resp = await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${resendApiKey}`,
-                },
-                body: JSON.stringify({
-                  from: site.fromEmail,
+              const resp = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
                   to: [normalizedEmail],
                   subject,
                   html,
-                }),
-              });
+                } });
 
               if (!resp.ok) {
                 const body = await resp.text().catch(() => '');

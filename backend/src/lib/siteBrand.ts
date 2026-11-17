@@ -15,6 +15,15 @@ export interface SiteBrand {
   name: string;
   /** Resend `from` header. */
   fromEmail: string;
+  /**
+   * Set only for a series sending from its own verified domain (`fromEmail` is then the partner
+   * address). `fallbackFrom` is the default sender used if Resend rejects the partner domain.
+   * Unbranded and not-yet-verified sites leave these unset, so their shape is unchanged.
+   */
+  fallbackFrom?: string;
+  seriesId?: string;
+  /** `email_reply_to`; sent as the Resend `reply_to` (also before domain verification). */
+  replyTo?: string;
 }
 
 interface SeriesSite {
@@ -22,6 +31,13 @@ interface SeriesSite {
   slug: string;
   url: string;
   name: string;
+  /** Extra origins (old host after a cutover, or a staged new domain); resolve to this site. */
+  aliases: string[];
+  emailFromAddress: string | null;
+  emailFromName: string | null;
+  emailReplyTo: string | null;
+  emailDomain: string | null;
+  emailDomainVerifiedAt: Date | null;
 }
 
 interface SiteCache {
@@ -34,6 +50,8 @@ const CACHE_TTL_MS = 60_000;
 
 let cache: SiteCache | null = null;
 let inflight: Promise<SiteCache> | null = null;
+/** Bumped by every invalidation so a load that started earlier can't overwrite fresher state. */
+let generation = 0;
 
 /** Normalize an origin/URL for exact comparison: trim, drop trailing slashes, lowercase. */
 export function normalizeOrigin(value: string | null | undefined): string | null {
@@ -45,7 +63,11 @@ export function normalizeOrigin(value: string | null | undefined): string | null
 async function load(): Promise<SiteCache> {
   const rows = await prisma.eventSeries.findMany({
     where: { siteUrl: { not: null }, isActive: true },
-    select: { id: true, slug: true, siteUrl: true, brandName: true, displayName: true, name: true },
+    select: {
+      id: true, slug: true, siteUrl: true, brandName: true, displayName: true, name: true,
+      siteAliases: true, emailFromAddress: true, emailFromName: true, emailReplyTo: true,
+      emailDomain: true, emailDomainVerifiedAt: true,
+    },
   });
   const byId = new Map<string, SeriesSite>();
   const byOrigin = new Map<string, SeriesSite>();
@@ -57,9 +79,22 @@ async function load(): Promise<SiteCache> {
       slug: r.slug,
       url: (r.siteUrl as string).trim().replace(/\/+$/, ''),
       name: (r.brandName && r.brandName.trim()) || r.displayName || r.name,
+      aliases: Array.isArray(r.siteAliases) ? r.siteAliases : [],
+      emailFromAddress: r.emailFromAddress ?? null,
+      emailFromName: r.emailFromName ?? null,
+      emailReplyTo: r.emailReplyTo ?? null,
+      emailDomain: r.emailDomain ?? null,
+      emailDomainVerifiedAt: r.emailDomainVerifiedAt ?? null,
     };
     byId.set(r.id, site);
     byOrigin.set(origin, site);
+  }
+  // Aliases resolve to the canonical site, but never shadow another series' own site_url.
+  for (const site of byId.values()) {
+    for (const alias of site.aliases) {
+      const a = normalizeOrigin(alias);
+      if (a && !byOrigin.has(a)) byOrigin.set(a, site);
+    }
   }
   return { at: Date.now(), byId, byOrigin };
 }
@@ -68,14 +103,18 @@ async function load(): Promise<SiteCache> {
 export async function getSeriesSites(): Promise<SiteCache> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache;
   if (!inflight) {
-    inflight = load()
+    const myGen = generation;
+    const p: Promise<SiteCache> = load()
       .then((c) => {
-        cache = c;
+        // A load that began before an invalidation may hold pre-change data: don't store it.
+        if (myGen === generation) cache = c;
         return c;
       })
       .finally(() => {
-        inflight = null;
+        // Only clear our own slot, never a newer in-flight load started after an invalidation.
+        if (inflight === p) inflight = null;
       });
+    inflight = p;
   }
   try {
     return await inflight;
@@ -85,8 +124,17 @@ export async function getSeriesSites(): Promise<SiteCache> {
   }
 }
 
+/** Drop the cached series sites so the next lookup reloads (used after a sender revert). */
+export function invalidateSiteBrandCache(): void {
+  generation++;
+  // Expire, don't discard: if the reload fails, getSeriesSites still falls back to this stale copy.
+  if (cache) cache = { ...cache, at: 0 };
+  inflight = null;
+}
+
 /** Test helper. */
 export function _resetSiteBrandCache(): void {
+  generation++;
   cache = null;
   inflight = null;
 }
@@ -95,8 +143,39 @@ function fallbackSite(fallbackUrl: string): SiteBrand {
   return { url: fallbackUrl, name: brand.name, fromEmail: brand.fromEmail };
 }
 
+/**
+ * Strip every RFC 5322 special and control char from a From display name (same rule as the admin
+ * validator, `senderNameOrNull`): no quoting, so `Acme, Inc` and `support@paypal.com` can't add
+ * recipients or spoof an address.
+ */
+function headerName(v: string): string {
+  return v.replace(/[\u0000-\u001f\u007f"<>,;:@()[\]\\]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** True when the address' domain equals `domain` or is a subdomain of it. */
+function addressUnder(address: string, domain: string): boolean {
+  const host = address.slice(address.lastIndexOf('@') + 1).toLowerCase();
+  const d = domain.toLowerCase();
+  return host === d || host.endsWith(`.${d}`);
+}
+
+/**
+ * Sender for a series. The partner address is used only when ALL hold: from-address set, the domain
+ * verified (server-written timestamp), and the address on the Resend sending domain. Anything else
+ * is today's exact "<name> <brand noreply>", so existing brands are byte-identical.
+ * `reply_to` applies even before verification.
+ */
 function brandedSite(s: SeriesSite): SiteBrand {
-  return { url: s.url, name: s.name, fromEmail: `${s.name} <${brand.noreplyEmail}>` };
+  const fallbackFrom = `${s.name} <${brand.noreplyEmail}>`;
+  const site: SiteBrand = { url: s.url, name: s.name, fromEmail: fallbackFrom };
+  if (s.emailReplyTo) site.replyTo = s.emailReplyTo;
+  if (s.emailFromAddress && s.emailDomainVerifiedAt && s.emailDomain && addressUnder(s.emailFromAddress, s.emailDomain)) {
+    const display = headerName(s.emailFromName || '') || s.name;
+    site.fromEmail = `${display} <${s.emailFromAddress}>`;
+    site.fallbackFrom = fallbackFrom;
+    site.seriesId = s.id;
+  }
+  return site;
 }
 
 /** Site for a party. No series / unbranded series -> the call site's own fallback, unchanged. */

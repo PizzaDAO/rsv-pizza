@@ -31,6 +31,7 @@ import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
 import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
 import { applyCreatePreset, enforceBrandCreateLimit, presetHackathonCreate } from '../lib/brandCreate.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -2576,19 +2577,11 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
             </body></html>
           `;
           try {
-            const r = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${resendApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                from: site.fromEmail,
+            const r = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
                 to: [recipient.email],
                 subject: subject || `Update from ${party.name}`,
                 html,
-              }),
-            });
+              } });
             if (r.ok) emailSentCount += 1;
           } catch (err) {
             console.error(`[Day-of announce] Resend send failed for guest ${recipient.id}:`, err);

@@ -21,6 +21,7 @@ import {
   type RateStore,
   type Reservation,
 } from './authRateLimit.js';
+import { sendBrandedEmail } from './resendSend.js';
 
 // Helper function to send magic link email (moved verbatim from auth.routes.ts)
 export async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string, site: SiteBrand) {
@@ -53,19 +54,11 @@ export async function sendMagicLinkEmail(email: string, magicLinkUrl: string, co
     </html>
   `;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
+  const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [email],
       subject: `${site.name} Code ${code}`,
       html: emailHtml,
-    }),
-  });
+    } });
 
   if (!response.ok) {
     const error = await response.text();
