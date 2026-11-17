@@ -48,9 +48,18 @@ function text(v: unknown, field: string, max: number, opts: { multiline?: boolea
   return s;
 }
 
+/** Names that would impersonate the platform or its operator (case, spaces and punctuation ignored). */
+const RESERVED_FRAGMENTS = ['pizzadao', 'rsvpizza'];
+export function assertNotReservedName(v: string | null, field: string): void {
+  if (!v) return;
+  const flat = v.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  if (RESERVED_FRAGMENTS.some((r) => flat.includes(r))) bad(`${field} can't use a reserved name`);
+}
+
 function name(v: unknown, field: string): string | null {
   const s = text(v, field, 40);
   if (s && !NAME_RE.test(s)) bad(`${field} can only use letters, digits, spaces and . & ' ! -`);
+  assertNotReservedName(s, field);
   return s;
 }
 
@@ -106,7 +115,12 @@ export function validateBrandSettings(input: Record<string, unknown>, opts: { st
       case 'eventDate': data.eventDate = date(v, 'eventDate'); break;
       case 'eventStartTime': data.eventStartTime = hm(v, 'eventStartTime'); break;
       case 'eventEndTime': data.eventEndTime = hm(v, 'eventEndTime'); break;
-      case 'emailFromName': data.emailFromName = senderNameOrNull(v); break;
+      case 'emailFromName': {
+        const n = senderNameOrNull(v);
+        assertNotReservedName(n, 'emailFromName');
+        data.emailFromName = n;
+        break;
+      }
       case 'emailReplyTo': data.emailReplyTo = emailOrNull(v, 'emailReplyTo'); break;
       default: break;
     }

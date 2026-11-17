@@ -8,8 +8,8 @@
  *    site with a link to `<site>/brand-admin/events`. On by default; kill switch SERIES_ADMIN_ALERTS=off.
  *  - PizzaDAO: unchanged and OFF unless env BRAND_EVENT_ADMIN_ALERTS === 'on'. Recipients:
  *    `BRAND_EVENT_NOTIFY_EMAILS` (csv) when set, else every DB admin (role admin or super_admin; NOT
- *    payment_admin). Once a brand has an active admin PizzaDAO stops getting THAT brand's alerts
- *    (while the series-admin channel is on, so someone is always told).
+ *    payment_admin). PizzaDAO stops getting a brand's alerts while that brand has an active admin with alerts
+ *    enabled (and the series-admin channel is on), so someone is always told.
  *
  * Uses the Resend path. No-ops without RESEND_API_KEY (so dev and tests never send), and never
  * throws: callers fire-and-forget it (`void ...`).
@@ -57,8 +57,8 @@ export async function resolveAdminRecipients(): Promise<string[]> {
 export const seriesAdminEventsUrl = (siteUrl: string) => `${siteUrl}/brand-admin/events`;
 
 /**
- * The series' active brand admins. `activeCount` counts every active admin (it decides whether
- * PizzaDAO still gets alerts); `recipients` are the ones with alerts enabled.
+ * The series' active brand admins. `activeCount` counts every active admin; `recipients` are the ones
+ * with alerts enabled (they decide whether PizzaDAO is still alerted).
  */
 export async function resolveSeriesAdminRecipients(seriesId: string): Promise<{ activeCount: number; recipients: string[] }> {
   const rows = await prisma.seriesAdmin.findMany({
@@ -129,8 +129,8 @@ export async function notifyAdminsOfBrandEvent(partyId: string): Promise<void> {
       }
     }
 
-    // PizzaDAO: only while the brand has no active admin of its own.
-    if (!pizzadaoAlertsOn || seriesAdmins.activeCount > 0) return;
+    // PizzaDAO: skipped only when a brand admin was actually told, so someone always hears about the event.
+    if (!pizzadaoAlertsOn || seriesAdmins.recipients.length > 0) return;
     const to = await resolveAdminRecipients();
     if (!to.length) return;
     const { subject, html } = buildAdminNotifyEmail({

@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { makeFakeDb } from '../testutil/fakeSeriesAdminDb.js';
+import { makeFakeDb, matches } from '../testutil/fakeSeriesAdminDb.js';
 import { memoryRateStore } from '../lib/authRateLimit.js';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
+const CA1 = 'c0000000-0000-4000-8000-0000000000a1';
+const CB1 = 'c0000000-0000-4000-8000-0000000000b1';
+const CG1 = 'c0000000-0000-4000-8000-0000000000e1';
+const PA1 = 'd0000000-0000-4000-8000-0000000000a1';
+const PB1 = 'd0000000-0000-4000-8000-0000000000b1';
+const MISSING = 'c0000000-0000-4000-8000-0000000000ff';
 
 const m = vi.hoisted(() => ({
   fake: null as any,
   actor: { email: 'brand@partner.com', userId: 'u-brand' },
   superAdmins: new Set<string>(['boss@example.com']),
   notifyHost: vi.fn(),
+  invalidate: vi.fn(),
   statusAudit: vi.fn(),
   state: null as any,
 }));
@@ -26,7 +33,7 @@ vi.mock('../middleware/auth.js', () => ({
 }));
 vi.mock('../services/partyStatusEmailNotify.js', () => ({ emailHostOfStatusChange: (...a: any[]) => m.notifyHost(...a) }));
 vi.mock('../helpers/statusAudit.js', () => ({ writeStatusAudit: (...a: any[]) => m.statusAudit(...a) }));
-vi.mock('../lib/siteBrand.js', () => ({ brandedSiteForParty: async () => null }));
+vi.mock('../lib/siteBrand.js', () => ({ brandedSiteForParty: async () => null, invalidateSiteBrandCache: () => m.invalidate() }));
 vi.mock('../lib/resendSend.js', () => ({ sendBrandedEmail: vi.fn() }));
 vi.mock('../config/secrets.js', () => ({ getJwtSecret: () => 'test-secret' }));
 
@@ -63,21 +70,18 @@ function buildState() {
   const series: Record<string, any> = { [A]: seriesRow(A), [B]: seriesRow(B, { brandName: 'Other Brand' }) };
   const audit: any[] = fake.audit;
   const checklist: any[] = [
-    { id: 'ca1', seriesId: A, name: 'Book venue', dueDate: null, linkTab: null, sortOrder: 0, isAuto: false },
-    { id: 'cb1', seriesId: B, name: 'B item', dueDate: null, linkTab: null, sortOrder: 0, isAuto: false },
-    { id: 'cg1', seriesId: null, name: 'Global item', dueDate: null, linkTab: null, sortOrder: 0, isAuto: false },
+    { id: CA1, seriesId: A, name: 'Book venue', dueDate: null, linkTab: null, sortOrder: 0, isAuto: false },
+    { id: CB1, seriesId: B, name: 'B item', dueDate: null, linkTab: null, sortOrder: 0, isAuto: false },
+    { id: CG1, seriesId: null, name: 'Global item', dueDate: null, linkTab: null, sortOrder: 0, isAuto: false },
   ];
   const parties: any[] = [
-    { id: 'pa1', eventSeriesId: A, underbossStatus: 'pending', name: 'A event', cancelledAt: null },
-    { id: 'pb1', eventSeriesId: B, underbossStatus: 'pending', name: 'B event', cancelledAt: null },
+    { id: PA1, eventSeriesId: A, underbossStatus: 'pending', name: 'A event', cancelledAt: null },
+    { id: PB1, eventSeriesId: B, underbossStatus: 'pending', name: 'B event', cancelledAt: null },
   ];
   const writes = vi.fn();
-  const match = (row: any, where: any) => Object.entries(where || {}).every(([k, v]) => {
-    if (v && typeof v === 'object' && 'in' in (v as any)) return (v as any).in.includes(row[k]);
-    if (v && typeof v === 'object' && 'not' in (v as any)) return row[k] !== (v as any).not;
-    if (v && typeof v === 'object') return true; // relation filters
-    return row[k] === v;
-  });
+  // Real relation matching: `party: { eventSeriesId }` on checklist items resolves through the parties table.
+  const rel = { party: (r: any) => parties.find((p) => p.id === r.partyId) } as any;
+  const match = (row: any, where: any) => matches(row, where, rel);
   const sel = (row: any, select?: any) => (row && select ? Object.fromEntries(Object.keys(select).map((k) => [k, row[k] ?? null])) : row && { ...row });
   const db: any = fake.db;
   db.eventSeries = {
@@ -123,7 +127,22 @@ function buildState() {
       return { count: hit.length };
     },
   };
-  db.checklistItem = { updateMany: async (a: any) => { writes('checklistItem.updateMany', a); return { count: 0 }; } };
+  const items: any[] = [
+    { id: 'e0000000-0000-4000-8000-0000000000a1', partyId: PA1, isDefault: true, name: 'Book venue', dueDate: null, linkTab: null },
+    { id: 'e0000000-0000-4000-8000-0000000000b1', partyId: PB1, isDefault: true, name: 'Book venue', dueDate: null, linkTab: null },
+  ];
+  db.checklistItem = {
+    updateMany: async ({ where, data }: any) => {
+      writes('checklistItem.updateMany', where, data);
+      const hit = items.filter((r) => match(r, where));
+      hit.forEach((r) => Object.assign(r, data));
+      return { count: hit.length };
+    },
+  };
+  const statusAudits: any[] = [];
+  db.partyStatusAudit = {
+    findFirst: async ({ where }: any) => [...statusAudits].reverse().find((r) => r.partyId === where.partyId) ?? null,
+  };
   db.party = {
     findFirst: async ({ where, select }: any) => sel(parties.find((r) => match(r, where)), select),
     findMany: async ({ where }: any) => parties.filter((r) => match(r, where)),
@@ -134,7 +153,7 @@ function buildState() {
       return { id: row.id, underbossStatus: row.underbossStatus };
     },
   };
-  return { fake, db, series, audit, checklist, parties, writes, admins: fake.admins };
+  return { fake, db, series, audit, checklist, parties, items, statusAudits, writes, admins: fake.admins };
 }
 
 const lastAudit = (s: any) => s.audit.at(-1);
@@ -142,6 +161,9 @@ const lastAudit = (s: any) => s.audit.at(-1);
 beforeEach(() => {
   vi.clearAllMocks();
   m.state = buildState();
+  m.statusAudit.mockImplementation((_tx: any, partyId: string, _o: any, newStatus: string, _email: string, actorKind: string, reason?: string) => {
+    m.state.statusAudits.push({ partyId, newStatus, actorKind, reason: reason ?? null });
+  });
   m.state.admins.push({ id: 'mem-a', seriesId: A, email: 'brand@partner.com', status: 'active', alertsEnabled: true, role: 'editor' });
   as('brand@partner.com');
   setInviteLimitStore(memoryRateStore());
@@ -175,10 +197,10 @@ describe('cross-tenant matrix: admin of A against series B', () => {
     ['post', `/${B}/revert`, { auditId: '33333333-3333-4333-8333-333333333333' }],
     ['get', `/${B}/checklist`],
     ['post', `/${B}/checklist`, { name: 'x' }],
-    ['patch', `/${B}/checklist/cb1`, { name: 'x' }],
-    ['delete', `/${B}/checklist/cb1`],
+    ['patch', `/${B}/checklist/${CB1}`, { name: 'x' }],
+    ['delete', `/${B}/checklist/${CB1}`],
     ['get', `/${B}/events`],
-    ['patch', `/${B}/events/pb1/status`, { status: 'approved' }],
+    ['patch', `/${B}/events/${PB1}/status`, { status: 'approved' }],
     ['patch', `/${B}/alerts`, { alertsEnabled: false }],
   ];
 
@@ -321,8 +343,8 @@ describe('audit history and revert', () => {
       createdAt: new Date(),
     });
     const rev = await request(app).post(`/api/brand-admin/${A}/revert`).send({ auditId: 'au-old' }).catch((e) => e);
-    // 'au-old' is not a uuid: rejected up front
-    expect(rev.status).toBe(400);
+    // 'au-old' is not a uuid: a 404 up front
+    expect(rev.status).toBe(404);
     m.state.audit[0].id = '44444444-4444-4444-8444-444444444444';
     const ok = await request(app).post(`/api/brand-admin/${A}/revert`).send({ auditId: '44444444-4444-4444-8444-444444444444' });
     expect(ok.status).toBe(200);
@@ -347,7 +369,7 @@ describe('checklist', () => {
 
   it('lists only this series (never the global template or another series)', async () => {
     const res = await request(app).get(base);
-    expect(res.body.items.map((i: any) => i.id)).toEqual(['ca1']);
+    expect(res.body.items.map((i: any) => i.id)).toEqual([CA1]);
   });
 
   it('creates in the caller series from the path, audited; seriesId / isAuto / autoRule in the body are rejected', async () => {
@@ -370,27 +392,27 @@ describe('checklist', () => {
   });
 
   it('edits and deletes this series items; another series item and a global default are untouchable (404)', async () => {
-    expect((await request(app).patch(`${base}/ca1`).send({ name: 'Book the venue' })).status).toBe(200);
-    expect(m.state.checklist.find((i: any) => i.id === 'ca1').name).toBe('Book the venue');
+    expect((await request(app).patch(`${base}/${CA1}`).send({ name: 'Book the venue' })).status).toBe(200);
+    expect(m.state.checklist.find((i: any) => i.id === CA1).name).toBe('Book the venue');
     m.state.writes.mockClear();
     const auditCount = m.state.audit.length;
-    for (const id of ['cb1', 'cg1', 'missing']) {
+    for (const id of [CB1, CG1, MISSING]) {
       expect((await request(app).patch(`${base}/${id}`).send({ name: 'hacked' })).status).toBe(404);
       expect((await request(app).delete(`${base}/${id}`)).status).toBe(404);
     }
     expect(m.state.checklist.map((i: any) => i.name)).toEqual(expect.arrayContaining(['B item', 'Global item']));
     expect(m.state.writes.mock.calls.filter((c: any[]) => c[0] === 'checklistDefault.deleteMany')).toHaveLength(0);
     expect(m.state.audit).toHaveLength(auditCount);
-    expect((await request(app).delete(`${base}/ca1`)).status).toBe(200);
+    expect((await request(app).delete(`${base}/${CA1}`)).status).toBe(200);
     expect(lastAudit(m.state)).toMatchObject({ action: 'checklist.delete', seriesId: A });
   });
 
   it('every checklist write is scoped by series id in the where clause', async () => {
-    await request(app).patch(`${base}/ca1`).send({ sortOrder: 3 });
-    await request(app).delete(`${base}/ca1`);
+    await request(app).patch(`${base}/${CA1}`).send({ sortOrder: 3 });
+    await request(app).delete(`${base}/${CA1}`);
     const scopedWrites = m.state.writes.mock.calls.filter((c: any[]) => /checklistDefault\.(updateMany|deleteMany)/.test(c[0]));
     expect(scopedWrites.length).toBe(2);
-    for (const c of scopedWrites) expect(c[1]).toMatchObject({ id: 'ca1', seriesId: A });
+    for (const c of scopedWrites) expect(c[1]).toMatchObject({ id: CA1, seriesId: A });
   });
 });
 
@@ -399,20 +421,20 @@ describe('events and the PizzaDAO veto', () => {
 
   it('lists only the series events', async () => {
     const res = await request(app).get(`/api/brand-admin/${A}/events?status=pending`);
-    expect(res.body.events.map((e: any) => e.id)).toEqual(['pa1']);
+    expect(res.body.events.map((e: any) => e.id)).toEqual([PA1]);
     expect((await request(app).get(`/api/brand-admin/${A}/events?status=bogus`)).status).toBe(400);
   });
 
   it("approves its own series' event: audited in series_audit and party_status_audit, host emailed", async () => {
-    expect((await ev('pa1', 'approved')).status).toBe(200);
+    expect((await ev(PA1, 'approved')).status).toBe(200);
     expect(m.state.parties[0].underbossStatus).toBe('approved');
     expect(lastAudit(m.state)).toMatchObject({ action: 'event.status', actorKind: 'series_admin', seriesId: A });
-    expect(m.statusAudit).toHaveBeenCalledWith(expect.anything(), 'pa1', 'pending', 'approved', 'brand@partner.com', 'admin', 'brand admin');
-    expect(m.notifyHost).toHaveBeenCalledWith('pa1', 'approved');
+    expect(m.statusAudit).toHaveBeenCalledWith(expect.anything(), PA1, 'pending', 'approved', 'brand@partner.com', 'admin', 'brand admin');
+    expect(m.notifyHost).toHaveBeenCalledWith(PA1, 'approved');
   });
 
   it("another series' party (even through our own series id) is a 404 and untouched", async () => {
-    const res = await ev('pb1', 'approved');
+    const res = await ev(PB1, 'approved');
     expect(res.status).toBe(404);
     expect(m.state.parties[1].underbossStatus).toBe('pending');
     expect(m.state.writes.mock.calls.filter((c: any[]) => c[0] === 'party.update')).toHaveLength(0);
@@ -420,24 +442,24 @@ describe('events and the PizzaDAO veto', () => {
   });
 
   it('only approved / rejected / hidden are settable', async () => {
-    expect((await ev('pa1', 'pending')).status).toBe(400);
-    expect((await ev('pa1', 'listed')).status).toBe(400);
+    expect((await ev(PA1, 'pending')).status).toBe(400);
+    expect((await ev(PA1, 'listed')).status).toBe(400);
   });
 
   it('a super-admin can overrule a brand-admin decision through the admin route', async () => {
-    await ev('pa1', 'approved');
+    await ev(PA1, 'approved');
     m.notifyHost.mockClear();
     as('boss@example.com');
-    const res = await request(app).patch(`/api/admin/series/${A}/events/pa1/status`).send({ status: 'rejected' });
+    const res = await request(app).patch(`/api/admin/series/${A}/events/${PA1}/status`).send({ status: 'rejected' });
     expect(res.status).toBe(200);
     expect(m.state.parties[0].underbossStatus).toBe('rejected');
     expect(lastAudit(m.state)).toMatchObject({ action: 'event.status', actorKind: 'super_admin' });
-    expect(m.notifyHost).toHaveBeenCalledWith('pa1', 'rejected');
+    expect(m.notifyHost).toHaveBeenCalledWith(PA1, 'rejected');
   });
 
   it("the super-admin route is still scoped: a party of another series is a 404", async () => {
     as('boss@example.com');
-    const res = await request(app).patch(`/api/admin/series/${A}/events/pb1/status`).send({ status: 'approved' });
+    const res = await request(app).patch(`/api/admin/series/${A}/events/${PB1}/status`).send({ status: 'approved' });
     expect(res.status).toBe(404);
   });
 });
@@ -472,5 +494,100 @@ describe('own alerts toggle and /me', () => {
     const me = await request(app).get('/api/brand-admin/me');
     expect(me.body.series).toHaveLength(2);
     expect(me.body.series[0].actorKind).toBe('super_admin');
+  });
+});
+
+describe('review hardening', () => {
+  const settings = (body: unknown) => request(app).patch(`/api/brand-admin/${A}/settings`).send(body as object);
+  const ev = (partyId: string, status: string) => request(app).patch(`/api/brand-admin/${A}/events/${partyId}/status`).send({ status });
+  const base = `/api/brand-admin/${A}/checklist`;
+
+  it.each(['PizzaDAO', 'Pizza-DAO Events', 'pizza dao', 'RSV.Pizza', 'R S V Pizza', 'The RSV Pizza Team'])(
+    'rejects reserved brand name %s (brandName, displayName and emailFromName)', async (n) => {
+      expect((await settings({ brandName: n })).status).toBe(400);
+      expect((await settings({ displayName: n })).status).toBe(400);
+      expect((await settings({ emailFromName: n })).status).toBe(400);
+      expect(m.state.writes).not.toHaveBeenCalled();
+    });
+
+  it('still accepts ordinary names', async () => {
+    expect((await settings({ brandName: 'Slice Club', emailFromName: 'Slice Club Events' })).status).toBe(200);
+  });
+
+  it('invalidates the site-brand cache after a real change or revert, not after a no-op', async () => {
+    await settings({ brandName: 'Acme Pizza' });
+    expect(m.invalidate).not.toHaveBeenCalled();
+    await settings({ brandName: 'Acme Slices' });
+    expect(m.invalidate).toHaveBeenCalledTimes(1);
+    const hist = await request(app).get(`/api/brand-admin/${A}/audit`);
+    await request(app).post(`/api/brand-admin/${A}/revert`).send({ auditId: hist.body.history[0].id });
+    expect(m.invalidate).toHaveBeenCalledTimes(2);
+  });
+
+  it('non-uuid child ids (item, party, audit) are 404s with no write', async () => {
+    expect((await request(app).patch(`${base}/not-a-uuid`).send({ name: 'x' })).status).toBe(404);
+    expect((await request(app).delete(`${base}/not-a-uuid`)).status).toBe(404);
+    expect((await ev('not-a-uuid', 'approved')).status).toBe(404);
+    expect((await request(app).post(`/api/brand-admin/${A}/revert`).send({ auditId: 'zz' })).status).toBe(404);
+    expect(m.state.writes).not.toHaveBeenCalled();
+  });
+
+  it('automatic checklist defaults can be neither edited nor deleted by a brand admin (403)', async () => {
+    m.state.checklist.find((i: any) => i.id === CA1).isAuto = true;
+    expect((await request(app).patch(`${base}/${CA1}`).send({ name: 'Renamed' })).status).toBe(403);
+    expect((await request(app).delete(`${base}/${CA1}`)).status).toBe(403);
+    expect(m.state.checklist.find((i: any) => i.id === CA1).name).toBe('Book venue');
+    expect(m.state.audit).toHaveLength(0);
+  });
+
+  it('due-date propagation reaches only this series seeded items (relation filter exercised)', async () => {
+    expect((await request(app).patch(`${base}/${CA1}`).send({ dueDate: '2026-12-24' })).status).toBe(200);
+    const [a, b] = m.state.items;
+    expect(a.dueDate).toEqual(new Date('2026-12-24T00:00:00.000Z'));
+    expect(b.dueDate).toBeNull();
+  });
+
+  it('an inactive series 404s its brand admin', async () => {
+    m.state.fake.seriesState[A].isActive = false;
+    expect((await request(app).get(`/api/brand-admin/${A}/settings`)).status).toBe(404);
+  });
+
+  describe('durable PizzaDAO veto', () => {
+    it('a brand admin cannot change an event after a PizzaDAO actor set its status (409)', async () => {
+      m.state.statusAudits.push({ partyId: PA1, newStatus: 'rejected', actorKind: 'admin', reason: null });
+      const res = await ev(PA1, 'approved');
+      expect(res.status).toBe(409);
+      expect(JSON.stringify(res.body)).toContain("PizzaDAO has set this event's status");
+      expect(m.state.parties.find((p: any) => p.id === PA1).underbossStatus).toBe('pending');
+      expect(m.state.audit).toHaveLength(0);
+    });
+
+    it('same for an underboss, and after a super-admin overrules through the admin route', async () => {
+      m.state.statusAudits.push({ partyId: PA1, newStatus: 'hidden', actorKind: 'underboss', reason: null });
+      expect((await ev(PA1, 'approved')).status).toBe(409);
+      m.state.statusAudits.length = 0;
+      expect((await ev(PA1, 'approved')).status).toBe(200); // brand admin's own decision
+      expect((await ev(PA1, 'rejected')).status).toBe(200); // and they may change their own
+      as('boss@example.com');
+      expect((await request(app).patch(`/api/admin/series/${A}/events/${PA1}/status`).send({ status: 'approved' })).status).toBe(200);
+      as('brand@partner.com');
+      expect((await ev(PA1, 'hidden')).status).toBe(409);
+    });
+
+    it('host or system rows do not block a brand admin', async () => {
+      m.state.statusAudits.push({ partyId: PA1, newStatus: 'pending', actorKind: 'system', reason: null });
+      m.state.statusAudits.push({ partyId: PA1, newStatus: 'pending', actorKind: 'owner', reason: null });
+      expect((await ev(PA1, 'approved')).status).toBe(200);
+    });
+  });
+
+  it('audit history names PizzaDAO staff by role, not email', async () => {
+    m.state.audit.push({
+      id: '00000000-0000-4000-8000-0000000000aa', seriesId: A, actorKind: 'super_admin', actorEmail: 'boss@example.com',
+      action: 'settings.update', changes: { tagline: { old: null, new: 'x' } }, createdAt: new Date(),
+    });
+    const res = await request(app).get(`/api/brand-admin/${A}/audit`);
+    expect(JSON.stringify(res.body)).not.toContain('boss@example.com');
+    expect(res.body.history[0].actorEmail).toBe('PizzaDAO admin');
   });
 });

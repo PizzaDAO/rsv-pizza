@@ -79,14 +79,15 @@ export async function addSeriesChecklistDefault(
 }
 
 export async function updateSeriesChecklistDefault(
+  seriesId: string,
   defaultId: string,
   data: { name?: string; dueDate?: string | null; linkTab?: string | null; isAuto?: boolean; autoRule?: string | null; sortOrder?: number },
 ): Promise<{ item: SeriesChecklistDefault }> {
-  return apiRequest<{ item: SeriesChecklistDefault }>(`/api/admin/series/checklist/${defaultId}`, { method: 'PATCH', body: data });
+  return apiRequest<{ item: SeriesChecklistDefault }>(`/api/admin/series/${seriesId}/checklist/${defaultId}`, { method: 'PATCH', body: data });
 }
 
-export async function deleteSeriesChecklistDefault(defaultId: string): Promise<{ success: boolean }> {
-  return apiRequest<{ success: boolean }>(`/api/admin/series/checklist/${defaultId}`, { method: 'DELETE' });
+export async function deleteSeriesChecklistDefault(seriesId: string, defaultId: string): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/admin/series/${seriesId}/checklist/${defaultId}`, { method: 'DELETE' });
 }
 
 // ---- Public series (landing page) ----

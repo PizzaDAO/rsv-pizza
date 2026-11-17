@@ -33,10 +33,11 @@ import {
   reserveInviteAccept, reserveUserBucket,
   BRAND_ADMIN_SETTINGS_BUCKET, BRAND_ADMIN_SETTINGS_LIMIT, BRAND_ADMIN_WRITE_BUCKET, BRAND_ADMIN_WRITE_LIMIT,
 } from '../lib/seriesInviteLimit.js';
-import { requireSeriesAdmin, type SeriesAdminRequest } from '../lib/seriesAccess.js';
+import { requireSeriesAdmin, UUID_RE, type SeriesAdminRequest } from '../lib/seriesAccess.js';
 import {
   BRAND_SETTINGS_SELECT, validateBrandSettings, applyBrandSettings, pickSettings, visibleChanges, revertToAudit,
 } from '../lib/seriesBrandSettings.js';
+import { invalidateSiteBrandCache } from '../lib/siteBrand.js';
 import { writeSeriesAudit } from '../lib/seriesAudit.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import {
@@ -129,6 +130,10 @@ router.get('/me', requireAuth, async (req: AuthRequest, res: Response, next: Nex
 
 const scoped = Router({ mergeParams: true });
 scoped.use(requireSeriesAdmin);
+// Child ids are uuids too: anything else is a 404 before any query.
+for (const name of ['itemId', 'partyId']) {
+  scoped.param(name, (_req, _res, next, value) => (UUID_RE.test(String(value)) ? next() : next(new AppError('Not found', 404, 'NOT_FOUND'))));
+}
 router.use('/:seriesId', requireAuth, scoped);
 
 scoped.get('/settings', wrap(async (req, res) => {
@@ -143,6 +148,7 @@ scoped.patch('/settings', settingsLimit, wrap(async (req, res) => {
   const data = validateBrandSettings(body as Record<string, unknown>);
   if (Object.keys(data).length === 0) throw new AppError('Nothing to update', 400, 'VALIDATION_ERROR');
   const result = await applyBrandSettings({ ...actor(req), data, action: 'settings.update' });
+  if (result.changed.length) invalidateSiteBrandCache(); // brand name / sender show up in emails within the request, not 60 s later
   res.json(result);
 }));
 
@@ -157,7 +163,9 @@ scoped.get('/audit', wrap(async (req, res) => {
   // Fields are named explicitly (never spread the row): the snapshot column holds money/domain fields.
   const history = rows
     .map((r) => ({
-      id: r.id, actorEmail: r.actorEmail, actorKind: r.actorKind, action: r.action,
+      id: r.id, action: r.action,
+      // PizzaDAO staff are shown by role, not by email.
+      actorEmail: r.actorKind === 'series_admin' ? r.actorEmail : 'PizzaDAO admin', actorKind: r.actorKind,
       changes: visibleChanges(r.changes), createdAt: r.createdAt,
     }))
     .filter((r) => Object.keys(r.changes).length > 0);
@@ -166,8 +174,10 @@ scoped.get('/audit', wrap(async (req, res) => {
 
 scoped.post('/revert', settingsLimit, wrap(async (req, res) => {
   const auditId = (req.body || {}).auditId;
-  if (typeof auditId !== 'string' || !/^[0-9a-f-]{36}$/i.test(auditId)) throw new AppError('auditId is required', 400, 'VALIDATION_ERROR');
-  res.json(await revertToAudit({ ...actor(req), auditId }));
+  if (typeof auditId !== 'string' || !UUID_RE.test(auditId)) throw new AppError('Not found', 404, 'NOT_FOUND');
+  const result = await revertToAudit({ ...actor(req), auditId });
+  if (result.changed.length) invalidateSiteBrandCache();
+  res.json(result);
 }));
 
 // ----- checklist (series defaults only; never the global template) -----
@@ -208,6 +218,7 @@ function checklistData(body: unknown, requireName: boolean): Prisma.ChecklistDef
   return data;
 }
 
+const autoItemForbidden = () => new AppError('Automatic checklist items can only be changed by PizzaDAO', 403, 'FORBIDDEN');
 const dupGuard = (e: any) => (e?.code === 'P2002' ? new AppError('That checklist item name already exists', 400, 'DUPLICATE') : e);
 
 scoped.get('/checklist', wrap(async (req, res) => {
@@ -258,8 +269,9 @@ scoped.patch('/checklist/:itemId', writeLimited, wrap(async (req, res) => {
   try {
     const item = await prisma.$transaction(async (tx) => {
       // Scoped lookup: another series' item (or a global default) is a 404.
-      const before = await tx.checklistDefault.findFirst({ where: { id: itemId, seriesId }, select: { id: true, name: true } });
+      const before = await tx.checklistDefault.findFirst({ where: { id: itemId, seriesId }, select: { id: true, name: true, isAuto: true } });
       if (!before) throw new AppError('Checklist item not found', 404, 'NOT_FOUND');
+      if (before.isAuto) throw autoItemForbidden();
       const res = await tx.checklistDefault.updateMany({ where: { id: itemId, seriesId }, data: data as Prisma.ChecklistDefaultUpdateManyMutationInput });
       if (res.count !== 1) throw new AppError('Checklist item not found', 404, 'NOT_FOUND');
       const updated = await tx.checklistDefault.findFirst({
@@ -291,8 +303,9 @@ scoped.patch('/checklist/:itemId', writeLimited, wrap(async (req, res) => {
 scoped.delete('/checklist/:itemId', writeLimited, wrap(async (req, res) => {
   const { seriesId } = req.seriesAdmin!;
   await prisma.$transaction(async (tx) => {
-    const before = await tx.checklistDefault.findFirst({ where: { id: req.params.itemId, seriesId }, select: { id: true, name: true } });
+    const before = await tx.checklistDefault.findFirst({ where: { id: req.params.itemId, seriesId }, select: { id: true, name: true, isAuto: true } });
     if (!before) throw new AppError('Checklist item not found', 404, 'NOT_FOUND');
+    if (before.isAuto) throw autoItemForbidden();
     const r = await tx.checklistDefault.deleteMany({ where: { id: req.params.itemId, seriesId } });
     if (r.count !== 1) throw new AppError('Checklist item not found', 404, 'NOT_FOUND');
     await writeSeriesAudit(tx, {

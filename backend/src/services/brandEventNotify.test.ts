@@ -187,10 +187,11 @@ describe('brand-admin alerts (series_admins)', () => {
     expect(bodies().map((b) => b.to)).toEqual([['a@partner.com'], ['b@partner.com']]);
   });
 
-  it('active admins who all opted out still silence PizzaDAO (brand has an admin) but nobody is emailed', async () => {
+  it('brand admins who all opted out do not silence PizzaDAO: someone is always told', async () => {
     mockPrisma.seriesAdmin.findMany.mockResolvedValue([{ email: 'q@partner.com', alertsEnabled: false }]);
     await notifyAdminsOfBrandEvent('p1');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(bodies()).toHaveLength(1);
+    expect(bodies()[0].to).toEqual(['a@x.com', 'b@x.com']);
   });
 
   it('SERIES_ADMIN_ALERTS=off restores the PizzaDAO alert and sends nothing to brand admins', async () => {

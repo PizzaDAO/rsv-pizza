@@ -14,6 +14,7 @@
  * Execute Payout (POST /:id/execute) is intentionally a 501 stub here — PR 5
  * wires in the actual Mercury / wire / USDC-via-Privy execution paths.
  */
+import { notBrandOnlyApproved } from '../lib/partyApproval.js';
 import { Router, Request, Response, NextFunction } from 'express';
 import { customAlphabet } from 'nanoid';
 import sharp from 'sharp';
@@ -743,6 +744,7 @@ async function buildPayoutWhere(query: Request['query']): Promise<any> {
   // argentina-92103: merged with optional region filter for regional portals.
   where.party = {
     underbossStatus: 'approved',
+    ...notBrandOnlyApproved, // brand-admin-only approvals don't unlock payouts
     ...countryClause,
     ...tagClause,
     ...regionClause,
@@ -1118,6 +1120,7 @@ router.get(
       const parties = await prisma.party.findMany({
         where: {
           underbossStatus: 'approved',
+          ...notBrandOnlyApproved,
           id: { in: ids },
         },
         select: {
@@ -1413,6 +1416,7 @@ router.get(
         where: {
           eventTags: { has: 'prepay' },
           underbossStatus: 'approved',
+          ...notBrandOnlyApproved,
           ...regionFilter,
         },
         select: {

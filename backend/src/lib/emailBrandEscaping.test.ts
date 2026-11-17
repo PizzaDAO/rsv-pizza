@@ -55,4 +55,14 @@ describe('brand name in emails is escaped', () => {
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
   });
+
+  it('reminder email escapes party, guest, venue, address and image (including the alt attribute)', () => {
+    const html = buildReminderHtml({
+      guestName: EVIL, whenText: 'w', addressText: EVIL, partyName: EVIL, eventUrl: 'https://x.example.org/e',
+      unsubUrl: 'https://x.example.org/u', venueName: EVIL, address: EVIL, imageUrl: 'https://x.example.org/a.png' + EVIL,
+    });
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('onerror=alert(1)>');
+    expect(html).toContain('alt="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"');
+  });
 });

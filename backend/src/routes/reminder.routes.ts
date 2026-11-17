@@ -162,8 +162,16 @@ export function buildReminderHtml(params: {
   /** Origin that serves the banner image (the party's own site). Default: www.rsv.pizza. */ // brand-check-ignore-line
   siteUrl?: string;
 }): string {
-  const { guestName, whenText, addressText, partyName, eventUrl, unsubUrl, venueName, address, imageUrl } =
-    params;
+  // Everything interpolated into the HTML is escaped: party/guest/venue text is user-controlled.
+  const guestName = escapeHtml(params.guestName);
+  const whenText = escapeHtml(params.whenText);
+  const addressText = escapeHtml(params.addressText);
+  const partyName = escapeHtml(params.partyName);
+  const eventUrl = escapeHtml(params.eventUrl);
+  const unsubUrl = escapeHtml(params.unsubUrl);
+  const venueName = params.venueName ? escapeHtml(params.venueName) : params.venueName;
+  const address = params.address ? escapeHtml(params.address) : params.address;
+  const imageUrl = params.imageUrl ? escapeHtml(params.imageUrl) : params.imageUrl;
   const siteName = escapeHtml(params.siteName ?? 'RSV.Pizza'); // brand-check-ignore-line
   const bannerUrl = `${params.siteUrl ?? 'https://www.rsv.pizza'}/reminder-see-you-in-4-hours.png`; // brand-check-ignore-line
 

@@ -4,13 +4,15 @@
  * (`/api/brand-admin/:seriesId/events/:partyId/status`), so both write the same audit trail.
  *
  * The party is always looked up by `{ id, eventSeriesId }`, so a party of another series is a 404.
- * Brand-admin decisions are final, but a super-admin can set any status again (the veto), since this
- * function has no "already decided" lock.
+ * Brand-admin decisions are final, but PizzaDAO keeps a durable veto: a super-admin (or underboss) can
+ * set any status again, and once a PizzaDAO actor has set a status a brand admin can no longer change
+ * it (409). Brand-admin audit rows are tagged reason 'brand admin' (lib/partyApproval.ts).
  */
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
+import { BRAND_ADMIN_REASON, isPizzadaoSet } from './partyApproval.js';
 import { writeSeriesAudit, type SeriesActorKind } from './seriesAudit.js';
 
 export const SETTABLE_EVENT_STATUSES = ['approved', 'rejected', 'hidden'] as const;
@@ -50,6 +52,16 @@ export async function setSeriesEventStatus(opts: {
     });
     if (!before) throw new AppError('Party not found in this series', 404, 'NOT_FOUND');
     priorStatus = before.underbossStatus;
+    if (actorKind === 'series_admin') {
+      const last = await tx.partyStatusAudit.findFirst({
+        where: { partyId },
+        orderBy: { createdAt: 'desc' },
+        select: { actorKind: true, reason: true },
+      });
+      if (isPizzadaoSet(last)) {
+        throw new AppError("PizzaDAO has set this event's status", 409, 'PIZZADAO_DECIDED');
+      }
+    }
     const updated = await tx.party.update({
       where: { id: partyId },
       data: { underbossStatus: status },
@@ -57,7 +69,7 @@ export async function setSeriesEventStatus(opts: {
     });
     await writeStatusAudit(
       tx, partyId, before.underbossStatus, status, actorEmail, 'admin',
-      actorKind === 'series_admin' ? 'brand admin' : undefined,
+      actorKind === 'series_admin' ? BRAND_ADMIN_REASON : undefined,
     );
     await writeSeriesAudit(tx, {
       seriesId, actorEmail, actorKind, action: 'event.status',
