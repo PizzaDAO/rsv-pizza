@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, renderHook } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 
 const auth = vi.hoisted(() => ({ user: { id: 'u1', email: 'brand@example.org' } as any, loading: false }));
@@ -30,7 +30,8 @@ const assetApi = vi.hoisted(() => ({ uploadBrandAsset: vi.fn(), removeBrandAsset
 vi.mock('../lib/seriesApi', async (orig) => ({ ...(await orig<typeof import('../lib/seriesApi')>()), ...assetApi }));
 
 import { BrandAdminPage } from './BrandAdminPage';
-import { resolveAccessibleSeries } from '../lib/brandAdminAccess';
+import { planMove } from '../components/brand-admin/ChecklistPanel';
+import { resolveAccessibleSeries, useBrandAdminAccess } from '../lib/brandAdminAccess';
 
 const SID = '11111111-1111-4111-8111-111111111111';
 const mkSeries = (over: Record<string, unknown> = {}) => ({
@@ -63,6 +64,22 @@ beforeEach(() => {
   api.fetchBrandHistory.mockResolvedValue({ history: [] });
   api.fetchBrandChecklist.mockResolvedValue({ items: [] });
   api.fetchBrandEvents.mockResolvedValue({ events: [] });
+});
+
+describe('access hook', () => {
+  it('never shows a previous user\'s series after the user changes or signs out', async () => {
+    api.fetchBrandAdminMe.mockResolvedValueOnce({ series: [mkSeries()] });
+    const { result, rerender } = renderHook(({ on, id }: { on: boolean; id: string | null }) => useBrandAdminAccess(on, id), { initialProps: { on: true, id: 'u1' as string | null } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    let release: (v: unknown) => void = () => undefined;
+    api.fetchBrandAdminMe.mockReturnValueOnce(new Promise((r) => { release = r; }));
+    rerender({ on: true, id: 'u2' });
+    expect(result.current.status).toBe('loading');
+    release({ series: [] });
+    await waitFor(() => expect(result.current).toEqual({ status: 'ready', series: [] }));
+    rerender({ on: false, id: null });
+    expect(result.current.status).toBe('loading');
+  });
 });
 
 describe('admin gating', () => {
@@ -130,13 +147,19 @@ describe('Look tab (theme editor)', () => {
 
   it('applies the draft to the live preview only (scoped variables, no API call, document untouched)', async () => {
     await open();
-    const preview = screen.getByTestId('theme-preview');
-    expect(preview.style.getPropertyValue('--accent')).toBe('#e6212f');
+    const frame = screen.getByTestId('theme-preview') as HTMLIFrameElement;
+    const root = () => frame.contentDocument!.documentElement;
+    await waitFor(() => expect(root().style.getPropertyValue('--accent')).toBe('#e6212f'));
+    // an old page-level theme class must not reach the preview: the frame is its own document
+    document.documentElement.classList.add('doge-theme');
+    expect(root().classList.contains('doge-theme')).toBe(false);
+    document.documentElement.classList.remove('doge-theme');
     fireEvent.change(hex('Accent (buttons)'), { target: { value: '#00aa55' } });
-    await waitFor(() => expect(preview.style.getPropertyValue('--accent')).toBe('#00aa55'));
+    await waitFor(() => expect(root().style.getPropertyValue('--accent')).toBe('#00aa55'));
     expect(api.saveBrandSettings).not.toHaveBeenCalled();
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('');
-    expect(preview.className).toContain('wl-theme');
+    expect(root().classList.contains('wl-theme')).toBe(true);
+    expect(frame.contentDocument!.body.textContent).toContain('Pizza night downtown');
   });
 
   it('a failing text contrast pair shows an error chip and blocks Save', async () => {
@@ -301,6 +324,52 @@ describe('Checklist tab', () => {
     fireEvent.click(screen.getByText('Add'));
     await waitFor(() => expect(api.addBrandChecklistItem).toHaveBeenCalledWith(SID, { name: 'Order pizza' }));
     expect(await screen.findByText('Order pizza')).toBeTruthy();
+  });
+});
+
+describe('Checklist reorder', () => {
+  // doge-like: 1-based, automatic items interleaved
+  const seeded = [
+    { id: 'a1', name: 'Auto 1', dueDate: null, linkTab: null, sortOrder: 1, isAuto: true },
+    { id: 'm2', name: 'Manual 2', dueDate: null, linkTab: null, sortOrder: 2, isAuto: false },
+    { id: 'm3', name: 'Manual 3', dueDate: null, linkTab: null, sortOrder: 3, isAuto: false },
+    { id: 'a4', name: 'Auto 4', dueDate: null, linkTab: null, sortOrder: 4, isAuto: true },
+    { id: 'm5', name: 'Manual 5', dueDate: null, linkTab: null, sortOrder: 5, isAuto: false },
+  ];
+
+  it('swaps the two stored values: no ties, at most 2 PATCHes', () => {
+    const patches = planMove(seeded, 2, -1);
+    expect(patches).toEqual([{ id: 'm3', sortOrder: 2 }, { id: 'm2', sortOrder: 3 }]);
+    expect(patches.length).toBeLessThanOrEqual(2);
+    const after = seeded.map((i) => ({ ...i, sortOrder: patches.find((p) => p.id === i.id)?.sortOrder ?? i.sortOrder }));
+    expect(new Set(after.map((i) => i.sortOrder)).size).toBe(after.length);
+    expect(planMove(seeded, 1, -1)).toEqual([]); // neighbour is automatic
+  });
+
+  it('picks a free value when the two are tied, never creating another tie', () => {
+    const tied = [
+      { id: 'x', name: 'X', dueDate: null, linkTab: null, sortOrder: 3, isAuto: false },
+      { id: 'y', name: 'Y', dueDate: null, linkTab: null, sortOrder: 3, isAuto: false },
+      { id: 'z', name: 'Z', dueDate: null, linkTab: null, sortOrder: 5, isAuto: false },
+    ];
+    const up = planMove(tied, 1, -1);
+    expect(up).toHaveLength(1);
+    expect([3, 5]).not.toContain(up[0].sortOrder);
+    const down = planMove(tied, 0, 1);
+    expect(down).toHaveLength(1);
+    expect([3, 5]).not.toContain(down[0].sortOrder);
+  });
+
+  it('sends the swap and reloads the stored order, also when a PATCH fails part-way', async () => {
+    api.fetchBrandChecklist.mockResolvedValue({ items: seeded });
+    api.updateBrandChecklistItem.mockResolvedValueOnce({ item: seeded[2], propagated: 0 }).mockRejectedValueOnce(new Error('boom'));
+    renderAt('/brand-admin/checklist');
+    const rows = await screen.findAllByTestId('checklist-item');
+    fireEvent.click(within(rows[1]).getByLabelText('Move up'));
+    await waitFor(() => expect(api.updateBrandChecklistItem).toHaveBeenCalledTimes(2));
+    expect(api.updateBrandChecklistItem.mock.calls.map((c) => [c[1], c[2]])).toEqual([['m3', { sortOrder: 2 }], ['m2', { sortOrder: 3 }]]);
+    await waitFor(() => expect(api.fetchBrandChecklist).toHaveBeenCalledTimes(2)); // reloaded
+    expect(await screen.findByText('boom')).toBeTruthy();
   });
 });
 

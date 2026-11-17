@@ -22,11 +22,34 @@ const linkLabel = (v: string | null) => LINK_TAB_OPTIONS.find((o) => o.value ===
 const dateOnly = (v: string | null) => (v ? String(v).slice(0, 10) : '');
 const NAME_MAX = 120;
 
+/**
+ * The PATCHes (at most 2) that move item `index` one step. It swaps the two stored sortOrder values, so
+ * the interleaved, 1-based seeded lists (with automatic items) never gain ties. If the two values are
+ * equal, one item takes a free value on the correct side instead.
+ */
+export function planMove(list: BrandChecklistItem[], index: number, dir: -1 | 1): Array<{ id: string; sortOrder: number }> {
+  const a = list[index];
+  const b = list[index + dir];
+  if (!a || !b || a.isAuto || b.isAuto) return [];
+  if (a.sortOrder !== b.sortOrder) return [{ id: a.id, sortOrder: b.sortOrder }, { id: b.id, sortOrder: a.sortOrder }];
+  const v = a.sortOrder;
+  const used = new Set(list.map((i) => i.sortOrder));
+  const below = () => { for (let x = v - 1; x >= 0; x--) if (!used.has(x)) return x; return null; };
+  const above = () => { for (let x = v + 1; x <= 10000; x++) if (!used.has(x)) return x; return null; };
+  // `lo` must end up before `hi`: the earlier item moves down to a free value, or the later one up.
+  const [lo, hi] = dir === -1 ? [a, b] : [b, a];
+  const l = below();
+  if (l !== null) return [{ id: lo.id, sortOrder: l }];
+  const h = above();
+  return h !== null ? [{ id: hi.id, sortOrder: h }] : [];
+}
+
 export function validateItemName(name: string): string | null {
   const n = name.trim();
   if (!n) return 'Give the item a name';
   if (n.length > NAME_MAX) return `Keep it to ${NAME_MAX} characters`;
-  if (/[<>\u0000-\u001f\u007f]/.test(n)) return "Names can't contain < or >";
+  if (/[<>]/.test(n)) return "Names can't contain < or >";
+  if (/[\u0000-\u001f\u007f]/.test(n)) return "Names can't contain control characters (such as tabs or line breaks)";
   return null;
 }
 
@@ -159,15 +182,12 @@ export const ChecklistPanel: React.FC<{ seriesId: string }> = ({ seriesId }) => 
   });
 
   const move = (index: number, dir: -1 | 1) => run(async () => {
-    const list = [...(items ?? [])];
-    const j = index + dir;
-    if (j < 0 || j >= list.length) return;
-    [list[index], list[j]] = [list[j], list[index]];
-    // Give every item whose stored position no longer matches its place its new place (usually just two).
-    const changed = list.map((it, pos) => ({ it, pos })).filter(({ it, pos }) => it.sortOrder !== pos && !it.isAuto);
-    const next = list.map((it, pos) => ({ ...it, sortOrder: pos }));
-    for (const { it, pos } of changed) await updateBrandChecklistItem(seriesId, it.id, { sortOrder: pos });
-    setItems(next);
+    const patches = planMove(items ?? [], index, dir);
+    try {
+      for (const p of patches) await updateBrandChecklistItem(seriesId, p.id, { sortOrder: p.sortOrder });
+    } finally {
+      await load(); // the UI always shows the stored order, even if a PATCH failed part-way
+    }
   });
 
   if (loadError) {

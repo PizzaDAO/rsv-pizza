@@ -27,6 +27,12 @@ const STAGE_LABEL: Record<BrandUploadStage, { text: string; pct: number }> = {
   processing: { text: 'Processing your image…', pct: 80 },
 };
 
+const FG_CLASS = {
+  dark: 'text-neutral-300',
+  light: 'text-neutral-600',
+  checker: 'text-theme-text-muted',
+};
+
 const BG_CLASS = {
   dark: 'bg-[#111]',
   light: 'bg-[#f4f4f5]',
@@ -97,7 +103,7 @@ const SlotCard: React.FC<{ info: SlotInfo; seriesId: string; url: string | null;
         {url && !imgBroken ? (
           <img src={url} alt={`${info.title} (current)`} className="max-h-full max-w-full object-contain" onError={() => setImgBroken(true)} />
         ) : (
-          <div className="flex flex-col items-center gap-1 text-xs text-theme-text-muted">
+          <div className={`flex flex-col items-center gap-1 text-xs ${FG_CLASS[info.bg]}`}>
             <ImageOff size={20} />
             <span>{url ? 'Could not load the image' : 'Using the default'}</span>
           </div>

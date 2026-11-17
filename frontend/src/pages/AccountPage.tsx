@@ -47,7 +47,7 @@ export function AccountPage() {
   const [sponsorships, setSponsorships] = useState<UserSponsorshipEntry[]>([]);
 
   // Brand admins (and super-admins) get a link to this site's brand settings; nobody else sees anything.
-  const brandAdmin = useBrandAdminAccess(!!user);
+  const brandAdmin = useBrandAdminAccess(!!user, user?.id ?? null);
   const showBrandAdminLink = brandAdmin.status === 'ready' && brandAdmin.series.length > 0;
 
   const [saving, setSaving] = useState(false);

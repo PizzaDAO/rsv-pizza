@@ -87,7 +87,7 @@ export function BrandAdminPage() {
   const [showLogin, setShowLogin] = useState(false);
   const [retry, setRetry] = useState(0);
   const [pickedId, setPickedId] = useState<string | null>(null);
-  const access = useBrandAdminAccess(!!user, retry);
+  const access = useBrandAdminAccess(!!user, user?.id ?? null, retry);
 
   // Hooks are all above; the branches below only choose what to render.
   if (authLoading || (user && access.status === 'loading')) {

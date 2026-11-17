@@ -142,12 +142,12 @@ export function describeUploadError(e: unknown): string {
   const msg = err?.message || '';
   switch (err?.code) {
     case 'FILE_TOO_BIG':
-      return msg || 'That image is too big (10 MB max).';
+      return /too big/i.test(msg) ? msg : 'That image is too big (10 MB max).';
     case 'BAD_FILE_TYPE':
     case 'BAD_FILE_SIZE':
-      return msg || 'Please upload a PNG, JPEG or WebP image (SVG, GIF and AVIF are not accepted).';
+      return /PNG, JPEG/.test(msg) ? msg : 'Please upload a PNG, JPEG or WebP image (SVG, GIF and AVIF are not accepted).';
     case 'RATE_LIMITED':
-      return msg && msg !== 'Request failed' ? msg : 'Too many uploads. Please try again later.';
+      return msg && msg !== 'Request failed' && !/upload failed/i.test(msg) ? msg : 'Too many uploads. Please try again later.';
     case 'UPLOADS_UNAVAILABLE':
       return 'Image uploads are not available yet. Please contact PizzaDAO.';
     case 'UNAVAILABLE':

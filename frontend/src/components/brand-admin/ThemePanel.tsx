@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Mail, Lock } from 'lucide-react';
 import { ColorInput } from './ColorInput';
 import { IconInput } from '../IconInput';
@@ -16,60 +17,103 @@ interface Props {
   onSaved: (s: BrandSettings) => void;
 }
 
-/** Load the (fixed-table) font stylesheets the preview needs. Idempotent, same markers as themeRuntime. */
-function useFontLinks(t: Pick<ThemeTokens, 'fontHeading' | 'fontBody'> | null) {
-  const heading = t?.fontHeading;
-  const body = t?.fontBody;
+/** The sample page shown inside the preview frame. */
+const PreviewContent: React.FC<{ brandName: string }> = ({ brandName }) => (
+  <div style={{ background: 'var(--bg-main)', color: 'var(--text-primary)', fontFamily: 'var(--font-body)', minHeight: 0 }}>
+    <div className="site-header flex items-center justify-between gap-3 px-4 py-3" style={{ background: 'var(--bg-header)', borderBottom: '1px solid var(--stroke)' }}>
+      <span className="font-bold truncate" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}>{brandName || 'Your brand'}</span>
+      <span className="text-sm shrink-0" style={{ color: 'var(--text-secondary)' }}>Log in</span>
+    </div>
+    <div className="p-4 space-y-4">
+      <div className="card p-4 space-y-3">
+        <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Pizza night downtown</h3>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Join us for slices, friends and good company.</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Saturday, 6 PM · 42 going</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" tabIndex={-1} className="btn-primary text-sm" style={{ padding: '8px 16px' }}>RSVP</button>
+          <button type="button" tabIndex={-1} className="btn-secondary text-sm" style={{ padding: '8px 16px' }}>Share</button>
+          <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: 'var(--accent-tint)', color: 'var(--accent)' }}>Approved</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--success)' }}>Open</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--warning)' }}>Pending</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--error)' }}>Full</span>
+        </div>
+      </div>
+      <IconInput type="text" icon={Mail} placeholder="Email address" readOnly tabIndex={-1} />
+      <Checkbox checked onChange={() => undefined} label="Notify me about new events" disabled labelClassName="text-sm" />
+    </div>
+  </div>
+);
+
+/**
+ * The live preview renders in an iframe so the page's own theme classes (an old `.doge-theme` etc. on
+ * <html>) cannot bleed into it: the frame's <html> carries only `wl-theme` (+ `wl-light`) and the derived
+ * variables, with this app's stylesheets copied in. The live page is never touched, and the font
+ * stylesheets the preview needs live in the frame's own <head> (removed with it on unmount).
+ */
+export const ThemePreview: React.FC<{ tokens: ThemeTokens; brandName: string }> = ({ tokens, brandName }) => {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [body, setBody] = useState<HTMLElement | null>(null);
+  const [height, setHeight] = useState(430);
+  const vars = useMemo(() => deriveThemeVars(tokens), [tokens]);
+
+  const init = useCallback(() => {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc || !doc.body) return;
+    if (!doc.head.querySelector('[data-wl-preview-styles]')) {
+      const marker = doc.createElement('meta');
+      marker.setAttribute('data-wl-preview-styles', '');
+      doc.head.appendChild(marker);
+      document.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((n) => {
+        if (n.hasAttribute('data-wl-font')) return;
+        doc.head.appendChild(n.cloneNode(true));
+      });
+      doc.body.style.margin = '0';
+    }
+    setBody(doc.body);
+  }, []);
+
+  useLayoutEffect(() => { init(); }, [init]);
+
+  // Variables, mode class and fonts on the frame's own root.
   useEffect(() => {
-    if (!heading || !body) return;
-    for (const href of themeFontHrefs({ fontHeading: heading, fontBody: body })) {
-      const exists = Array.from(document.querySelectorAll('link[data-wl-font]')).some((l) => l.getAttribute('href') === href);
-      if (exists) continue;
-      const link = document.createElement('link');
+    const doc = frameRef.current?.contentDocument;
+    if (!doc || !body) return;
+    const root = doc.documentElement;
+    root.className = `wl-theme ${tokens.mode === 'light' ? 'wl-light' : ''}`.trim();
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    for (const href of themeFontHrefs(tokens)) {
+      if (Array.from(doc.querySelectorAll('link[data-wl-font]')).some((l) => l.getAttribute('href') === href)) continue;
+      const link = doc.createElement('link');
       link.rel = 'stylesheet';
       link.href = href;
       link.setAttribute('data-wl-font', '');
-      document.head.appendChild(link);
+      doc.head.appendChild(link);
     }
-  }, [heading, body]);
-}
+  }, [body, vars, tokens]);
 
-/**
- * The live preview: a scoped `.wl-theme` box whose variables are set inline from the draft. Nothing
- * outside this box changes (the page itself keeps the saved theme), and nothing is sent anywhere.
- */
-export const ThemePreview: React.FC<{ tokens: ThemeTokens; brandName: string }> = ({ tokens, brandName }) => {
-  const vars = useMemo(() => deriveThemeVars(tokens), [tokens]);
-  useFontLinks(tokens);
-  const style = { ...vars, background: 'var(--bg-main)', color: 'var(--text-primary)' } as React.CSSProperties;
+  // Size the frame to its content.
+  useEffect(() => {
+    if (!body || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const h = body.scrollHeight;
+      if (h > 0) setHeight(h);
+    });
+    ro.observe(body);
+    return () => ro.disconnect();
+  }, [body]);
+
   return (
-    <div
-      data-testid="theme-preview"
-      className={`wl-theme ${tokens.mode === 'light' ? 'wl-light' : ''} rounded-xl border overflow-hidden`}
-      style={{ ...style, borderColor: 'var(--stroke)' }}
-    >
-      <div className="site-header flex items-center justify-between gap-3 px-4 py-3" style={{ background: 'var(--bg-header)', borderBottom: '1px solid var(--stroke)' }}>
-        <span className="font-bold truncate" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}>{brandName || 'Your brand'}</span>
-        <span className="text-sm shrink-0" style={{ color: 'var(--text-secondary)' }}>Log in</span>
-      </div>
-      <div className="p-4 space-y-4">
-        <div className="card p-4 space-y-3">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Pizza night downtown</h3>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Join us for slices, friends and good company.</p>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Saturday, 6 PM · 42 going</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" tabIndex={-1} className="btn-primary text-sm" style={{ padding: '8px 16px' }}>RSVP</button>
-            <button type="button" tabIndex={-1} className="btn-secondary text-sm" style={{ padding: '8px 16px' }}>Share</button>
-            <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: 'var(--accent-tint)', color: 'var(--accent)' }}>Approved</span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--success)' }}>Open</span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--warning)' }}>Pending</span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--error)' }}>Full</span>
-          </div>
-        </div>
-        <IconInput type="text" icon={Mail} placeholder="Email address" readOnly tabIndex={-1} />
-        <Checkbox checked onChange={() => undefined} label="Notify me about new events" disabled labelClassName="text-sm" />
-      </div>
-    </div>
+    <>
+      <iframe
+        ref={frameRef}
+        data-testid="theme-preview"
+        title="Live theme preview"
+        onLoad={init}
+        className="w-full rounded-xl border border-theme-stroke block"
+        style={{ height, background: 'transparent' }}
+      />
+      {body && createPortal(<PreviewContent brandName={brandName} />, body)}
+    </>
   );
 };
 
