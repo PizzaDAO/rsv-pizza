@@ -231,14 +231,23 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
 
     const series = await prisma.$transaction(async (tx) => {
       const updated = await tx.eventSeries.update({ where: { id: req.params.id }, data });
+      const changes = diffSeries(before as any, updated as any);
       await writeSeriesAudit(tx, {
         seriesId: updated.id,
         actorEmail: req.userEmail || 'unknown',
         actorKind: 'super_admin',
         action: 'settings.update',
-        changes: diffSeries(before as any, updated as any),
+        changes,
         snapshot: snapshotOf(before as any),
       });
+      // CORS trusts site_url / site_aliases of active series (lib/cors.ts), so every change to them is
+      // also logged on its own line for a quick grep, in addition to the series_audit row.
+      if (changes.siteUrl || changes.siteAliases || changes.isActive) {
+        console.log(
+          `[wl-audit] series ${updated.slug} origin change by ${req.userEmail || 'unknown'}: ` +
+          JSON.stringify({ siteUrl: changes.siteUrl, siteAliases: changes.siteAliases, isActive: changes.isActive }),
+        );
+      }
       return updated;
     });
     res.json({ series });

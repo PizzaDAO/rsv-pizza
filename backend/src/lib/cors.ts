@@ -37,7 +37,15 @@ export function isAllowedTaxFormOrigin(origin: string, allowed: readonly string[
  * Per-request CORS options. Tax-form public paths additionally trust the pizzadao-org origins
  * and never use credentials (no cookies on these routes). All other paths: unchanged behavior.
  */
-export function corsOptionsDelegate(allowed: readonly string[]): CorsOptionsDelegate<Request> {
+export function corsOptionsDelegate(
+  allowed: readonly string[],
+  /**
+   * Origins of active white-label series (`site_url` + `site_aliases`), from the DB (cached 60 s).
+   * Consulted only after the env list and the preview regex miss, and never on the tax-form paths.
+   * An error or empty set means exactly today's behavior (env list only): it fails closed.
+   */
+  seriesOrigins?: () => Promise<ReadonlySet<string>>,
+): CorsOptionsDelegate<Request> {
   return (req, cb) => {
     const path = (req.originalUrl || req.url || '').split('?')[0];
     const taxForm = isTaxFormRequestPublicPath(path);
@@ -48,7 +56,12 @@ export function corsOptionsDelegate(allowed: readonly string[]): CorsOptionsDele
         const ok = taxForm ? isAllowedTaxFormOrigin(origin, allowed) : isAllowedOrigin(origin, allowed);
         if (ok) return done(null, true);
         // AppError so the error handler answers 403 instead of 500.
-        done(new AppError('Not allowed by CORS', 403, 'CORS_FORBIDDEN'));
+        const deny = () => done(new AppError('Not allowed by CORS', 403, 'CORS_FORBIDDEN'));
+        if (taxForm || !seriesOrigins) return deny();
+        seriesOrigins().then(
+          (set) => (set.has(origin) ? done(null, true) : deny()),
+          () => deny(),
+        );
       },
       credentials: !taxForm,
     };

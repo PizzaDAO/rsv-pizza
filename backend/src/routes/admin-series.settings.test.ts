@@ -62,6 +62,16 @@ describe('PATCH /api/admin/series/:id sender + audit', () => {
     expect(JSON.stringify(data)).not.toMatch(/pendingDomainToken|resendDomainId/);
   });
 
+  it('logs a [wl-audit] line when the CORS-trusted origins (site_url / aliases) change, and not otherwise', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await patch({ siteAliases: ['https://old.example.org'] });
+    expect(log.mock.calls.some((c) => String(c[0]).startsWith('[wl-audit] series acme origin change by boss@example.com'))).toBe(true);
+    log.mockClear();
+    await patch({ brandName: 'Other' });
+    expect(log.mock.calls.some((c) => String(c[0]).startsWith('[wl-audit]'))).toBe(false);
+    log.mockRestore();
+  });
+
   it('bumps config_version on a write', async () => {
     await patch({ brandName: 'Acme Slice' });
     expect(lastUpdateData().configVersion).toEqual({ increment: 1 });
