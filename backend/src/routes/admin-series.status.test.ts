@@ -23,12 +23,13 @@ app.use(express.json());
 app.use('/api/admin/series', router);
 app.use(errorHandler);
 
-const patch = (status: string) => request(app).patch('/api/admin/series/s1/events/p1/status').send({ status });
+const SID = '11111111-1111-4111-8111-111111111111';
+const patch = (status: string) => request(app).patch(`/api/admin/series/${SID}/events/p1/status`).send({ status });
 
 beforeEach(() => {
   vi.clearAllMocks();
   m.prisma.$transaction.mockImplementation(async (fn: any) => fn(m.prisma));
-  m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: 's1', underbossStatus: 'pending' });
+  m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: SID, underbossStatus: 'pending' });
   m.prisma.party.update.mockResolvedValue({ id: 'p1', underbossStatus: 'approved' });
 });
 
@@ -45,7 +46,7 @@ describe('PATCH /api/admin/series/:id/events/:partyId/status host email', () => 
   });
 
   it('does not email when the status is unchanged', async () => {
-    m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: 's1', underbossStatus: 'approved' });
+    m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: SID, underbossStatus: 'approved' });
     expect((await patch('approved')).status).toBe(200);
     expect(m.notify).not.toHaveBeenCalled();
   });

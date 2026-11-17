@@ -26,13 +26,14 @@ app.use(express.json());
 app.use('/api/admin/series', router);
 app.use(errorHandler);
 
+const SID = '11111111-1111-4111-8111-111111111111';
 const BEFORE = {
-  id: 's1', slug: 'acme', name: 'Acme', displayName: 'Acme', isActive: true, siteUrl: 'https://acme.example.org',
+  id: SID, slug: 'acme', name: 'Acme', displayName: 'Acme', isActive: true, siteUrl: 'https://acme.example.org',
   siteAliases: [], brandName: 'Acme Pizza', emailFromAddress: null, emailFromName: null, emailReplyTo: null,
   emailDomain: null, emailDomainVerifiedAt: null, configVersion: 1,
 };
 
-const patch = (body: unknown) => request(app).patch('/api/admin/series/s1').send(body as object);
+const patch = (body: unknown) => request(app).patch(`/api/admin/series/${SID}`).send(body as object);
 const lastUpdateData = () => m.prisma.eventSeries.update.mock.calls.at(-1)![0].data;
 
 beforeEach(() => {
@@ -55,7 +56,7 @@ describe('PATCH /api/admin/series/:id sender + audit', () => {
     expect(res.status).toBe(200);
     expect(m.prisma.seriesAudit.create).toHaveBeenCalledTimes(1);
     const { data } = m.prisma.seriesAudit.create.mock.calls[0][0];
-    expect(data).toMatchObject({ seriesId: 's1', actorEmail: 'boss@example.com', actorKind: 'super_admin', action: 'settings.update' });
+    expect(data).toMatchObject({ seriesId: SID, actorEmail: 'boss@example.com', actorKind: 'super_admin', action: 'settings.update' });
     expect(data.changes).toEqual({ brandName: { old: 'Acme Pizza', new: 'Acme Slice' } });
     expect(data.snapshot.brandName).toBe('Acme Pizza');
     // secrets / server-only ids never enter the audit payload

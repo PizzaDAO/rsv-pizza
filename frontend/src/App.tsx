@@ -33,6 +33,8 @@ const DisplayPage = React.lazy(() => import('./pages/DisplayPage').then(m => ({ 
 const UnderbossDashboard = React.lazy(() => import('./pages/UnderbossDashboard').then(m => ({ default: m.UnderbossDashboard })));
 const ShippingDashboard = React.lazy(() => import('./pages/ShippingDashboard').then(m => ({ default: m.ShippingDashboard })));
 const AdminPage = React.lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
+// Brand-admin invite acceptance (works on brand sites: not in GPP_ONLY_PATHS).
+const BrandAdminAcceptPage = React.lazy(() => import('./pages/BrandAdminAcceptPage').then(m => ({ default: m.BrandAdminAcceptPage })));
 const AdminSeriesPage = React.lazy(() => import('./pages/AdminSeriesPage').then(m => ({ default: m.AdminSeriesPage })));
 import { SeriesLandingPage } from './pages/SeriesLandingPage';
 const SuggestionsPage = React.lazy(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
@@ -211,6 +213,7 @@ function App() {
             <Route path="/suggestions" element={gppOnly("/suggestions", <SuggestionsPage />)} />
             <Route path="/admin/logo-cleanup" element={gppOnly("/admin/logo-cleanup", <AdminLogoCleanup />)} />
             <Route path="/admin/series" element={gppOnly("/admin/series", <AdminSeriesPage />)} />
+            <Route path="/brand-admin/accept" element={<Suspense fallback={null}><BrandAdminAcceptPage /></Suspense>} />
             <Route path="/partner" element={gppOnly("/partner", <PartnerDashboardPage />)} />
             <Route path="/partner/report" element={gppOnly("/partner/report", <ConsolidatedReportPage />)} />
             {/* soppressata-72251: per-partner BizDev industry report — before /:slug catch-all */}

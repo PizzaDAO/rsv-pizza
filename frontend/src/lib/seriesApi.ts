@@ -185,3 +185,44 @@ export async function setSeriesEventStatus(
     { method: 'PATCH', body: { status } },
   );
 }
+
+// ---- Brand admins (super-admin manages; invitee accepts) ----
+export interface SeriesAdminMember {
+  id: string;
+  seriesId: string;
+  email: string;
+  role: 'owner' | 'editor';
+  status: 'invited' | 'active' | 'revoked';
+  alertsEnabled: boolean;
+  inviteExpiresAt: string | null;
+  invitedBy: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+type AdminMemberResult = { admin: SeriesAdminMember; emailSent: boolean };
+
+export async function fetchSeriesAdmins(seriesId: string): Promise<{ admins: SeriesAdminMember[] }> {
+  return apiRequest<{ admins: SeriesAdminMember[] }>(`/api/admin/series/${seriesId}/admins`);
+}
+
+export async function inviteSeriesAdmin(seriesId: string, email: string): Promise<AdminMemberResult> {
+  return apiRequest<AdminMemberResult>(`/api/admin/series/${seriesId}/admins`, { method: 'POST', body: { email, role: 'editor' } });
+}
+
+export async function resendSeriesAdminInvite(seriesId: string, adminId: string): Promise<AdminMemberResult> {
+  return apiRequest<AdminMemberResult>(`/api/admin/series/${seriesId}/admins/${adminId}/resend`, { method: 'POST' });
+}
+
+export async function revokeSeriesAdmin(seriesId: string, adminId: string): Promise<{ admin: SeriesAdminMember }> {
+  return apiRequest<{ admin: SeriesAdminMember }>(`/api/admin/series/${seriesId}/admins/${adminId}`, { method: 'PATCH', body: { status: 'revoked' } });
+}
+
+export async function setSeriesAdminAlerts(seriesId: string, adminId: string, alertsEnabled: boolean): Promise<{ admin: SeriesAdminMember }> {
+  return apiRequest<{ admin: SeriesAdminMember }>(`/api/admin/series/${seriesId}/admins/${adminId}`, { method: 'PATCH', body: { alertsEnabled } });
+}
+
+export async function acceptBrandAdminInvite(token: string): Promise<{ success: boolean; seriesId: string }> {
+  return apiRequest<{ success: boolean; seriesId: string }>('/api/brand-admin/accept', { method: 'POST', body: { token } });
+}

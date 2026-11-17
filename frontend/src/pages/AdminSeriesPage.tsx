@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { IconInput } from '../components/IconInput';
 import { Checkbox } from '../components/Checkbox';
+import { BrandAdminsSection } from '../components/series/BrandAdminsSection';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   fetchAdminMe,
@@ -438,6 +439,8 @@ export function AdminSeriesPage() {
                 </div>
               </div>
             )}
+
+            {selectedId && <BrandAdminsSection seriesId={selectedId} />}
 
             {/* Per-series checklist */}
             {selectedId && (
