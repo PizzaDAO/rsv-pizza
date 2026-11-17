@@ -3,6 +3,7 @@
   "allow": [
     "frontend/src/config/brand.ts",
     "backend/src/config/brand.ts",
+    "backend/src/generated/openapi.ts",
     "frontend/src/lib/supabase.ts",
     "frontend/src/i18n/",
     "backend/src/lib/siteBrand.test.ts",
