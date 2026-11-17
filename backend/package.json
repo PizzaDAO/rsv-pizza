@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc",
+    "gen:openapi": "tsx scripts/gen-openapi.ts",
+    "build": "prisma generate && tsx scripts/gen-openapi.ts && tsc",
     "start": "node dist/index.js",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
