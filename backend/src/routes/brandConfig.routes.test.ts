@@ -34,7 +34,7 @@ const ROW = {
   themeClass: 'example-theme',
   themeTokens: TOKENS,
   flyerTemplateKey: 'standard',
-  flyerArt: { hero: 'a.png' },
+  flyerArt: { poster: '/cdn/brand-assets/x/poster.png', hero: 'a.png' },
   configVersion: 7,
   siteAliases: ['https://alt.example.org'],
   // Internal columns that must never be served:
@@ -82,7 +82,7 @@ describe('GET /api/brand-config', () => {
       themeClass: 'example-theme',
       tokens: TOKENS,
       themeVars: deriveThemeVars(TOKENS as never),
-      flyer: { templateKey: 'standard', art: { hero: 'a.png' } },
+      flyer: { templateKey: 'standard', art: { poster: '/cdn/brand-assets/x/poster.png' } },
     });
   });
 

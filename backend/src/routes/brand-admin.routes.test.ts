@@ -38,12 +38,16 @@ vi.mock('../lib/resendSend.js', () => ({ sendBrandedEmail: vi.fn() }));
 vi.mock('../config/secrets.js', () => ({ getJwtSecret: () => 'test-secret' }));
 
 import { Prisma } from '@prisma/client';
-import router from './brand-admin.routes.js';
+import router, { brandAssetsCronRouter } from './brand-admin.routes.js';
 import adminSeries from './admin-series.routes.js';
 import { requireSeriesAdmin } from '../lib/seriesAccess.js';
 import { setInviteLimitStore } from '../lib/seriesInviteLimit.js';
 import { BRAND_ADMIN_FIELDS } from '../lib/seriesBrandSettings.js';
 import { errorHandler } from '../middleware/error.js';
+import { setStorageClientForTest, cleanupAbandonedBrandUploads } from '../lib/brandAssets.js';
+import { reserveKeyBucket, BRAND_ASSET_DAILY_BUCKET, BRAND_ASSET_DAILY_LIMIT } from '../lib/seriesInviteLimit.js';
+import { RATE_EVENT_RETENTION_MS } from '../lib/authRateLimit.js';
+import sharp from 'sharp';
 
 const app = express();
 app.use(express.json());
@@ -85,6 +89,8 @@ function buildState() {
   const match = (row: any, where: any) => matches(row, where, rel);
   const sel = (row: any, select?: any) => (row && select ? Object.fromEntries(Object.keys(select).map((k) => [k, row[k] ?? null])) : row && { ...row });
   const db: any = fake.db;
+  const rawQueries: string[] = [];
+  db.$queryRaw = async (strings: TemplateStringsArray) => { rawQueries.push(strings.join('?')); return []; };
   db.eventSeries = {
     findUnique: async ({ where }: any) => (series[where.id] ? { id: where.id } : null),
     findFirst: async ({ where, select }: any) => sel(Object.values(series).find((r: any) => match(r, where)), select),
@@ -154,7 +160,7 @@ function buildState() {
       return { id: row.id, underbossStatus: row.underbossStatus };
     },
   };
-  return { fake, db, series, audit, checklist, parties, items, statusAudits, writes, admins: fake.admins };
+  return { rawQueries, fake, db, series, audit, checklist, parties, items, statusAudits, writes, admins: fake.admins };
 }
 
 const lastAudit = (s: any) => s.audit.at(-1);
@@ -183,9 +189,9 @@ describe('route registry', () => {
     expect(inner[0].handle).toBe(requireSeriesAdmin);
     const scopedRoutes = inner.filter((l) => l.route).map((l) => `${Object.keys(l.route.methods)[0].toUpperCase()} ${l.route.path}`).sort();
     expect(scopedRoutes).toEqual([
-      'DELETE /checklist/:itemId', 'GET /audit', 'GET /checklist', 'GET /events', 'GET /settings',
+      'DELETE /assets/:slot', 'DELETE /checklist/:itemId', 'GET /audit', 'GET /checklist', 'GET /events', 'GET /settings',
       'PATCH /alerts', 'PATCH /checklist/:itemId', 'PATCH /events/:partyId/status', 'PATCH /settings',
-      'POST /checklist', 'POST /revert',
+      'POST /assets/attach', 'POST /assets/upload-url', 'POST /checklist', 'POST /revert',
     ]);
   });
 });
@@ -698,5 +704,195 @@ describe('review hardening', () => {
     const res = await request(app).get(`/api/brand-admin/${A}/audit`);
     expect(JSON.stringify(res.body)).not.toContain('boss@example.com');
     expect(res.body.history[0].actorEmail).toBe('PizzaDAO admin');
+  });
+});
+
+describe('brand image uploads', () => {
+  const U = (id: string, n = 1) => `${id}/tmp/aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12, '0')}.png`;
+  let stored: Record<string, Buffer>;
+  let removed: string[];
+
+  const png = (w: number, h: number) => sharp({ create: { width: w, height: h, channels: 3, background: '#336699' } }).png().toBuffer();
+
+  beforeEach(() => {
+    stored = {};
+    removed = [];
+    setStorageClientForTest({
+      storage: {
+        from: (bucket: string) => ({
+          createSignedUploadUrl: async (p: string) => ({ data: { token: 'tok', path: p }, error: null }),
+          download: async (p: string) => (stored[`${bucket}/${p}`] ? { data: new Blob([new Uint8Array(stored[`${bucket}/${p}`])]), error: null } : { data: null, error: { message: 'Object not found' } }),
+          upload: async (p: string, body: Buffer) => { stored[`${bucket}/${p}`] = body; return { data: { path: p }, error: null }; },
+          remove: async (ps: string[]) => { removed.push(...ps); return { data: [], error: null }; },
+        }),
+      },
+    });
+  });
+
+  it('upload-url: refuses bad slot, svg/gif/avif and oversize; mints a path for this series', async () => {
+    const url = `/api/brand-admin/${A}/assets/upload-url`;
+    expect((await request(app).post(url).send({ slot: 'nope', mimeType: 'image/png', fileSize: 10 })).status).toBe(400);
+    for (const mimeType of ['image/svg+xml', 'image/gif', 'image/avif']) {
+      expect((await request(app).post(url).send({ slot: 'logo', mimeType, fileSize: 10 })).body.error.code).toBe('BAD_FILE_TYPE');
+    }
+    expect((await request(app).post(url).send({ slot: 'logo', mimeType: 'image/png', fileSize: 11 * 1024 * 1024 })).status).toBe(413);
+    const ok = await request(app).post(url).send({ slot: 'logo', mimeType: 'image/png', fileSize: 1000 });
+    expect(ok.status).toBe(200);
+    expect(ok.body.path.startsWith(`${A}/tmp/`)).toBe(true);
+  });
+
+  it('attach: re-encodes, writes the public object, stores the /cdn url, audits and bumps config_version', async () => {
+    stored[`brand-uploads/${U(A)}`] = await png(2000, 1000);
+    const res = await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'logo', path: U(A) });
+    expect(res.status).toBe(200);
+    expect(res.body.url).toMatch(new RegExp(`^/cdn/brand-assets/${A}/logo/[0-9a-f-]{36}\\.png$`));
+    expect(res.body.width).toBe(1024);
+    expect(removed).toContain(U(A));
+    expect(m.invalidate).toHaveBeenCalled();
+    const row = m.state.audit.find((r: any) => r.action === 'asset.update');
+    expect(row.seriesId).toBe(A);
+    expect(row.changes.logoUrl.new).toBe(res.body.url);
+    const hist = await request(app).get(`/api/brand-admin/${A}/audit`);
+    expect(hist.body.history[0].changes.logoUrl).toBeDefined();
+  });
+
+  it('attach: tmp path of another series is refused', async () => {
+    stored[`brand-uploads/${U(B)}`] = await png(100, 100);
+    const res = await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'logo', path: U(B) });
+    expect(res.status).toBe(400);
+    expect(Object.keys(stored).filter((k) => k.startsWith('brand-assets/'))).toHaveLength(0);
+  });
+
+  it('a non-admin of the series gets 404 on every asset route', async () => {
+    as('stranger@example.com');
+    for (const [method, path, body] of [
+      ['post', `/api/brand-admin/${A}/assets/upload-url`, { slot: 'logo', mimeType: 'image/png', fileSize: 1 }],
+      ['post', `/api/brand-admin/${A}/assets/attach`, { slot: 'logo', path: U(A) }],
+      ['delete', `/api/brand-admin/${A}/assets/logo`, undefined],
+    ] as const) {
+      expect((await (request(app) as any)[method](path).send(body)).status).toBe(404);
+    }
+  });
+
+  it('attach: svg disguised as png is refused and the tmp object is discarded', async () => {
+    stored[`brand-uploads/${U(A)}`] = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const res = await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'logo', path: U(A) });
+    expect(res.status).toBe(400);
+    expect(removed).toContain(U(A));
+    expect(Object.keys(stored).filter((k) => k.startsWith('brand-assets/'))).toHaveLength(0);
+  });
+
+  it('flyer slots merge into flyer_art without clobbering the other; remove clears one', async () => {
+    stored[`brand-uploads/${U(A, 1)}`] = await png(600, 800);
+    stored[`brand-uploads/${U(A, 2)}`] = await png(600, 800);
+    const p = await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'flyerPoster', path: U(A, 1) });
+    const r = await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'flyerRollup', path: U(A, 2) });
+    expect(p.status).toBe(200);
+    expect(r.status).toBe(200);
+    const art = m.state.audit.filter((x: any) => x.action === 'asset.update').at(-1).changes.flyerArt.new;
+    expect(Object.keys(art).sort()).toEqual(['poster', 'rollup']);
+    const del = await request(app).delete(`/api/brand-admin/${A}/assets/flyerPoster`);
+    expect(del.status).toBe(200);
+    const last = m.state.audit.at(-1);
+    expect(last.action).toBe('asset.remove');
+    expect(Object.keys(last.changes.flyerArt.new)).toEqual(['rollup']);
+  });
+
+  it('fails closed with 503 when the bucket is missing', async () => {
+    const miss = { message: 'Bucket not found' };
+    setStorageClientForTest({ storage: { from: () => ({ createSignedUploadUrl: async () => ({ data: null, error: miss }), download: async () => ({ data: null, error: miss }) }) } });
+    const a = await request(app).post(`/api/brand-admin/${A}/assets/upload-url`).send({ slot: 'logo', mimeType: 'image/png', fileSize: 1 });
+    expect(a.status).toBe(503);
+    expect(a.body.error.code).toBe('UPLOADS_UNAVAILABLE');
+    const b = await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'logo', path: U(A) });
+    expect(b.status).toBe(503);
+  });
+
+  it('upload-url is rate limited per user (30/h)', async () => {
+    const url = `/api/brand-admin/${A}/assets/upload-url`;
+    let last = 200;
+    for (let i = 0; i < 31; i++) last = (await request(app).post(url).send({ slot: 'logo', mimeType: 'image/png', fileSize: 1 })).status;
+    expect(last).toBe(429);
+  });
+
+  it('writes lock the series row (FOR UPDATE) so concurrent flyer slots cannot lose an update', async () => {
+    stored[`brand-uploads/${U(A, 1)}`] = await png(600, 800);
+    await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'flyerPoster', path: U(A, 1) });
+    expect(m.state.rawQueries.some((q: string) => /FOR UPDATE/.test(q))).toBe(true);
+  });
+
+  it('an uppercase series id in the URL still matches tmp paths and /cdn urls', async () => {
+    stored[`brand-uploads/${U(A)}`] = await png(100, 100);
+    const res = await request(app).post(`/api/brand-admin/${A.toUpperCase()}/assets/attach`).send({ slot: 'logo', path: U(A) });
+    expect(res.status).toBe(200);
+    expect(res.body.url.startsWith(`/cdn/brand-assets/${A}/`)).toBe(true);
+  });
+
+  it('a 503 (missing bucket) does not consume the daily cap', async () => {
+    const miss = { message: 'Bucket not found' };
+    setStorageClientForTest({ storage: { from: () => ({ createSignedUploadUrl: async () => ({ data: null, error: miss }) }) } });
+    for (let i = 0; i < 5; i++) {
+      expect((await request(app).post(`/api/brand-admin/${A}/assets/upload-url`).send({ slot: 'logo', mimeType: 'image/png', fileSize: 1 })).status).toBe(503);
+    }
+    // all 200 daily slots are still available
+    for (let i = 0; i < BRAND_ASSET_DAILY_LIMIT; i++) {
+      expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, BRAND_ASSET_DAILY_LIMIT, 86_400_000)).toBe(true);
+    }
+  });
+});
+
+describe('daily cap survives the routine rate-event cleanup', () => {
+  it('series_asset_daily rows are not pruned at the 1 h retention', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryRateStore();
+      setInviteLimitStore(store);
+      for (let i = 0; i < 3; i++) expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, 3, 86_400_000)).toBe(true);
+      vi.advanceTimersByTime(2 * 3600_000);
+      await store.cleanup(RATE_EVENT_RETENTION_MS); // what loginCode runs
+      expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, 3, 86_400_000)).toBe(false);
+      vi.advanceTimersByTime(24 * 3600_000); // > 25 h old: now prunable
+      await store.cleanup(RATE_EVENT_RETENTION_MS);
+      expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, 3, 86_400_000)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('brand-uploads tmp cleanup cron', () => {
+  const OLD = '2020-01-01T00:00:00Z';
+  const mkStore = (tree: Record<string, any[]>, removedOut: string[], err?: any) => ({
+    list: async (prefix: string) => ({ data: err ? null : tree[prefix] ?? [], error: err ?? null }),
+    remove: async (ps: string[]) => { removedOut.push(...ps); },
+  });
+
+  it('removes only old <seriesId>/tmp objects; ignores other folders and recent files', async () => {
+    const gone: string[] = [];
+    const store = mkStore({
+      '': [{ id: null, name: A }, { id: null, name: 'not-a-uuid' }, { id: 'x', name: 'stray.png' }],
+      [`${A}/tmp`]: [{ id: '1', name: 'old.png', created_at: OLD }, { id: '2', name: 'new.png', created_at: new Date().toISOString() }],
+    }, gone);
+    const r = await cleanupAbandonedBrandUploads(new Date(), store as any);
+    expect(r).toEqual({ scanned: 2, deleted: 1 });
+    expect(gone).toEqual([`${A}/tmp/old.png`]);
+  });
+
+  it('skips when the bucket is missing', async () => {
+    const gone: string[] = [];
+    const r = await cleanupAbandonedBrandUploads(new Date(), mkStore({}, gone, { message: 'Bucket not found' }) as any);
+    expect(r.skipped).toBe('bucket missing');
+    expect(gone).toEqual([]);
+  });
+
+  it('route requires CRON_SECRET', async () => {
+    const cronApp = express();
+    cronApp.use('/api/cron', brandAssetsCronRouter);
+    cronApp.use(errorHandler);
+    delete process.env.CRON_SECRET;
+    expect((await request(cronApp).get('/api/cron/cleanup-brand-uploads')).status).toBe(401);
+    process.env.CRON_SECRET = 's3cret';
+    expect((await request(cronApp).get('/api/cron/cleanup-brand-uploads').set('Authorization', 'Bearer wrong')).status).toBe(401);
+    delete process.env.CRON_SECRET;
   });
 });

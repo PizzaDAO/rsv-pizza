@@ -35,7 +35,7 @@ const notFound = () => new AppError('Not found', 404, 'NOT_FOUND');
 
 export async function requireSeriesAdmin(req: SeriesAdminRequest, _res: Response, next: NextFunction) {
   try {
-    const seriesId = req.params.seriesId;
+    const seriesId = (req.params.seriesId || '').toLowerCase();
     const email = (req.userEmail || '').toLowerCase();
     if (!seriesId || !UUID_RE.test(seriesId) || !email) throw notFound();
 

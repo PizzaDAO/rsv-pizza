@@ -26,7 +26,9 @@ export const BRAND_ADMIN_FIELDS = [
   'nameTemplate', 'hideGuests', 'photosEnabled', 'photosPublic',
   'eventDate', 'eventStartTime', 'eventEndTime', 'emailFromName', 'emailReplyTo', 'themeTokens',
 ] as const;
-export type BrandAdminField = (typeof BRAND_ADMIN_FIELDS)[number];
+/** Written only by the validated upload endpoints (lib/brandAssets.ts), never by PATCH /settings. */
+export const ASSET_FIELDS = ['logoUrl', 'logoLightUrl', 'faviconUrl', 'ogImageUrl', 'flyerArt'] as const;
+export type BrandAdminField =(typeof BRAND_ADMIN_FIELDS)[number];
 
 /** What a brand admin may read: the editable fields plus a little read-only context. */
 export const BRAND_SETTINGS_SELECT = {
@@ -224,7 +226,10 @@ export function pickSettings(row: Record<string, unknown>) {
 /** Brand-admin-visible slice of an audit `changes` object. */
 export function visibleChanges(changes: unknown): Record<string, unknown> {
   if (!changes || typeof changes !== 'object') return {};
-  return pickAllowed(changes as Record<string, unknown>);
+  const out = pickAllowed(changes as Record<string, unknown>);
+  // Image changes (asset.update / asset.remove audit rows) are visible too; they are not revertible via /revert.
+  for (const k of ASSET_FIELDS) if (k in (changes as object)) out[k] = (changes as Record<string, unknown>)[k];
+  return out;
 }
 
 /**
