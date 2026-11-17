@@ -18,6 +18,21 @@ function getStore(): RateStore {
   return (store ??= prismaRateStore(prisma as any));
 }
 
+/** Per-user hourly write budgets for the brand-admin API (settings/revert are tighter than the rest). */
+export const BRAND_ADMIN_SETTINGS_BUCKET = 'series_admin_settings';
+export const BRAND_ADMIN_SETTINGS_LIMIT = 60;
+export const BRAND_ADMIN_WRITE_BUCKET = 'series_admin_write';
+export const BRAND_ADMIN_WRITE_LIMIT = 200;
+
+/** true = allowed (a slot is reserved), false = over budget. Throws when the store is unavailable. */
+export async function reserveUserBucket(bucket: string, userId: string, limit: number): Promise<boolean> {
+  const res = await getStore().reserve(
+    [{ bucket, key: hashRateKey(`${bucket}:user`, userId), limit }],
+    INVITE_ACCEPT_WINDOW_MS,
+  );
+  return res.ids !== null;
+}
+
 /** true = allowed (a slot is reserved), false = over budget. Throws when the store is unavailable. */
 export async function reserveInviteAccept(ip: string | undefined, userId: string): Promise<boolean> {
   const res = await getStore().reserve(

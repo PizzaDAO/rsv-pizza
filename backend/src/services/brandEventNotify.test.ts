@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockPrisma = vi.hoisted(() => ({
   party: { findUnique: vi.fn(), count: vi.fn() },
   admin: { findMany: vi.fn() },
+  seriesAdmin: { findMany: vi.fn() },
 }));
 const mockBranded = vi.hoisted(() => vi.fn());
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
@@ -29,6 +30,8 @@ beforeEach(() => {
   process.env.BRAND_EVENT_ADMIN_ALERTS = 'on';
   mockPrisma.party.findUnique.mockResolvedValue(party);
   mockPrisma.party.count.mockResolvedValue(1);
+  mockPrisma.seriesAdmin.findMany.mockResolvedValue([]); // no brand admin yet: PizzaDAO alerts as before
+  delete process.env.SERIES_ADMIN_ALERTS;
   mockPrisma.admin.findMany.mockResolvedValue([{ email: 'A@x.com' }, { email: 'b@x.com' }, { email: 'a@x.com' }]);
   mockBranded.mockResolvedValue(TEAM1);
 });
@@ -60,8 +63,9 @@ describe('notifyAdminsOfBrandEvent', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).to).toEqual(['ops@x.com', 'ops2@x.com']);
   });
 
-  it('is off by default: no DB read, no send', async () => {
+  it('both channels off: no DB read, no send', async () => {
     delete process.env.BRAND_EVENT_ADMIN_ALERTS;
+    process.env.SERIES_ADMIN_ALERTS = 'off';
     await notifyAdminsOfBrandEvent('p1');
     expect(mockPrisma.party.findUnique).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -131,5 +135,88 @@ describe('emailHostOfStatusChange (brand-aware)', () => {
     const e = buildBrandedStatusEmail(TEAM1, { hostName: 'H', eventName: 'E', slug: 's' }, 'rejected');
     expect(e.subject).toBe('Update on your Team1 event');
     expect(e.html).toContain('Team1');
+  });
+});
+
+describe('brand-admin alerts (series_admins)', () => {
+  const bodies = () => fetchMock.mock.calls.map((c) => JSON.parse(c[1].body));
+
+  it('with no brand admin the PizzaDAO email is exactly the same as before', async () => {
+    await notifyAdminsOfBrandEvent('p1');
+    expect(bodies()).toHaveLength(1);
+    expect(bodies()[0]).toEqual({
+      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      to: ['a@x.com', 'b@x.com'],
+      subject: 'New Team1 event pending approval: Team1 Hack <Berlin>',
+      html: buildAdminNotifyEmail({
+        eventName: 'Team1 Hack <Berlin>', brandName: 'Team1', hostLabel: 'Hana / host@x.com',
+        eventUrl: 'https://team1.rsv.pizza/team1-berlin', adminUrl: 'https://rsv.pizza/underboss',
+      }).html,
+    });
+  });
+
+  it('brand admins with alerts on get the brand-site link; PizzaDAO stops getting that brand alerts', async () => {
+    mockPrisma.seriesAdmin.findMany.mockResolvedValue([
+      { email: 'Owner@Partner.com', alertsEnabled: true },
+      { email: 'quiet@partner.com', alertsEnabled: false },
+    ]);
+    await notifyAdminsOfBrandEvent('p1');
+    const sent = bodies();
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toEqual(['owner@partner.com']);
+    expect(sent[0].from).toBe('Team1 <noreply@rsv.pizza>');
+    expect(sent[0].html).toContain('https://team1.rsv.pizza/brand-admin/events');
+    expect(sent[0].html).not.toContain('/underboss');
+    expect(mockPrisma.admin.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.seriesAdmin.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { seriesId: 's1', status: 'active' } }));
+  });
+
+  it('works even when PizzaDAO alerts are off (default), and PizzaDAO is not emailed', async () => {
+    delete process.env.BRAND_EVENT_ADMIN_ALERTS;
+    mockPrisma.seriesAdmin.findMany.mockResolvedValue([{ email: 'o@partner.com', alertsEnabled: true }]);
+    await notifyAdminsOfBrandEvent('p1');
+    expect(bodies()).toHaveLength(1);
+    expect(bodies()[0].to).toEqual(['o@partner.com']);
+  });
+
+  it('every admin gets their own message', async () => {
+    mockPrisma.seriesAdmin.findMany.mockResolvedValue([
+      { email: 'a@partner.com', alertsEnabled: true }, { email: 'b@partner.com', alertsEnabled: true },
+    ]);
+    await notifyAdminsOfBrandEvent('p1');
+    expect(bodies().map((b) => b.to)).toEqual([['a@partner.com'], ['b@partner.com']]);
+  });
+
+  it('active admins who all opted out still silence PizzaDAO (brand has an admin) but nobody is emailed', async () => {
+    mockPrisma.seriesAdmin.findMany.mockResolvedValue([{ email: 'q@partner.com', alertsEnabled: false }]);
+    await notifyAdminsOfBrandEvent('p1');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('SERIES_ADMIN_ALERTS=off restores the PizzaDAO alert and sends nothing to brand admins', async () => {
+    process.env.SERIES_ADMIN_ALERTS = 'off';
+    mockPrisma.seriesAdmin.findMany.mockResolvedValue([{ email: 'o@partner.com', alertsEnabled: true }]);
+    await notifyAdminsOfBrandEvent('p1');
+    expect(mockPrisma.seriesAdmin.findMany).not.toHaveBeenCalled();
+    expect(bodies()).toHaveLength(1);
+    expect(bodies()[0].to).toEqual(['a@x.com', 'b@x.com']);
+  });
+
+  it('a failed brand-admin lookup falls back to the PizzaDAO alert', async () => {
+    mockPrisma.seriesAdmin.findMany.mockRejectedValue(new Error('db'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await notifyAdminsOfBrandEvent('p1');
+    expect(bodies()).toHaveLength(1);
+    expect(bodies()[0].to).toEqual(['a@x.com', 'b@x.com']);
+    warn.mockRestore();
+  });
+
+  it('escapes the brand name and event name in the brand-admin email', async () => {
+    mockBranded.mockResolvedValue({ ...TEAM1, name: '<b>Evil</b>' });
+    mockPrisma.seriesAdmin.findMany.mockResolvedValue([{ email: 'o@partner.com', alertsEnabled: true }]);
+    await notifyAdminsOfBrandEvent('p1');
+    const html: string = bodies()[0].html;
+    expect(html).not.toContain('<b>Evil</b>');
+    expect(html).toContain('&lt;b&gt;Evil&lt;/b&gt;');
   });
 });

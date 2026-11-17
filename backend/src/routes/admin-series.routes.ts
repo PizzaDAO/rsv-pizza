@@ -28,10 +28,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { writeStatusAudit } from '../helpers/statusAudit.js';
+import { listSeriesEvents, setSeriesEventStatus } from '../lib/seriesEventStatus.js';
 import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
-import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
 import {
   emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent, assertSubdomainHost,
 } from '../lib/seriesEmailFields.js';
@@ -385,17 +384,7 @@ router.get('/:id/events', async (req: AuthRequest, res: Response, next: NextFunc
     if (!APPROVAL_STATUSES.includes(status)) {
       throw new AppError(`status must be one of: ${APPROVAL_STATUSES.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
-    const events = await prisma.party.findMany({
-      where: { eventSeriesId: req.params.id, underbossStatus: status, cancelledAt: null },
-      orderBy: [{ createdAt: 'desc' }],
-      select: {
-        id: true, name: true, customUrl: true, inviteCode: true, city: true, country: true,
-        date: true, venueName: true, address: true, underbossStatus: true, createdAt: true,
-        user: { select: { email: true, name: true } },
-      },
-      take: 500,
-    });
-    res.json({ events });
+    res.json({ events: await listSeriesEvents(req.params.id, status) });
   } catch (error) {
     next(error);
   }
@@ -403,34 +392,14 @@ router.get('/:id/events', async (req: AuthRequest, res: Response, next: NextFunc
 
 router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id, partyId } = req.params;
-    const status = (req.body || {}).status;
-    if (!['approved', 'rejected', 'hidden'].includes(status)) {
-      throw new AppError('status must be one of: approved, rejected, hidden', 400, 'VALIDATION_ERROR');
-    }
-    const email = req.userEmail || 'unknown';
-    let priorStatus: string | null = null;
-    const party = await prisma.$transaction(async (tx) => {
-      const before = await tx.party.findUnique({
-        where: { id: partyId },
-        select: { eventSeriesId: true, underbossStatus: true },
-      });
-      if (!before || before.eventSeriesId !== id) {
-        throw new AppError('Party not found in this series', 404, 'NOT_FOUND');
-      }
-      priorStatus = before.underbossStatus;
-      const updated = await tx.party.update({
-        where: { id: partyId },
-        data: { underbossStatus: status },
-        select: { id: true, underbossStatus: true },
-      });
-      await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, 'admin');
-      return updated;
+    // Super-admins keep a veto: no "already decided" lock, they can overrule a brand admin's decision.
+    const party = await setSeriesEventStatus({
+      seriesId: req.params.id,
+      partyId: req.params.partyId,
+      status: (req.body || {}).status,
+      actorEmail: req.userEmail || 'unknown',
+      actorKind: 'super_admin',
     });
-    // Same as underboss.routes.ts: tell the host of approve/reject (fire-and-forget, only on a real change).
-    if ((status === 'approved' || status === 'rejected') && priorStatus !== status) {
-      void emailHostOfStatusChange(partyId, status);
-    }
     res.json({ party });
   } catch (error) {
     next(error);
