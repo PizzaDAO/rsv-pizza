@@ -52,25 +52,32 @@ async function waitForAssets(): Promise<void> {
   for (let i = 0; i < 30 && root.querySelector('[data-qr-pending]'); i++) {
     await new Promise((r) => setTimeout(r, 100));
   }
-  await Promise.all(
-    Array.from(root.querySelectorAll('img')).map((img) => (img.decode ? img.decode().catch(() => undefined) : Promise.resolve())),
-  );
-  try {
-    await document.fonts?.ready;
-  } catch {
-    /* ignore */
-  }
+  // Never let a slow/broken image or font block printing: give up after ~5s.
+  const assets = Promise.all([
+    ...Array.from(root.querySelectorAll('img')).map((img) => (img.decode ? img.decode().catch(() => undefined) : Promise.resolve())),
+    Promise.resolve(document.fonts?.ready).catch(() => undefined),
+  ]);
+  await Promise.race([assets, new Promise((r) => setTimeout(r, 5000))]);
 }
 
 /** `print(paper)` mounts the sheets (render `<PrintPortal>` while `printing` is set) then opens the print dialog. */
+let printBusy = false; // only one print root may exist at a time (both builders share this)
+
 export function usePrintSheets() {
   const [printing, setPrinting] = useState<PaperSize | null>(null);
-  const print = useCallback((paper: PaperSize) => setPrinting(paper), []);
+  const print = useCallback((paper: PaperSize) => {
+    if (printBusy) return;
+    printBusy = true;
+    setPrinting(paper);
+  }, []);
 
   useEffect(() => {
     if (!printing) return;
     let cancelled = false;
-    const done = () => setPrinting(null);
+    const done = () => {
+      printBusy = false;
+      setPrinting(null);
+    };
     window.addEventListener('afterprint', done);
     // iOS Safari fires afterprint unreliably.
     const fallback = window.setTimeout(done, 120000);
@@ -82,6 +89,7 @@ export function usePrintSheets() {
       cancelled = true;
       window.removeEventListener('afterprint', done);
       window.clearTimeout(fallback);
+      printBusy = false;
     };
   }, [printing]);
 

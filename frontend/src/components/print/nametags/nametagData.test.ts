@@ -59,6 +59,10 @@ describe('helpers', () => {
     expect(safeName('bob@example.com')).toBe('bob');
     expect(safeName('  Ann   Lee ')).toBe('Ann Lee');
   });
+  it('typed badge keys are stable when other lines change', () => {
+    expect(typedBadges('Ann\nBob\nAnn').map((b) => b.key)).toEqual(['t-Ann-1', 't-Bob-1', 't-Ann-2']);
+    expect(typedBadges('New\nAnn\nBob\nAnn').find((b) => b.name === 'Bob')!.key).toBe('t-Bob-1');
+  });
   it('typed + blank badges', () => {
     expect(typedBadges('A\n\n b@x.io \nC').map((b) => b.name)).toEqual(['A', 'b', 'C']);
     expect(blankBadges(3)).toHaveLength(3);

@@ -82,11 +82,18 @@ export function buildBadges(guests: Guest[], coHosts: CoHost[], opts: BuildBadge
 
 /** One badge per non-empty line of typed text. */
 export function typedBadges(text: string): Badge[] {
+  // Keys are name + occurrence (not line index), so per-badge pronouns stay with the right
+  // badge when other lines are added, removed or reordered.
+  const counts = new Map<string, number>();
   return text
     .split('\n')
     .map((l) => safeName(l))
     .filter(Boolean)
-    .map((name, i) => ({ key: `t-${i}`, name }));
+    .map((name) => {
+      const n = (counts.get(name) ?? 0) + 1;
+      counts.set(name, n);
+      return { key: `t-${name}-${n}`, name };
+    });
 }
 
 export function blankBadges(n: number): Badge[] {

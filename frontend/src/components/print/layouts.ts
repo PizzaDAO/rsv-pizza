@@ -118,8 +118,8 @@ export function pageDims(page: PaperSize): { w: number; h: number; unit: SheetUn
 /** Table tent: one sheet, folded at the half. */
 export function tentDims(page: PaperSize) {
   const d = pageDims(page);
-  const safe = d.unit === 'in' ? 0.3 : 8;
-  const foldSafe = d.unit === 'in' ? 0.25 : 6;
+  const safe = d.unit === 'in' ? 0.4 : 10;
+  const foldSafe = d.unit === 'in' ? 0.4 : 10;
   return { ...d, foldAt: d.h / 2, safe, foldSafe };
 }
 

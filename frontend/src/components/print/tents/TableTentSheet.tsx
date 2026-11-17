@@ -24,8 +24,10 @@ export function TentFace({ paper, data }: { paper: PaperSize; data: TentFaceData
   const u = (v: number) => `${v}${unit}`;
   const panelH = d.h / 2;
   const innerWpt = toPt(d.w - 2 * d.safe, unit);
-  const qrSizePx = unit === 'in' ? 240 : 242; // ~2.5in / 64mm
-  const head = data.headline.trim() ? fitText(data.headline, { maxWidth: innerWpt, maxSize: 64, minSize: 24, wrapBelow: 36 }) : null;
+  const head = data.headline.trim() ? fitText(data.headline, { maxWidth: innerWpt, maxSize: 44, minSize: 24, wrapBelow: 30 }) : null;
+  const fixed = { flexShrink: 0, maxWidth: '100%' } as const;
+  const clamp = (n: number) =>
+    ({ display: '-webkit-box', WebkitLineClamp: n, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }) as const;
 
   return (
     <div
@@ -39,27 +41,29 @@ export function TentFace({ paper, data }: { paper: PaperSize; data: TentFaceData
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: u(unit === 'in' ? 0.12 : 3),
+        gap: u(unit === 'in' ? 0.1 : 2.5),
         textAlign: 'center',
         fontFamily: PRINT_FONT_STACK,
         overflow: 'hidden',
       }}
     >
-      {data.logoUrl && <img src={data.logoUrl} alt="" style={{ maxHeight: u(unit === 'in' ? 0.6 : 15), maxWidth: '40%', objectFit: 'contain' }} />}
-      {data.eventName && <div style={{ fontSize: '18pt', fontWeight: 600 }}>{data.eventName}</div>}
+      {data.logoUrl && <img data-tent-logo src={data.logoUrl} alt="" style={{ ...fixed, maxHeight: u(unit === 'in' ? 0.4 : 10), maxWidth: '40%', objectFit: 'contain' }} />}
+      {data.eventName && <div style={{ ...fixed, ...clamp(2), fontSize: '16pt', fontWeight: 600 }}>{data.eventName}</div>}
       {head && (
-        <div style={{ fontSize: `${head.size}pt`, fontWeight: 800, lineHeight: 1.1 }}>
+        <div style={{ ...fixed, fontSize: `${head.size}pt`, fontWeight: 800, lineHeight: 1.1 }}>
           {head.lines.map((l, i) => (
             <div key={i} style={{ whiteSpace: 'nowrap' }}>{l}</div>
           ))}
         </div>
       )}
-      {data.body.trim() && <div style={{ fontSize: '16pt', lineHeight: 1.3, whiteSpace: 'pre-wrap', maxWidth: '100%' }}>{data.body}</div>}
-      {data.dateLine && <div style={{ fontSize: '12pt', color: '#333' }}>{data.dateLine}</div>}
+      {data.body.trim() && <div style={{ ...fixed, ...clamp(3), fontSize: '13pt', lineHeight: 1.3, whiteSpace: 'pre-wrap' }}>{data.body}</div>}
+      {data.dateLine && <div style={{ ...fixed, ...clamp(1), fontSize: '11pt', color: '#333' }}>{data.dateLine}</div>}
       {data.qrUrl && (
-        <div>
-          <QRCode value={data.qrUrl} size={qrSizePx} margin={4} alt="" className="[image-rendering:pixelated]" />
-          <div style={{ fontSize: '11pt', marginTop: u(unit === 'in' ? 0.04 : 1) }}>{qrCaption(data.qrUrl)}</div>
+        <div data-tent-qr style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0, maxHeight: u(unit === 'in' ? 2.5 : 64), width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0, width: '100%', position: 'relative' }}>
+            <QRCode value={data.qrUrl} size={480} margin={4} alt="" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', imageRendering: 'pixelated' }} />
+          </div>
+          <div style={{ flexShrink: 0, ...clamp(1), fontSize: '10pt', marginTop: u(unit === 'in' ? 0.03 : 1), maxWidth: '100%' }}>{qrCaption(data.qrUrl)}</div>
         </div>
       )}
     </div>
