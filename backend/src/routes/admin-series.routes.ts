@@ -7,6 +7,9 @@
  *   GET    /api/admin/series                       List all series (incl. inactive)
  *   POST   /api/admin/series                       Create a series
  *   PATCH  /api/admin/series/:id                   Update a series
+ * Every create/update also writes a `series_audit` row (actor, changed fields, pre-change snapshot).
+ * `emailDomainVerifiedAt` / `resendDomainId` are server-written: they are never read from a request body.
+ *
  *   GET    /api/admin/series/:id/checklist         List the series' checklist defaults
  *   POST   /api/admin/series/:id/checklist         Add a checklist default to the series
  *   PATCH  /api/admin/series/checklist/:defaultId  Update a series checklist default
@@ -23,6 +26,10 @@ import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
+import {
+  emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent,
+} from '../lib/seriesEmailFields.js';
+import { writeSeriesAudit, diffSeries, snapshotOf } from '../lib/seriesAudit.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -52,6 +59,10 @@ function siteUrlOrNull(v: unknown): string | null {
     throw new AppError('siteUrl must be an https origin with no path (e.g. https://events.example.com)', 400, 'VALIDATION_ERROR');
   }
   return u.origin;
+}
+/** Alias origin: same https-origin rule as siteUrl, but case-insensitive (hosts are lowercased). */
+function aliasOrigin(v: unknown): string | null {
+  return siteUrlOrNull(typeof v === 'string' ? v.toLowerCase() : v);
 }
 /** create_flow: one of the preset keys, or null (generic flow). Anything else is a 400. */
 function createFlowOrNull(v: unknown): string | null {
@@ -99,7 +110,14 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     }
     if (!name) throw new AppError('name is required', 400, 'VALIDATION_ERROR');
 
-    const series = await prisma.eventSeries.create({
+    const siteUrl = siteUrlOrNull(b.siteUrl);
+    const emailFromAddress = emailOrNull(b.emailFromAddress, 'emailFromAddress');
+    const emailDomain = hostnameOrNull(b.emailDomain, 'emailDomain');
+    assertSenderConsistent(emailFromAddress, emailDomain);
+    const siteAliases = b.siteAliases === undefined ? [] : siteAliasesOrNull(b.siteAliases, aliasOrigin, siteUrl);
+
+    const series = await prisma.$transaction(async (tx) => {
+     const created = await tx.eventSeries.create({
       data: {
         slug,
         name,
@@ -109,7 +127,13 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         logoUrl: str(b.logoUrl) ?? null,
         ogImageUrl: str(b.ogImageUrl) ?? null,
         flyerTemplateKey: str(b.flyerTemplateKey) ?? null,
-        siteUrl: siteUrlOrNull(b.siteUrl),
+        siteUrl,
+        siteAliases,
+        emailFromAddress,
+        emailFromName: senderNameOrNull(b.emailFromName),
+        emailReplyTo: emailOrNull(b.emailReplyTo, 'emailReplyTo'),
+        emailDomain,
+        // emailDomainVerifiedAt stays null: only the server-side Resend verification may set it.
         brandName: str(b.brandName) ?? null,
         createFlow: createFlowOrNull(b.createFlow),
         nameTemplate: str(b.nameTemplate) ?? null,
@@ -126,6 +150,15 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         eventDate: b.eventDate ? new Date(b.eventDate as string) : null,
         fundingWalletAddress: str(b.fundingWalletAddress) ?? null,
       },
+     });
+     await writeSeriesAudit(tx, {
+       seriesId: created.id,
+       actorEmail: req.userEmail || 'unknown',
+       actorKind: 'super_admin',
+       action: 'series.create',
+       changes: Object.fromEntries(Object.entries(snapshotOf(created as any)).map(([k, v]) => [k, { old: null, new: v }])),
+     });
+     return created;
     });
     res.status(201).json({ series });
   } catch (error: any) {
@@ -147,6 +180,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.logoUrl !== undefined) data.logoUrl = str(b.logoUrl) ?? null;
     if (b.ogImageUrl !== undefined) data.ogImageUrl = str(b.ogImageUrl) ?? null;
     if (b.flyerTemplateKey !== undefined) data.flyerTemplateKey = str(b.flyerTemplateKey) ?? null;
+    const before = await prisma.eventSeries.findUnique({ where: { id: req.params.id } });
+    if (!before) throw new AppError('Series not found', 404, 'NOT_FOUND');
     if (b.siteUrl !== undefined) data.siteUrl = siteUrlOrNull(b.siteUrl);
     if (b.brandName !== undefined) data.brandName = str(b.brandName) ?? null;
     if (b.createFlow !== undefined) data.createFlow = createFlowOrNull(b.createFlow);
@@ -164,7 +199,38 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.eventDate !== undefined) data.eventDate = b.eventDate ? new Date(b.eventDate as string) : null;
     if (b.fundingWalletAddress !== undefined) data.fundingWalletAddress = str(b.fundingWalletAddress) ?? null;
 
-    const series = await prisma.eventSeries.update({ where: { id: req.params.id }, data });
+    // Sender / custom-domain fields. emailDomainVerifiedAt and resendDomainId are NOT accepted here.
+    const effectiveSiteUrl = data.siteUrl !== undefined ? (data.siteUrl as string | null) : before.siteUrl;
+    if (b.siteAliases !== undefined) data.siteAliases = siteAliasesOrNull(b.siteAliases, aliasOrigin, effectiveSiteUrl);
+    if (b.emailFromName !== undefined) data.emailFromName = senderNameOrNull(b.emailFromName);
+    if (b.emailReplyTo !== undefined) data.emailReplyTo = emailOrNull(b.emailReplyTo, 'emailReplyTo');
+    if (b.emailFromAddress !== undefined) data.emailFromAddress = emailOrNull(b.emailFromAddress, 'emailFromAddress');
+    if (b.emailDomain !== undefined) data.emailDomain = hostnameOrNull(b.emailDomain, 'emailDomain');
+    const senderChanged =
+      (data.emailFromAddress !== undefined && data.emailFromAddress !== before.emailFromAddress) ||
+      (data.emailDomain !== undefined && data.emailDomain !== before.emailDomain);
+    if (senderChanged) {
+      assertSenderConsistent(
+        data.emailFromAddress !== undefined ? (data.emailFromAddress as string | null) : before.emailFromAddress,
+        data.emailDomain !== undefined ? (data.emailDomain as string | null) : before.emailDomain,
+      );
+      // A new sender must be re-verified with Resend; until then mail keeps going from rsv.pizza.
+      data.emailDomainVerifiedAt = null;
+    }
+    data.configVersion = { increment: 1 };
+
+    const series = await prisma.$transaction(async (tx) => {
+      const updated = await tx.eventSeries.update({ where: { id: req.params.id }, data });
+      await writeSeriesAudit(tx, {
+        seriesId: updated.id,
+        actorEmail: req.userEmail || 'unknown',
+        actorKind: 'super_admin',
+        action: 'settings.update',
+        changes: diffSeries(before as any, updated as any),
+        snapshot: snapshotOf(before as any),
+      });
+      return updated;
+    });
     res.json({ series });
   } catch (error: any) {
     if (error?.code === 'P2025') return next(new AppError('Series not found', 404, 'NOT_FOUND'));

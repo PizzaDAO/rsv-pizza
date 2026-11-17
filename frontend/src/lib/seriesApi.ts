@@ -31,6 +31,13 @@ export interface EventSeries {
   eventStartTime: string | null;
   eventEndTime: string | null;
   fundingWalletAddress: string | null;
+  // Custom domain + sender (super-admin API only). `emailDomainVerifiedAt` is server-written.
+  siteAliases?: string[];
+  emailFromAddress?: string | null;
+  emailFromName?: string | null;
+  emailReplyTo?: string | null;
+  emailDomain?: string | null;
+  emailDomainVerifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,7 +53,7 @@ export interface SeriesChecklistDefault {
   seriesId: string | null;
 }
 
-export type SeriesInput = Partial<Omit<EventSeries, 'id' | 'createdAt' | 'updatedAt'>> & { slug?: string; name?: string };
+export type SeriesInput = Partial<Omit<EventSeries, 'id' | 'createdAt' | 'updatedAt' | 'emailDomainVerifiedAt'>> & { slug?: string; name?: string };
 
 export async function fetchEventSeriesList(): Promise<{ series: EventSeries[] }> {
   return apiRequest<{ series: EventSeries[] }>('/api/admin/series');

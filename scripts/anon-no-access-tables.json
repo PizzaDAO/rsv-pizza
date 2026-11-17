@@ -19,6 +19,8 @@
     "hackathon_awards",
     "hackathon_voting",
     "hackathon_votes",
-    "party_booths"
+    "party_booths",
+    "series_admins",
+    "series_audit"
   ]
 }

@@ -413,13 +413,85 @@ model EventSeries {
   eventStartTime String?   @map("event_start_time") // 'HH:MM' local
   eventEndTime   String?   @map("event_end_time")
 
+  // Self-serve brand config (plans/wl-self-serve-brands.md). All nullable/defaulted; backend-only
+  // (event_series has no anon grant). Public reads go through series.routes PUBLIC_SELECT.
+  tagline         String?
+  metaDescription String? @map("meta_description")
+  supportEmail    String? @map("support_email")
+  faviconUrl      String? @map("favicon_url")
+  logoLightUrl    String? @map("logo_light_url")
+  themeTokens     Json?   @map("theme_tokens")
+  flyerArt        Json?   @map("flyer_art")
+  // Bumped on every brand-field write (cache key for /api/brand-config).
+  configVersion   Int     @default(1) @map("config_version")
+
+  // Custom domain + sender. `emailDomainVerifiedAt` and `resendDomainId` are server-written only
+  // (never accepted from a request body).
+  siteAliases           String[]  @default([]) @map("site_aliases")
+  emailFromAddress      String?   @map("email_from_address")
+  emailFromName         String?   @map("email_from_name")
+  emailReplyTo          String?   @map("email_reply_to")
+  emailDomain           String?   @map("email_domain")
+  resendDomainId        String?   @map("resend_domain_id")
+  emailDomainVerifiedAt DateTime? @map("email_domain_verified_at") @db.Timestamptz
+
+  // Custom domain request. Status: requested | dns_ok | attached | live | failed (validated in code).
+  pendingDomain          String?   @map("pending_domain")
+  pendingDomainToken     String?   @map("pending_domain_token")
+  pendingDomainStatus    String?   @map("pending_domain_status")
+  pendingDomainCheckedAt DateTime? @map("pending_domain_checked_at") @db.Timestamptz
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   parties           Party[]
   checklistDefaults ChecklistDefault[]
+  admins            SeriesAdmin[]
+  audit             SeriesAudit[]
 
   @@map("event_series")
+}
+
+// Partner brand admins (backend-only: RLS on, no anon/authenticated grants, listed in
+// scripts/anon-no-access-tables.json). The invite token is stored only as a sha256 hash.
+model SeriesAdmin {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seriesId        String      @map("series_id") @db.Uuid
+  series          EventSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  email           String // lowercased invited address
+  userId          String?     @map("user_id")
+  role            String      @default("editor") // 'owner' | 'editor' (CHECK)
+  status          String      @default("invited") // 'invited' | 'active' | 'revoked' (CHECK)
+  alertsEnabled   Boolean     @default(true) @map("alerts_enabled")
+  inviteTokenHash String?     @map("invite_token_hash")
+  inviteExpiresAt DateTime?   @map("invite_expires_at") @db.Timestamptz
+  invitedBy       String      @map("invited_by")
+  acceptedAt      DateTime?   @map("accepted_at") @db.Timestamptz
+  revokedAt       DateTime?   @map("revoked_at") @db.Timestamptz
+  revokedBy       String?     @map("revoked_by")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([seriesId, email], map: "series_admins_series_id_email_key")
+  @@index([email], map: "series_admins_email_idx")
+  @@index([inviteTokenHash], map: "series_admins_invite_token_hash_idx")
+  @@map("series_admins")
+}
+
+// Append-only audit log of brand/series writes (backend-only, same lockdown as series_admins).
+model SeriesAudit {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seriesId   String      @map("series_id") @db.Uuid
+  series     EventSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  actorEmail String      @map("actor_email")
+  actorKind  String      @map("actor_kind") // 'super_admin' | 'series_admin' | 'system' (CHECK)
+  action     String // e.g. 'settings.update', 'admin.invite', 'domain.cutover'
+  changes    Json? // {field: {old, new}}; never secrets
+  snapshot   Json? // brand-field snapshot before the change (one-click revert)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([seriesId, createdAt(sort: Desc)], map: "series_audit_series_id_created_at_idx")
+  @@map("series_audit")
 }
 
 // romana-61204: one post-event survey response per guest. Resubmit = upsert
@@ -2779,7 +2851,6 @@ model PartyTelegramHost {
   @@index([chatId])
   @@map("party_telegram_hosts")
 }
-
 
 // ============================================
 // Pizza Price Index (sfincione-40417)
