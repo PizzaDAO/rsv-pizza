@@ -28,7 +28,8 @@ export interface SeriesAdminRequest extends AuthRequest {
   seriesAdmin?: SeriesAdminContext;
 }
 
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Strict RFC 4122 shape (version 1-8, variant 8-b): what gen_random_uuid() produces. */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const notFound = () => new AppError('Not found', 404, 'NOT_FOUND');
 

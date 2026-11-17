@@ -27,7 +27,7 @@ const renderPage = (url = `/brand-admin/accept?token=${TOKEN}`) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sessionStorage.clear();
+  localStorage.clear();
   auth.user = { id: 'u1', email: 'partner@example.org' };
   auth.loading = false;
 });
@@ -40,7 +40,7 @@ describe('BrandAdminAcceptPage', () => {
     fireEvent.click(await screen.findByText('Accept invite'));
     await waitFor(() => expect(accept).toHaveBeenCalledWith(TOKEN));
     expect(await screen.findByText(/You're a brand admin/)).toBeTruthy();
-    expect(sessionStorage.getItem('brandAdminInviteToken')).toBeNull();
+    expect(localStorage.getItem('brandAdminInviteToken')).toBeNull();
   });
 
   it('shows the server error (e.g. wrong email) and keeps the token for a retry', async () => {
@@ -48,7 +48,7 @@ describe('BrandAdminAcceptPage', () => {
     renderPage();
     fireEvent.click(await screen.findByText('Accept invite'));
     expect(await screen.findByText(/different email/)).toBeTruthy();
-    expect(sessionStorage.getItem('brandAdminInviteToken')).toBe(TOKEN);
+    expect(JSON.parse(localStorage.getItem('brandAdminInviteToken')!).t).toBe(TOKEN);
   });
 
   it('asks signed-out visitors to sign in first and never calls the API', async () => {
@@ -60,11 +60,18 @@ describe('BrandAdminAcceptPage', () => {
   });
 
   it('reads the token back from storage after the sign-in round trip', async () => {
-    sessionStorage.setItem('brandAdminInviteToken', TOKEN);
+    localStorage.setItem('brandAdminInviteToken', JSON.stringify({ t: TOKEN, exp: Date.now() + 60000 }));
     accept.mockResolvedValue({ success: true, seriesId: 's1' });
     renderPage('/brand-admin/accept');
     fireEvent.click(await screen.findByText('Accept invite'));
     await waitFor(() => expect(accept).toHaveBeenCalledWith(TOKEN));
+  });
+
+  it('ignores an expired stored token', async () => {
+    localStorage.setItem('brandAdminInviteToken', JSON.stringify({ t: TOKEN, exp: Date.now() - 1 }));
+    renderPage('/brand-admin/accept');
+    expect(await screen.findByText('Invite link missing')).toBeTruthy();
+    expect(localStorage.getItem('brandAdminInviteToken')).toBeNull();
   });
 
   it('explains a missing token', async () => {
