@@ -362,7 +362,7 @@ export function AdminSeriesPage() {
 
             {/* Sender / custom domain. Verification is server-side (Resend), never set from this form. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <IconInput icon={Globe} placeholder="Site aliases (comma-separated https origins, e.g. the old brand.rsv.pizza host)" value={form.siteAliases}
+              <IconInput icon={Globe} placeholder="Site aliases (comma-separated https origins, e.g. the old brand-subdomain host)" value={form.siteAliases}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('siteAliases', e.target.value)} />
               <IconInput icon={Mail} placeholder="From address (e.g. events@mail.partner.com)" value={form.emailFromAddress}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('emailFromAddress', e.target.value)} />
@@ -377,7 +377,7 @@ export function AdminSeriesPage() {
               <p className="text-xs text-white/40">
                 {selectedSeries?.emailDomainVerifiedAt
                   ? `Sending as ${selectedSeries.emailFromAddress} (domain verified ${new Date(selectedSeries.emailDomainVerifiedAt).toLocaleDateString()})`
-                  : 'Sending as noreply@rsv.pizza (sender domain not verified). Changing the from address or domain resets verification.'}
+                  : 'Sending as the default sender (sender domain not verified). Changing the from address or domain resets verification.'}
               </p>
             )}
 

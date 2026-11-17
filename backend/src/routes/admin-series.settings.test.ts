@@ -27,7 +27,7 @@ app.use('/api/admin/series', router);
 app.use(errorHandler);
 
 const BEFORE = {
-  id: 's1', slug: 'acme', name: 'Acme', displayName: 'Acme', isActive: true, siteUrl: 'https://acme.rsv.pizza',
+  id: 's1', slug: 'acme', name: 'Acme', displayName: 'Acme', isActive: true, siteUrl: 'https://acme.example.org',
   siteAliases: [], brandName: 'Acme Pizza', emailFromAddress: null, emailFromName: null, emailReplyTo: null,
   emailDomain: null, emailDomainVerifiedAt: null, configVersion: 1,
 };
@@ -91,7 +91,7 @@ describe('PATCH /api/admin/series/:id sender + audit', () => {
     ['lookalike suffix domain', { emailFromAddress: 'events@evilmail.partner.com', emailDomain: 'mail.partner.com' }],
     ['http alias', { siteAliases: ['http://old.example.com'] }],
     ['alias with a path', { siteAliases: ['https://old.example.com/x'] }],
-    ['alias equal to site url', { siteAliases: ['https://acme.rsv.pizza'] }],
+    ['alias equal to site url', { siteAliases: ['https://acme.example.org'] }],
     ['alias not an array', { siteAliases: 'https://old.example.com' }],
   ])('400s %s', async (_n, body) => {
     const res = await patch(body);
@@ -148,7 +148,7 @@ describe('PATCH /api/admin/series/:id sender + audit', () => {
     expect(lastUpdateData()).not.toHaveProperty('emailDomainVerifiedAt');
   });
 
-  it('a PATCH that leaves the sender alone (rsv.pizza-style brand) touches no sender field', async () => {
+  it('a PATCH that leaves the sender alone (default-sender brand) touches no sender field', async () => {
     await patch({ description: 'hello' });
     const d = lastUpdateData();
     for (const k of ['emailFromAddress', 'emailFromName', 'emailReplyTo', 'emailDomain', 'emailDomainVerifiedAt', 'siteAliases']) {

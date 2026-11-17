@@ -214,7 +214,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         data.emailFromAddress !== undefined ? (data.emailFromAddress as string | null) : before.emailFromAddress,
         data.emailDomain !== undefined ? (data.emailDomain as string | null) : before.emailDomain,
       );
-      // A new sender must be re-verified with Resend; until then mail keeps going from rsv.pizza.
+      // A new sender must be re-verified with Resend; until then mail keeps using the default sender.
       data.emailDomainVerifiedAt = null;
     }
     data.configVersion = { increment: 1 };

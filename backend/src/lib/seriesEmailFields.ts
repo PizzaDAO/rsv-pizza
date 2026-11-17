@@ -75,7 +75,7 @@ export function assertSenderConsistent(fromAddress: string | null, emailDomain: 
 export const MAX_SITE_ALIASES = 10;
 
 /**
- * Extra origins for a series (old `*.rsv.pizza` after a cutover, or a staged new domain). Each must
+ * Extra origins for a series (the old brand-subdomain host after a cutover, or a staged new domain). Each must
  * be an https origin with no path: pass the same validator the route uses for `siteUrl`.
  * Duplicates are dropped; the canonical `siteUrl` is not allowed as its own alias.
  */
