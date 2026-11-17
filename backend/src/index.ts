@@ -73,7 +73,7 @@ import serviceTelegramRoutes from './routes/service-telegram.routes.js'; // Pizz
 import pizzadaoLinkRoutes from './routes/pizzadao-link.routes.js';
 import serviceRoutes from './routes/service.routes.js'; // PizzaDAO member app service-to-service (x-service-key gate)
 import adminSeriesRoutes from './routes/admin-series.routes.js';
-import brandAdminRoutes from './routes/brand-admin.routes.js';
+import brandAdminRoutes, { brandAssetsCronRouter } from './routes/brand-admin.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
 import linkclickRoutes from './routes/linkclick.routes.js';
 import funnelRoutes from './routes/funnel.routes.js';
@@ -324,6 +324,7 @@ app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public 
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/brand-config', brandConfigRoutes); // white-label: public runtime brand config (host or slug), CDN-cacheable
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config
+app.use('/api/cron', brandAssetsCronRouter); // brand-uploads tmp cleanup (CRON_SECRET)
 app.use('/api/brand-admin', brandAdminRoutes); // white-label: brand admins (invite accept; series-scoped settings in the next PR)
 app.use('/api/service/telegram', serviceTelegramRoutes); // must stay before /api/service
 app.use('/api/pizzadao-link', pizzadaoLinkRoutes); // account-link token for pizzadao.org (signed-in user)

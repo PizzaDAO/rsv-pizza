@@ -38,13 +38,15 @@ vi.mock('../lib/resendSend.js', () => ({ sendBrandedEmail: vi.fn() }));
 vi.mock('../config/secrets.js', () => ({ getJwtSecret: () => 'test-secret' }));
 
 import { Prisma } from '@prisma/client';
-import router from './brand-admin.routes.js';
+import router, { brandAssetsCronRouter } from './brand-admin.routes.js';
 import adminSeries from './admin-series.routes.js';
 import { requireSeriesAdmin } from '../lib/seriesAccess.js';
 import { setInviteLimitStore } from '../lib/seriesInviteLimit.js';
 import { BRAND_ADMIN_FIELDS } from '../lib/seriesBrandSettings.js';
 import { errorHandler } from '../middleware/error.js';
-import { setStorageClientForTest } from '../lib/brandAssets.js';
+import { setStorageClientForTest, cleanupAbandonedBrandUploads } from '../lib/brandAssets.js';
+import { reserveKeyBucket, BRAND_ASSET_DAILY_BUCKET, BRAND_ASSET_DAILY_LIMIT } from '../lib/seriesInviteLimit.js';
+import { RATE_EVENT_RETENTION_MS } from '../lib/authRateLimit.js';
 import sharp from 'sharp';
 
 const app = express();
@@ -87,6 +89,8 @@ function buildState() {
   const match = (row: any, where: any) => matches(row, where, rel);
   const sel = (row: any, select?: any) => (row && select ? Object.fromEntries(Object.keys(select).map((k) => [k, row[k] ?? null])) : row && { ...row });
   const db: any = fake.db;
+  const rawQueries: string[] = [];
+  db.$queryRaw = async (strings: TemplateStringsArray) => { rawQueries.push(strings.join('?')); return []; };
   db.eventSeries = {
     findUnique: async ({ where }: any) => (series[where.id] ? { id: where.id } : null),
     findFirst: async ({ where, select }: any) => sel(Object.values(series).find((r: any) => match(r, where)), select),
@@ -156,7 +160,7 @@ function buildState() {
       return { id: row.id, underbossStatus: row.underbossStatus };
     },
   };
-  return { fake, db, series, audit, checklist, parties, items, statusAudits, writes, admins: fake.admins };
+  return { rawQueries, fake, db, series, audit, checklist, parties, items, statusAudits, writes, admins: fake.admins };
 }
 
 const lastAudit = (s: any) => s.audit.at(-1);
@@ -809,5 +813,86 @@ describe('brand image uploads', () => {
     let last = 200;
     for (let i = 0; i < 31; i++) last = (await request(app).post(url).send({ slot: 'logo', mimeType: 'image/png', fileSize: 1 })).status;
     expect(last).toBe(429);
+  });
+
+  it('writes lock the series row (FOR UPDATE) so concurrent flyer slots cannot lose an update', async () => {
+    stored[`brand-uploads/${U(A, 1)}`] = await png(600, 800);
+    await request(app).post(`/api/brand-admin/${A}/assets/attach`).send({ slot: 'flyerPoster', path: U(A, 1) });
+    expect(m.state.rawQueries.some((q: string) => /FOR UPDATE/.test(q))).toBe(true);
+  });
+
+  it('an uppercase series id in the URL still matches tmp paths and /cdn urls', async () => {
+    stored[`brand-uploads/${U(A)}`] = await png(100, 100);
+    const res = await request(app).post(`/api/brand-admin/${A.toUpperCase()}/assets/attach`).send({ slot: 'logo', path: U(A) });
+    expect(res.status).toBe(200);
+    expect(res.body.url.startsWith(`/cdn/brand-assets/${A}/`)).toBe(true);
+  });
+
+  it('a 503 (missing bucket) does not consume the daily cap', async () => {
+    const miss = { message: 'Bucket not found' };
+    setStorageClientForTest({ storage: { from: () => ({ createSignedUploadUrl: async () => ({ data: null, error: miss }) }) } });
+    for (let i = 0; i < 5; i++) {
+      expect((await request(app).post(`/api/brand-admin/${A}/assets/upload-url`).send({ slot: 'logo', mimeType: 'image/png', fileSize: 1 })).status).toBe(503);
+    }
+    // all 200 daily slots are still available
+    for (let i = 0; i < BRAND_ASSET_DAILY_LIMIT; i++) {
+      expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, BRAND_ASSET_DAILY_LIMIT, 86_400_000)).toBe(true);
+    }
+  });
+});
+
+describe('daily cap survives the routine rate-event cleanup', () => {
+  it('series_asset_daily rows are not pruned at the 1 h retention', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryRateStore();
+      setInviteLimitStore(store);
+      for (let i = 0; i < 3; i++) expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, 3, 86_400_000)).toBe(true);
+      vi.advanceTimersByTime(2 * 3600_000);
+      await store.cleanup(RATE_EVENT_RETENTION_MS); // what loginCode runs
+      expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, 3, 86_400_000)).toBe(false);
+      vi.advanceTimersByTime(24 * 3600_000); // > 25 h old: now prunable
+      await store.cleanup(RATE_EVENT_RETENTION_MS);
+      expect(await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, A, 3, 86_400_000)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('brand-uploads tmp cleanup cron', () => {
+  const OLD = '2020-01-01T00:00:00Z';
+  const mkStore = (tree: Record<string, any[]>, removedOut: string[], err?: any) => ({
+    list: async (prefix: string) => ({ data: err ? null : tree[prefix] ?? [], error: err ?? null }),
+    remove: async (ps: string[]) => { removedOut.push(...ps); },
+  });
+
+  it('removes only old <seriesId>/tmp objects; ignores other folders and recent files', async () => {
+    const gone: string[] = [];
+    const store = mkStore({
+      '': [{ id: null, name: A }, { id: null, name: 'not-a-uuid' }, { id: 'x', name: 'stray.png' }],
+      [`${A}/tmp`]: [{ id: '1', name: 'old.png', created_at: OLD }, { id: '2', name: 'new.png', created_at: new Date().toISOString() }],
+    }, gone);
+    const r = await cleanupAbandonedBrandUploads(new Date(), store as any);
+    expect(r).toEqual({ scanned: 2, deleted: 1 });
+    expect(gone).toEqual([`${A}/tmp/old.png`]);
+  });
+
+  it('skips when the bucket is missing', async () => {
+    const gone: string[] = [];
+    const r = await cleanupAbandonedBrandUploads(new Date(), mkStore({}, gone, { message: 'Bucket not found' }) as any);
+    expect(r.skipped).toBe('bucket missing');
+    expect(gone).toEqual([]);
+  });
+
+  it('route requires CRON_SECRET', async () => {
+    const cronApp = express();
+    cronApp.use('/api/cron', brandAssetsCronRouter);
+    cronApp.use(errorHandler);
+    delete process.env.CRON_SECRET;
+    expect((await request(cronApp).get('/api/cron/cleanup-brand-uploads')).status).toBe(401);
+    process.env.CRON_SECRET = 's3cret';
+    expect((await request(cronApp).get('/api/cron/cleanup-brand-uploads').set('Authorization', 'Bearer wrong')).status).toBe(401);
+    delete process.env.CRON_SECRET;
   });
 });

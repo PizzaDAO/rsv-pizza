@@ -40,7 +40,7 @@ import {
   BRAND_SETTINGS_SELECT, validateBrandSettings, applyBrandSettings, pickSettings, visibleChanges, revertToAudit,
 } from '../lib/seriesBrandSettings.js';
 import { invalidateSiteBrandCache } from '../lib/siteBrand.js';
-import { isSlot, SLOTS, validateUploadRequest, createAssetUploadUrl, attachBrandAsset, removeBrandAsset } from '../lib/brandAssets.js';
+import { isSlot, SLOTS, validateUploadRequest, createAssetUploadUrl, attachBrandAsset, removeBrandAsset, cleanupAbandonedBrandUploads } from '../lib/brandAssets.js';
 import { writeSeriesAudit } from '../lib/seriesAudit.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import {
@@ -48,6 +48,20 @@ import {
 } from '../lib/seriesEventStatus.js';
 
 const router = Router();
+
+/** Cron (CRON_SECRET, mounted at /api/cron): delete abandoned brand-uploads tmp objects. */
+export const brandAssetsCronRouter = Router();
+async function runBrandUploadCleanup(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || (req.headers.authorization || '') !== `Bearer ${cronSecret}`) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    res.json(await cleanupAbandonedBrandUploads());
+  } catch (err) {
+    next(err);
+  }
+}
+brandAssetsCronRouter.get('/cleanup-brand-uploads', runBrandUploadCleanup);
+brandAssetsCronRouter.post('/cleanup-brand-uploads', runBrandUploadCleanup);
 const MAX_CHECKLIST_ITEMS = 100;
 
 type Handler = (req: SeriesAdminRequest, res: Response) => Promise<unknown>;
@@ -204,8 +218,9 @@ async function seriesDailyCap(seriesId: string) {
 scoped.post('/assets/upload-url', uploadLimit, wrap(async (req, res) => {
   const { slot, mimeType, fileSize } = req.body || {};
   const { ext } = validateUploadRequest(slot, mimeType, fileSize);
-  await seriesDailyCap(req.seriesAdmin!.seriesId);
+  // Mint first, count after: a 503 (missing bucket/env) must not use up the daily cap.
   const target = await createAssetUploadUrl(req.seriesAdmin!.seriesId, ext);
+  await seriesDailyCap(req.seriesAdmin!.seriesId);
   res.json({ ...target, slot });
 }));
 

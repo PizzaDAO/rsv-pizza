@@ -58,8 +58,15 @@ export interface RateStore {
   cleanup(olderThanMs: number): Promise<void>;
 }
 
-/** Rows older than this are never counted (every window is 15 min); delete them. */
+/** Rows older than this are never counted by the short-window (<= 1 h) buckets; delete them. */
 export const RATE_EVENT_RETENTION_MS = 60 * 60 * 1000;
+/**
+ * Buckets whose window is longer than RATE_EVENT_RETENTION_MS (24 h windows). The routine cleanup
+ * must NOT prune these at the short retention, or their cap would silently shrink to ~1 h; they
+ * are kept for LONG_WINDOW_RETENTION_MS (longest window + margin).
+ */
+export const LONG_WINDOW_BUCKETS: readonly string[] = ['series_asset_daily'];
+export const LONG_WINDOW_RETENTION_MS = 25 * 60 * 60 * 1000;
 /** Bounds on how long a reservation may wait for / hold the lock (SET LOCAL, per transaction). */
 export const RESERVE_LOCK_TIMEOUT = '2s';
 export const RESERVE_STATEMENT_TIMEOUT = '5s';
@@ -146,7 +153,9 @@ export function prismaRateStore(client: RawClient): RateStore {
       await client.$executeRaw`DELETE FROM auth_rate_events WHERE id = ANY(${ids}::bigint[])`;
     },
     async cleanup(olderThanMs) {
-      await client.$executeRaw`DELETE FROM auth_rate_events WHERE created_at < now() - (${olderThanMs}::int * interval '1 millisecond')`;
+      await client.$executeRaw`DELETE FROM auth_rate_events
+        WHERE (bucket <> ALL(${LONG_WINDOW_BUCKETS as string[]}::text[]) AND created_at < now() - (${olderThanMs}::int * interval '1 millisecond'))
+           OR (bucket = ANY(${LONG_WINDOW_BUCKETS as string[]}::text[]) AND created_at < now() - (${Math.max(olderThanMs, LONG_WINDOW_RETENTION_MS)}::int * interval '1 millisecond'))`;
     },
   };
 }
@@ -205,7 +214,10 @@ export function memoryRateStore(opts: { latencyMs?: number } = {}) {
     cleanup(olderThanMs) {
       return serial(() => {
         const now = Date.now();
-        for (let i = rows.length - 1; i >= 0; i--) if (now - rows[i].createdAt >= olderThanMs) rows.splice(i, 1);
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const keep = LONG_WINDOW_BUCKETS.includes(rows[i].bucket) ? Math.max(olderThanMs, LONG_WINDOW_RETENTION_MS) : olderThanMs;
+          if (now - rows[i].createdAt >= keep) rows.splice(i, 1);
+        }
       });
     },
   };

@@ -174,6 +174,8 @@ async function writeSlot(opts: { seriesId: string; slot: AssetSlot; url: string 
   const { seriesId, slot, url } = opts;
   const spec = SLOT_SPECS[slot];
   return prisma.$transaction(async (tx) => {
+    // Row lock: concurrent flyer slots (poster + rollup share flyer_art) serialize instead of losing an update.
+    await tx.$queryRaw`SELECT id FROM event_series WHERE id = ${seriesId}::uuid FOR UPDATE`;
     const before = await tx.eventSeries.findFirst({ where: { id: seriesId } });
     if (!before) throw new AppError('Not found', 404, 'NOT_FOUND');
     const b = before as Record<string, any>;
@@ -234,4 +236,56 @@ export async function attachBrandAsset(opts: { seriesId: string; slot: AssetSlot
 /** "Remove (use default)": clears the slot. The stored object is kept so history stays valid. */
 export function removeBrandAsset(opts: { seriesId: string; slot: AssetSlot; actorEmail: string; actorKind: SeriesActorKind }) {
   return writeSlot({ ...opts, url: null, action: 'asset.remove' });
+}
+
+// ---------- cron: abandoned tmp uploads ----------
+
+const TMP_MAX_AGE_MS = 24 * 3600_000;
+const CLEANUP_MAX_DELETES = 1000;
+const CLEANUP_MAX_LISTS = 2000;
+
+type StoreLike = {
+  list: (prefix: string, opts: { limit: number; offset?: number }) => Promise<{ data: Array<{ id: string | null; name: string; created_at?: string | null }> | null; error?: { message?: string } | null }>;
+  remove: (paths: string[]) => Promise<unknown>;
+};
+
+/**
+ * Daily cron: delete `<seriesId>/tmp/*` objects in `brand-uploads` older than 24h (attach deletes its tmp
+ * object, so anything that old was abandoned). Touches ONLY `<uuid>/tmp/` paths. A missing bucket or
+ * unconfigured storage is a no-op (`skipped`), never an error.
+ */
+export async function cleanupAbandonedBrandUploads(now: Date = new Date(), store?: StoreLike): Promise<{ scanned: number; deleted: number; skipped?: string }> {
+  let s = store;
+  if (!s) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { scanned: 0, deleted: 0, skipped: 'storage not configured' };
+    s = uploads() as unknown as StoreLike;
+  }
+  const cutoff = now.getTime() - TMP_MAX_AGE_MS;
+  const uuidRe = new RegExp(`^${UUID}$`);
+  const isFolder = (e: { id: string | null; name: string }) => !e.id && !!e.name;
+  let lists = 0;
+  let scanned = 0;
+  const doomed: string[] = [];
+  const list = async (prefix: string) => {
+    lists++;
+    const r = await s!.list(prefix, { limit: 1000 });
+    if (bucketMissing(r.error)) throw unavailable();
+    return r.data ?? [];
+  };
+  try {
+    for (const dir of (await list('')).filter((e) => isFolder(e) && uuidRe.test(e.name))) {
+      if (lists >= CLEANUP_MAX_LISTS || doomed.length >= CLEANUP_MAX_DELETES) break;
+      const files = await list(`${dir.name}/tmp`);
+      scanned += files.length;
+      for (const f of files) {
+        if (f.id && f.created_at && new Date(f.created_at).getTime() < cutoff) doomed.push(`${dir.name}/tmp/${f.name}`);
+      }
+    }
+  } catch (e) {
+    if (e instanceof AppError && e.code === 'UPLOADS_UNAVAILABLE') return { scanned: 0, deleted: 0, skipped: 'bucket missing' };
+    throw e;
+  }
+  const batch = doomed.slice(0, CLEANUP_MAX_DELETES);
+  if (batch.length) await s.remove(batch);
+  return { scanned, deleted: batch.length };
 }
