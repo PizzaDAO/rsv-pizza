@@ -336,7 +336,13 @@ export default async function middleware(request: Request) {
     }
 
     const ogImageUrl = (() => {
-      if (!event.eventImageUrl) return `${baseUrl}/logo.png`;
+      // Default site keeps /logo.png; a brand deploy uses its own OG image / logo.
+      if (!event.eventImageUrl) {
+        const brandImg = (process.env.VITE_BRAND_OG_IMAGE || process.env.VITE_BRAND_LOGO_URL || '').trim();
+        if (!brandImg) return `${baseUrl}/logo.png`;
+        if (/^https?:\/\//i.test(brandImg)) return brandImg;
+        return `${baseUrl}${brandImg.startsWith('/') ? '' : '/'}${brandImg}`;
+      }
       if (event.eventImageUrl.startsWith('http')) return event.eventImageUrl;
       if (event.eventImageUrl.startsWith('/'))
         return `${baseUrl}${event.eventImageUrl}`;

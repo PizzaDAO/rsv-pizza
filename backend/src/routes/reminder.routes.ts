@@ -157,10 +157,13 @@ export function buildReminderHtml(params: {
   address: string | null;
   imageUrl: string | null;
   siteName?: string;
+  /** Origin that serves the banner image (the party's own site). Default: www.rsv.pizza. */ // brand-check-ignore-line
+  siteUrl?: string;
 }): string {
   const { guestName, whenText, addressText, partyName, eventUrl, unsubUrl, venueName, address, imageUrl } =
     params;
   const siteName = params.siteName ?? 'RSV.Pizza'; // brand-check-ignore-line
+  const bannerUrl = `${params.siteUrl ?? 'https://www.rsv.pizza'}/reminder-see-you-in-4-hours.png`; // brand-check-ignore-line
 
   const whereHtml = venueName && address
     ? `<p style="margin: 10px 0;"><strong>Where:</strong> ${venueName}<br><span style="color: #666; font-size: 14px;">${address}</span></p>`
@@ -181,7 +184,7 @@ export function buildReminderHtml(params: {
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         ${flyerBlock}
         <div style="background: linear-gradient(180deg, #c8e8f2 0%, #9dd5e8 100%); padding: 44px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <img src="https://www.rsv.pizza/reminder-see-you-in-4-hours.png" alt="See you in 4 hours!" width="540" style="display: block; margin: 0 auto; max-width: 100%; height: auto;" />
+          <img src="${bannerUrl}" alt="See you in 4 hours!" width="540" style="display: block; margin: 0 auto; max-width: 100%; height: auto;" />
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
@@ -257,6 +260,8 @@ async function sendReminderEmail(
     address: ctx.partyAddress,
     imageUrl: ctx.partyImageUrl,
     siteName: site.name,
+    // A branded series serves the banner from its own site (same static asset); others keep www.rsv.pizza. // brand-check-ignore-line
+    siteUrl: site.url === 'https://rsv.pizza' ? undefined : site.url, // brand-check-ignore-line
   });
   const text = buildReminderText({
     guestName: guest.name,

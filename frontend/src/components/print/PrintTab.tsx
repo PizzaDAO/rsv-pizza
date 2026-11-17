@@ -1,5 +1,6 @@
 import { Download, Tag } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
+import { BRAND } from '../../config/brand';
 import { PosterGenerator } from '../generative/PosterGenerator';
 import { RollupGenerator } from '../generative/RollupGenerator';
 
@@ -154,6 +155,7 @@ function PrintHeader() {
       <p className="text-sm text-theme-text-secondary mt-1">
         Download print-ready materials for your event
       </p>
+      {!BRAND.isBranded && (
       <p className="text-sm text-theme-text-secondary mt-1">
         Need something custom?{' '}
         <a
@@ -165,6 +167,7 @@ function PrintHeader() {
           Browse the PizzaDAO Figma →
         </a>
       </p>
+      )}
     </div>
   );
 }
@@ -293,7 +296,8 @@ function PrintContent({ eventTags = [], showAllSwc = false, showHeader = true }:
         </div>
       </section>
 
-      {/* Table Tents Section */}
+      {/* Table Tents Section (PizzaDAO-branded asset: hidden on white-label builds) */}
+      {!BRAND.isBranded && (
       <section>
         <h3 className="text-lg font-semibold text-theme-text mb-3">Table Tents</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -322,6 +326,7 @@ function PrintContent({ eventTags = [], showAllSwc = false, showHeader = true }:
           ))}
         </div>
       </section>
+      )}
 
       {/* Name Tags Section */}
       <section>

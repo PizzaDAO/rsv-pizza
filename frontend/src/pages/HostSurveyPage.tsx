@@ -4,6 +4,7 @@ import { useParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, AlertCircle, CheckCircle2, Star, MessageSquare, Users } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { BRAND } from '../config/brand';
 import { IconInput } from '../components/IconInput';
 import { Checkbox } from '../components/Checkbox';
 import { ThemeProvider } from '../contexts/ThemeContext';
@@ -119,7 +120,7 @@ function HostSurveyPageInner() {
             <CheckCircle2 className="w-16 h-16 text-[#2E7D32] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-theme-text mb-2">Thank you! 🍕</h1>
             <p className="text-theme-text-muted">
-              Your feedback helps us support PizzaDAO hosts better.
+              Your feedback helps us support {BRAND.isBranded ? BRAND.name : 'PizzaDAO'} hosts better.
             </p>
             <button
               type="button"
@@ -139,7 +140,7 @@ function HostSurveyPageInner() {
   return (
     <Layout>
       <Helmet>
-        <title>{data ? `Host survey · ${data.eventName}` : 'Host survey'} | RSV.Pizza</title>
+        <title>{data ? `Host survey · ${data.eventName}` : 'Host survey'} | {BRAND.name}</title>
       </Helmet>
       <div className="max-w-2xl mx-auto px-4 py-10">
         <div className="card p-5 mb-6 text-center">

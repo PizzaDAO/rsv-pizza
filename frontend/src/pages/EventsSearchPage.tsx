@@ -108,7 +108,7 @@ export function EventsSearchPage() {
       </Helmet>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-theme-text mb-1">Find events</h1>
-        <p className="text-sm text-theme-text-muted mb-6">Search public pizza parties around the world.</p>
+        <p className="text-sm text-theme-text-muted mb-6">{BRAND.isBranded ? `Search public ${BRAND.name} events.` : 'Search public pizza parties around the world.'}</p>
 
         <div className="space-y-3 mb-6">
           <IconInput

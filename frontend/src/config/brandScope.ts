@@ -6,6 +6,9 @@
  */
 import { BRAND } from './brand';
 
+/** The default (unbranded) site: where GPP and series-less events live, whichever build you are on. */
+export const DEFAULT_SITE_ORIGIN = 'https://rsv.pizza'; // brand-check-ignore-line
+
 /** True when this build is scoped to a single event series. */
 export const IS_SERIES_SCOPED = !!BRAND.seriesSlug;
 

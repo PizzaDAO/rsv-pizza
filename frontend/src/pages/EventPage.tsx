@@ -46,6 +46,7 @@ import { BRAND_FEATURES } from '../config/brandScope';
 import { NftClaimCard } from '../components/NftClaimCard';
 import { captureInviteToken } from '../lib/inviteToken';
 import { HackathonSection } from '../components/hackathon/HackathonSection';
+import { redirectForeignEvent } from '../lib/seriesSites';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -172,6 +173,9 @@ export function EventPage() {
         const foundEvent = result && BRAND.isBranded
           ? { ...result, donationEnabled: false, nftEnabled: false }
           : result;
+        // White-label: an event outside this build's series belongs on its own site (series
+        // siteUrl, or the default site for GPP / series-less events), not under this chrome.
+        if (foundEvent && (await redirectForeignEvent(foundEvent.eventSeriesId, slug))) return;
         if (foundEvent) {
           setEvent(foundEvent);
           setCanEditAsCoHost(false);

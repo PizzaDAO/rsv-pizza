@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { brandSeriesSlug, ogFallbackImage, partyAllowedOnBrand, type OgSeries } from '../_ogBrand';
 
 // The helpers Vercel's Node runtime adds to req/res. Declared here instead of importing
 // @vercel/node, which only supplied these types and pulled in a vulnerable undici.
@@ -41,7 +42,30 @@ function isCrawler(userAgent: string | undefined): boolean {
 
 // Explicit allowlist: anon must never `select=*` from parties (password and other host-only
 // columns are not granted to anon). Every column here must be in scripts/parties-anon-columns.json.
-const OG_PARTY_COLUMNS = 'name,date,duration,description,address,event_image_url,custom_url,invite_code';
+const OG_PARTY_COLUMNS = 'name,date,duration,description,address,event_image_url,custom_url,invite_code,event_series_id';
+
+const API_URL = process.env.VITE_API_URL || 'https://backend-pizza-dao.vercel.app';
+
+// White-label: a series-scoped deployment resolves its own series (id + OG/logo) from the public
+// series list, cached briefly per function instance. Null when unscoped or unresolvable.
+let seriesCache: { at: number; series: OgSeries | null } | null = null;
+async function getBrandSeries(): Promise<OgSeries | null> {
+  const slug = brandSeriesSlug(process.env);
+  if (!slug) return null;
+  if (seriesCache && Date.now() - seriesCache.at < 60_000) return seriesCache.series;
+  let series: OgSeries | null = null;
+  try {
+    const r = await fetch(`${API_URL}/api/series`, { headers: { Accept: 'application/json' } });
+    if (r.ok) {
+      const body = await r.json();
+      series = (body?.series || []).find((s: OgSeries) => s.slug === slug) ?? null;
+    }
+  } catch {
+    series = null;
+  }
+  if (series) seriesCache = { at: Date.now(), series };
+  return series;
+}
 
 async function getPartyBySlug(slug: string) {
   // Try custom URL first
@@ -141,13 +165,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const party = await getPartyBySlug(slug as string);
+    const brandSeries = await getBrandSeries();
+    const fallbackImage = ogFallbackImage(process.env, SITE_URL, brandSeries);
+    let party = await getPartyBySlug(slug as string);
+    // White-label: a brand deployment only serves its own series' events; anything else looks
+    // exactly like an unknown slug.
+    if (party && !partyAllowedOnBrand(process.env, party, brandSeries)) party = null;
 
     if (!party) {
       return res.status(200).setHeader('Content-Type', 'text/html').send(generateHTML({
         title: `Event Not Found | ${BRAND_NAME}`,
         description: 'This event could not be found.',
-        image: `${SITE_URL}/logo.png`,
+        image: fallbackImage,
         url: `${SITE_URL}/${slug}`,
       }));
     }
@@ -192,7 +221,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         imageUrl = `${SITE_URL}/${imageUrl}`;
       }
     } else {
-      imageUrl = `${SITE_URL}/logo.png`;
+      imageUrl = fallbackImage;
     }
 
     const pageUrl = party.custom_url
@@ -214,7 +243,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).setHeader('Content-Type', 'text/html').send(generateHTML({
       title: `${BRAND_NAME} - ${BRAND_TAGLINE}`,
       description: 'Plan the perfect pizza order for your party guests.',
-      image: `${SITE_URL}/logo.png`,
+      image: ogFallbackImage(process.env, SITE_URL, null),
       url: `${SITE_URL}/${slug}`,
     }));
   }

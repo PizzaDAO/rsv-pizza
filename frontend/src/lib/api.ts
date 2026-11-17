@@ -1118,6 +1118,8 @@ export interface PublicEvent {
   userId: string | null;
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null;
+  /** White-label: the event's series id (null for none). */
+  eventSeriesId?: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
   donationEnabled?: boolean;

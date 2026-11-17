@@ -4,7 +4,9 @@ const mockPrisma = vi.hoisted(() => ({
   guest: { findFirst: vi.fn(), update: vi.fn() },
   party: { findUnique: vi.fn() },
 }));
+const mockBranded = vi.hoisted(() => vi.fn());
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
+vi.mock('./siteBrand.js', () => ({ brandedSiteForParty: mockBranded }));
 
 import { mintNftOnApproval } from './mintOnApproval.js';
 
@@ -23,6 +25,7 @@ describe('mintNftOnApproval', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'svc';
     mockPrisma.guest.findFirst.mockResolvedValue(guest);
     mockPrisma.party.findUnique.mockResolvedValue(party);
+    mockBranded.mockResolvedValue(null);
   });
 
   it('mints and records the token', async () => {
@@ -45,6 +48,14 @@ describe('mintNftOnApproval', () => {
     const f = vi.fn();
     const r = await mintNftOnApproval('p1', 'g1', f as any);
     expect(r).toEqual({ minted: false, reason });
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('skips a branded-series party (no attendance NFTs on brand sites)', async () => {
+    mockBranded.mockResolvedValue({ url: 'https://team1.rsv.pizza', name: 'Team1', fromEmail: 'x' }); // brand-check-ignore-line
+    const f = vi.fn();
+    const r = await mintNftOnApproval('p1', 'g1', f as any);
+    expect(r).toEqual({ minted: false, reason: 'branded' });
     expect(f).not.toHaveBeenCalled();
   });
 

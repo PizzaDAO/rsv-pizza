@@ -131,6 +131,14 @@ export async function siteForOrigin(origin: string | null | undefined, fallbackU
   return s ? brandedSite(s) : fallbackSite(fallbackUrl);
 }
 
+/** The live branded series whose site origin exactly matches this Origin header, or null. */
+export async function seriesSlugForOrigin(origin: string | null | undefined): Promise<string | null> {
+  const o = normalizeOrigin(origin);
+  if (!o) return null;
+  const { byOrigin } = await getSeriesSites();
+  return byOrigin.get(o)?.slug ?? null;
+}
+
 /** Series fields the create route needs (stamping + the optional create-flow preset). */
 export interface BrandedSeries {
   id: string;

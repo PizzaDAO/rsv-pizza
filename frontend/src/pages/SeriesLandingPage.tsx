@@ -8,6 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { BRAND, brandUrl } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
+import { foreignSeriesOrigin, loadPublicSeries } from '../lib/seriesSites';
 
 /**
  * Public landing page for a white-label event series: /series/:slug.
@@ -78,10 +79,24 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
 
   useEffect(() => {
     let cancelled = false;
+    let redirecting = false;
     (async () => {
       setLoading(true);
       setNotFound(false);
       try {
+        // White-label: a series-scoped build only shows its own series. Another series goes to its
+        // own site when it has one; otherwise "not found" (same as an unknown slug).
+        if (IS_SERIES_SCOPED && !slugOverride && slug !== BRAND.seriesSlug) {
+          const origin = foreignSeriesOrigin(await loadPublicSeries(), BRAND.seriesSlug, slug, window.location.origin);
+          if (cancelled) return;
+          if (origin) {
+            redirecting = true;
+            window.location.replace(origin);
+            return;
+          }
+          setNotFound(true);
+          return;
+        }
         const { series: s } = await fetchPublicSeries(slug);
         if (cancelled) return;
         setSeries(s);
@@ -94,11 +109,11 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
       } catch {
         if (!cancelled) setNotFound(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !redirecting) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, slugOverride]);
 
   // Apply the series' own theme class to this page's subtree.
   const pageThemeClass = series?.themeClass || themeClass;
