@@ -100,7 +100,7 @@ All errors follow a consistent format:
       `,
       contact: {
         name: 'RSVPizza Support',
-        url: 'https://rsv.pizza',
+        url: 'https://rsv.pizza', // brand-check-ignore-line: public API docs contact URL, moved from swagger.ts
       },
     },
     servers: [
