@@ -18,7 +18,6 @@ import { IconInput } from '../IconInput';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors } from '../../lib/api';
 import { BRAND } from '../../config/brand';
-import { isBrandSeriesParty } from '../../lib/hostDefaultTab';
 import { useSeriesById, seriesBrandName } from '../../lib/seriesSites';
 import {
   extractCityAndState,
@@ -46,9 +45,9 @@ export function PressReleaseWidget() {
   const [sponsors, setSponsors] = useState('');
 
   // White-label: GPP events keep the Global Pizza Party template; branded builds and brand-series
-  // events get a neutral one with the brand's own name.
+  // events (series with a live site) get a neutral one with the brand's own name.
   const series = useSeriesById(party?.eventSeriesId);
-  const neutralTemplate = party?.eventType !== 'gpp' && (BRAND.isBranded || isBrandSeriesParty(party));
+  const neutralTemplate = party?.eventType !== 'gpp' && (BRAND.isBranded || !!series?.siteUrl);
   const brandName = BRAND.isBranded || !series ? BRAND.name : seriesBrandName(series);
   const defaultTemplate = neutralTemplate
     ? t('pressRelease.defaultTemplateBrand', { brandName })

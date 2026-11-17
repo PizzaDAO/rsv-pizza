@@ -392,6 +392,19 @@ describe('Party Routes', () => {
       expect(data).not.toHaveProperty('nftEnabled');
     });
 
+    it('PATCH: a branded-series host can still turn donations/NFTs off', async () => {
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce({ id: PARTY_ID, userId: HOST_USER_ID, coHosts: [] })
+        .mockResolvedValue({ eventSeriesId: 'series-team1' });
+      mockPrisma.party.update.mockResolvedValue({ id: PARTY_ID, name: 'N', userId: HOST_USER_ID, user: { name: 'H' } });
+      const res = await request(createTestApp()).patch(`/api/parties/${PARTY_ID}`).set('Authorization', auth())
+        .send({ donationEnabled: false, nftEnabled: false });
+      expect(res.status).toBe(200);
+      const data = mockPrisma.party.update.mock.calls[0][0].data;
+      expect(data.donationEnabled).toBe(false);
+      expect(data.nftEnabled).toBe(false);
+    });
+
     it('PATCH: unbranded party keeps donationEnabled/nftEnabled behavior', async () => {
       const data = await patch(null);
       expect(data.donationEnabled).toBe(true);

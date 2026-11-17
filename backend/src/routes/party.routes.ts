@@ -1078,8 +1078,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // party-password-hash: undefined = keep, null/'' = clear, string = bcrypt hash.
     const passwordToWrite = await secretForWrite(password);
 
-    // White-label: donations and attendance NFTs are not offered on branded series. Drop those
-    // fields server-side (the rest of the save still succeeds), whatever the client sends.
+    // White-label: donations and attendance NFTs are not offered on branded series. Drop an attempt to
+    // turn them ON server-side (turning off stays allowed) (the rest of the save still succeeds), whatever the client sends.
     let brandedParty = false;
     if (donationEnabled !== undefined || nftEnabled !== undefined) {
       const seriesRow = await prisma.party.findUnique({ where: { id }, select: { eventSeriesId: true } });
@@ -1120,7 +1120,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
         ...(mergedCoHosts !== undefined && { coHosts: mergedCoHosts }),
         ...(selectedPizzerias !== undefined && { selectedPizzerias }),
-        ...(donationEnabled !== undefined && !brandedParty && { donationEnabled }),
+        ...(donationEnabled !== undefined && !(brandedParty && donationEnabled) && { donationEnabled }),
         ...(donationGoal !== undefined && { donationGoal: donationGoal || null }),
         ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
         ...(suggestedAmounts !== undefined && { suggestedAmounts }),
@@ -1134,7 +1134,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(musicEnabled !== undefined && { musicEnabled }),
         ...(musicNotes !== undefined && { musicNotes: musicNotes || null }),
         ...(photoModeration !== undefined && { photoModeration }),
-        ...(nftEnabled !== undefined && !brandedParty && { nftEnabled }),
+        ...(nftEnabled !== undefined && !(brandedParty && nftEnabled) && { nftEnabled }),
         ...(nftChain !== undefined && { nftChain: nftChain || null }),
         ...(pinnedApps !== undefined && { pinnedApps }),
         ...(region !== undefined && { region: region || null }),

@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { brandSeriesSlug, ogFallbackImage, partyAllowedOnBrand, type OgSeries } from '../_ogBrand';
+import { brandSeriesSlug, ogFallbackImage, partyAllowedOnBrand, type OgSeries } from '../_ogBrand.js';
 
 // The helpers Vercel's Node runtime adds to req/res. Declared here instead of importing
 // @vercel/node, which only supplied these types and pulled in a vulnerable undici.
