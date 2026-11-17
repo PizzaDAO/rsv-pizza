@@ -89,8 +89,21 @@ export function foreignSeriesOrigin(
   currentOrigin: string,
 ): string | null {
   if (!brandSlug || slug === brandSlug) return null;
+  return ownSiteOriginForSeries(all, slug, currentOrigin);
+}
+
+/**
+ * Default (unscoped) build asked for /series/:slug of a series that has its own site (siteUrl):
+ * that site's origin, so the page renders under the series' own chrome and theme. Null for series
+ * without a siteUrl (e.g. GPP), unknown slugs, or when the target is this very origin.
+ */
+export function ownSiteOriginForSeries(
+  all: PublicSeriesWithId[],
+  slug: string,
+  currentOrigin: string,
+): string | null {
   const target = all.find((s) => s.slug === slug);
-  if (!target?.siteUrl) return null;
+  if (!target?.siteUrl?.trim()) return null;
   const origin = seriesSiteOrigin(target);
   return trimOrigin(origin) === trimOrigin(currentOrigin) ? null : origin;
 }

@@ -1697,7 +1697,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .wl-theme h1, .wl-theme h2, .wl-theme h3 { font-family: var(--font-heading); }
 .wl-theme h1[data-testid="event-name"] { font-family: var(--font-heading) !important; }
 .wl-theme button, .wl-theme input, .wl-theme textarea, .wl-theme select { font-family: var(--font-body); }
-.wl-theme .min-h-screen { background: transparent !important; }
+/* brand-doge keeps the page wrappers' own backgrounds (DisplayPage bg-black, series wrapper), as the old doge theme did. */
+.wl-theme:not(.brand-doge) .min-h-screen { background: transparent !important; }
 
 /* Header: solid token surface and a hairline border. */
 .wl-theme .site-header {
@@ -2015,3 +2016,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 /* The event page title carries an inline Rubik font; the old doge theme never overrode it (the inline style
  * beat its rule), and the generic layer would force the heading font, so pin the existing look. */
 .wl-theme.brand-doge h1[data-testid="event-name"] { font-family: 'Rubik', sans-serif !important; }
+/* The wordmark is the logo image, so the old theme hid every span inside a header link: the brand name text
+ * (now the hideHeaderName flag) AND the logged-in /account link's name. Keep hiding those spans. */
+.wl-theme.brand-doge .site-header a span { display: none; }
+/* The generic layer rounds textareas like cards; the old doge theme left them at the base 12px. */
+.wl-theme.brand-doge textarea { border-radius: 12px; }

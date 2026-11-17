@@ -22,8 +22,9 @@
  * Modes (default is a read-only dry run that prints the before/after diff):
  *   (none)                   dry run for every entry in the data file, or just `--slug <slug>`
  *   --slug doge --apply      ONE transaction: SET LOCAL timeouts, lock the row, UPDATE, audit row
- *   --slug doge --rollback   restore the fields from the snapshot of the latest 'brand-tokens.apply'
- *                            audit row (and write a 'brand-tokens.rollback' row)
+ *   --slug doge --rollback   undo the newest apply not yet rolled back (restore its snapshot, audit it, verify);
+ *                            run again to step back to the previous apply. Refuses if the row was edited
+ *                            since that apply, unless --force
  *
  *   cd backend && node --env-file=.env scripts/apply-brand-tokens.cjs [--slug doge] [--apply|--rollback]
  *
@@ -52,6 +53,7 @@ const ARGS = process.argv.slice(2);
 const MODE = ARGS.includes('--apply') ? 'apply' : ARGS.includes('--rollback') ? 'rollback' : 'dry';
 const slugIdx = ARGS.indexOf('--slug');
 const SLUG = slugIdx >= 0 ? ARGS[slugIdx + 1] : null;
+const FORCE = ARGS.includes('--force');
 
 let themeTokensLib = null;
 /** src/lib/themeTokens.ts (TypeScript) through tsx, loaded lazily so tests can inject their own. */
@@ -79,9 +81,10 @@ function validateEntry(entry, parse) {
     errors.push('themeClass must be a CSS class name');
   }
   for (const k of Object.keys(entry)) if (!FIELD_KEYS.includes(k)) errors.push(`unknown field: ${k}`);
-  for (const k of ['tagline', 'metaDescription']) {
-    if (entry[k] !== undefined && (typeof entry[k] !== 'string' || !entry[k].trim() || entry[k].length > 300)) {
-      errors.push(`${k} must be a non-empty string (max 300)`);
+  // Same caps as the brand-settings API (tagline 80, meta description 200).
+  for (const [k, max] of [['tagline', 80], ['metaDescription', 200]]) {
+    if (entry[k] !== undefined && (typeof entry[k] !== 'string' || !entry[k].trim() || entry[k].length > max)) {
+      errors.push(`${k} must be a non-empty string (max ${max})`);
     }
   }
   if (entry.faviconUrl !== undefined && (typeof entry.faviconUrl !== 'string' || !URL_OK.test(entry.faviconUrl))) {
@@ -204,26 +207,39 @@ async function applyEntry(tx, slug, entry) {
   return { changed: true, before, after };
 }
 
-/** rollback (inside ONE transaction): restore the snapshot of the latest apply audit row. */
-async function rollbackEntry(tx, slug) {
+/**
+ * rollback (inside ONE transaction): undo the newest apply that has not been rolled back yet.
+ * Each rollback audit row records which apply it undid (`snapshot._undoes`), so repeated rollbacks
+ * step back through earlier applies. Refuses when the row no longer holds the values that apply wrote
+ * (somebody edited it since) unless `force`; `drifted` lists the fields.
+ */
+async function rollbackEntry(tx, slug, opts = {}) {
   await setLocalTimeouts(tx);
   const row = await readRow(tx, slug, true);
   if (!row) throw new Error(`no event_series row with slug "${slug}"`);
   const audits = await tx.$queryRawUnsafe(
-    `SELECT id, snapshot, created_at FROM series_audit WHERE series_id = $1::uuid AND action = 'brand-tokens.apply' ORDER BY created_at DESC LIMIT 1`,
+    `SELECT id, action, snapshot, changes, created_at FROM series_audit WHERE series_id = $1::uuid AND action IN ('brand-tokens.apply', 'brand-tokens.rollback') ORDER BY created_at DESC`,
     row.id,
   );
-  if (!audits.length) throw new Error(`no 'brand-tokens.apply' audit row for "${slug}": nothing to roll back`);
-  const snap = audits[0].snapshot || {};
-  const keys = Object.keys(snap).filter((k) => FIELD_KEYS.includes(k));
-  if (!keys.length) throw new Error(`the latest 'brand-tokens.apply' audit row for "${slug}" has no snapshot`);
+  const undone = new Set(audits.filter((a) => a.action === 'brand-tokens.rollback').map((a) => a.snapshot && a.snapshot._undoes).filter(Boolean));
+  const target = audits.find((a) => a.action === 'brand-tokens.apply' && !undone.has(a.id));
+  if (!target) throw new Error(`no un-rolled-back 'brand-tokens.apply' audit row for "${slug}": nothing to roll back`);
+  const snap = target.snapshot || {};
+  const written = target.changes || {};
+  // Only the fields that apply actually changed are restored (never fields it left alone).
+  const keys = Object.keys(written).filter((k) => FIELD_KEYS.includes(k) && k in snap);
+  if (!keys.length) throw new Error(`the 'brand-tokens.apply' audit row for "${slug}" has no snapshot`);
+  const drifted = Object.keys(written).filter((k) => FIELD_KEYS.includes(k) && stable(row[k] ?? null) !== stable(written[k].new ?? null));
+  if (drifted.length && !opts.force) {
+    throw new Error(`the row changed since that apply (drifted: ${drifted.join(', ')}); rollback would overwrite those edits. Re-run with --force to restore anyway`);
+  }
   const before = pick(row, keys);
   const after = pick(snap, keys);
   const changes = diffValues(before, after);
-  if (!Object.keys(changes).length) return { changed: false, before, after };
+  if (!Object.keys(changes).length) return { changed: false, before, after, undoes: target.id, drifted };
   await writeRow(tx, row.id, after);
-  await writeAudit(tx, row.id, 'brand-tokens.rollback', changes, before);
-  return { changed: true, before, after };
+  await writeAudit(tx, row.id, 'brand-tokens.rollback', changes, { ...before, _undoes: target.id });
+  return { changed: true, before, after, undoes: target.id, drifted };
 }
 
 function target() {
@@ -258,9 +274,14 @@ async function main() {
       console.log(`  config_version: ${row.configVersion}`);
 
       if (MODE === 'rollback') {
-        const r = await prisma.$transaction((tx) => rollbackEntry(tx, slug), TX_OPTS);
+        const r = await prisma.$transaction((tx) => rollbackEntry(tx, slug, { force: FORCE }), TX_OPTS);
+        if (r.drifted.length) console.log(`  --force: overwrote edited fields: ${r.drifted.join(', ')}`);
         console.log(r.changed ? 'rolled back; before/after (* = changes):' : 'already at the snapshot values; nothing to do');
         if (r.changed) console.log(formatDiff(r.before, r.after));
+        const now = await readRow(prisma, slug);
+        if (Object.keys(diffValues(pick(now, Object.keys(r.after)), r.after)).length) {
+          throw new Error('post-commit verify failed: the row differs from the restored snapshot');
+        }
         continue;
       }
 

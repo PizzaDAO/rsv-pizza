@@ -8,7 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { BRAND, HIDE_HERO_LOGO, brandUrl } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
-import { foreignSeriesOrigin, loadPublicSeries } from '../lib/seriesSites';
+import { foreignSeriesOrigin, loadPublicSeries, ownSiteOriginForSeries } from '../lib/seriesSites';
 
 /**
  * Public landing page for a white-label event series: /series/:slug.
@@ -96,6 +96,16 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
           }
           setNotFound(true);
           return;
+        }
+        // Default (unscoped) build: a series with its own site is shown there, under its own theme.
+        if (!IS_SERIES_SCOPED && !slugOverride) {
+          const origin = ownSiteOriginForSeries(await loadPublicSeries(), slug, window.location.origin);
+          if (cancelled) return;
+          if (origin) {
+            redirecting = true;
+            window.location.replace(`${origin}/series/${slug}${window.location.search}`);
+            return;
+          }
         }
         const { series: s } = await fetchPublicSeries(slug);
         if (cancelled) return;

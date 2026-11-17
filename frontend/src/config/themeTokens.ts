@@ -251,12 +251,13 @@ export function parseThemeTokens(input: unknown, opts: ParseOptions = {}): Theme
   };
   const fontHeading = fontOf('fontHeading');
   const fontBody = fontOf('fontBody');
-  const flags: Partial<Record<(typeof FLAG_KEYS)[number], true>> = {};
+  // An explicit true OR false is kept (so a save can tell "turned off" from "not sent").
+  const flags: Partial<Record<(typeof FLAG_KEYS)[number], boolean>> = {};
   for (const k of FLAG_KEYS) {
     const v = o[k];
     if (v === undefined) continue;
     if (typeof v !== 'boolean') errors.push(`${k} must be true or false`);
-    else if (v) flags[k] = true;
+    else flags[k] = v;
   }
 
   let overrides: Record<string, string> | undefined;

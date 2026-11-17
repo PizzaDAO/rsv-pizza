@@ -8,11 +8,11 @@ const GOOD = {
 
 // Same cases run in frontend/src/config/themeTokensFlags.test.ts (themeTokens.ts is byte-identical in both).
 describe('presentation flags (hideHeaderName / hideHeroLogo)', () => {
-  it('accepts booleans, keeps only true flags, and they do not change the derived variables', () => {
+  it('accepts booleans, keeps explicit true and false, and they do not change the derived variables', () => {
     const r = parseThemeTokens({ ...GOOD, hideHeaderName: true, hideHeroLogo: false });
     if (!r.ok) throw new Error(JSON.stringify(r));
     expect(r.tokens.hideHeaderName).toBe(true);
-    expect('hideHeroLogo' in r.tokens).toBe(false);
+    expect(r.tokens.hideHeroLogo).toBe(false);
     const plain = parseThemeTokens(GOOD);
     if (!plain.ok) throw new Error('plain');
     expect(deriveThemeVars(r.tokens)).toEqual(deriveThemeVars(plain.tokens));

@@ -1,10 +1,10 @@
 {
-  "_comment": "Per-brand theme tokens for backend/scripts/apply-brand-tokens.cjs (self-serve brands PRs 9-12). Each entry is what event_series.theme_class and event_series.theme_tokens should hold. Validated against backend/src/lib/themeTokens.ts (contrast, mode-vs-bg) by the runner and by apply-brand-tokens.test.ts.",
+  "_comment": "tagline / metaDescription / faviconUrl equal the rsvpizza-doge VITE_BRAND_TAGLINE / _DESCRIPTION / _FAVICON_URL exactly, so title, meta description and OG do not change. Per-brand theme tokens for backend/scripts/apply-brand-tokens.cjs (self-serve brands PRs 9-12). Each entry is what event_series.theme_class and event_series.theme_tokens should hold. Validated against backend/src/lib/themeTokens.ts (contrast, mode-vs-bg) by the runner and by apply-brand-tokens.test.ts.",
   "doge": {
     "themeClass": "brand-doge",
     "tagline": "Pizza parties for Doge Day, Nov 2 2027",
     "metaDescription": "Throw a pizza party for Doge Day on November 2, 2027.",
-    "faviconUrl": "https://doge.rsv.pizza/brands/doge/favicon.png",
+    "faviconUrl": "/brands/doge/favicon.png",
     "themeTokens": {
       "mode": "light",
       "bg": "#f4ebd7",

@@ -51,6 +51,8 @@ describe('data file', () => {
     expect(runner.validateEntry(wrongMode).ok).toBe(false);
     expect(runner.validateEntry({ ...data.doge, themeClass: 'bad class!' }).ok).toBe(false);
     expect(runner.validateEntry({ ...data.doge, surprise: 1 }).ok).toBe(false);
+    expect(runner.validateEntry({ ...data.doge, tagline: 'x'.repeat(81) }).ok).toBe(false);
+    expect(runner.validateEntry({ ...data.doge, metaDescription: 'x'.repeat(201) }).ok).toBe(false);
     expect(runner.validateEntry({ ...data.doge, faviconUrl: 'javascript:alert(1)' }).ok).toBe(false);
   });
 });
@@ -94,7 +96,7 @@ function fakeDb(initial: Record<string, any> = {}) {
         return 1;
       }
       if (/^INSERT INTO series_audit/.test(sql)) {
-        audits.push({ series_id: p[0], actor_email: p[1], actor_kind: 'system', action: p[2], changes: JSON.parse(p[3]), snapshot: JSON.parse(p[4]), created_at: audits.length });
+        audits.push({ id: 'a' + audits.length, series_id: p[0], actor_email: p[1], actor_kind: 'system', action: p[2], changes: JSON.parse(p[3]), snapshot: JSON.parse(p[4]), created_at: audits.length });
         return 1;
       }
       throw new Error('unexpected exec: ' + sql);
@@ -103,8 +105,7 @@ function fakeDb(initial: Record<string, any> = {}) {
       log.push(sql.replace(/\s+/g, ' ').trim());
       if (/FROM event_series/.test(sql)) return p[0] === row.slug ? [{ ...row }] : [];
       if (/FROM series_audit/.test(sql)) {
-        const mine = audits.filter((a) => a.action === 'brand-tokens.apply').sort((a, b) => b.created_at - a.created_at);
-        return mine.slice(0, 1);
+        return audits.filter((a) => a.action === 'brand-tokens.apply' || a.action === 'brand-tokens.rollback').sort((a, b) => b.created_at - a.created_at);
       }
       throw new Error('unexpected query: ' + sql);
     },
@@ -126,6 +127,9 @@ describe('apply / rollback against a fake database', () => {
     expect(db.row.theme_class).toBe('brand-doge');
     expect(db.row.theme_tokens.hideHeaderName).toBe(true);
     expect(db.row.favicon_url).toBe(data.doge.faviconUrl);
+    expect(data.doge.faviconUrl).toBe('/brands/doge/favicon.png');
+    expect(data.doge.tagline).toBe('Pizza parties for Doge Day, Nov 2 2027');
+    expect(data.doge.metaDescription).toBe('Throw a pizza party for Doge Day on November 2, 2027.');
     expect(db.row.config_version).toBe(2);
     expect(db.audits).toHaveLength(1);
     expect(db.audits[0].actor_kind).toBe('system');
@@ -163,6 +167,46 @@ describe('apply / rollback against a fake database', () => {
     expect(db.row.config_version).toBe(3);
     expect(db.audits.map((a) => a.action)).toEqual(['brand-tokens.apply', 'brand-tokens.rollback']);
     expect(db.audits[1].actor_kind).toBe('system');
+  });
+
+  it('two applies then two rollbacks step back one apply at a time; a third has nothing left', async () => {
+    const db = fakeDb({ tagline: 'T0' });
+    await runner.applyEntry(db, 'doge', entry()); // T0 -> data tagline
+    const second = { ...entry(), tagline: 'Second tagline' };
+    await runner.applyEntry(db, 'doge', second);
+    expect(db.row.tagline).toBe('Second tagline');
+    await runner.rollbackEntry(db, 'doge');
+    expect(db.row.tagline).toBe(data.doge.tagline); // undid apply #2 only
+    expect(db.row.theme_class).toBe('brand-doge');
+    await runner.rollbackEntry(db, 'doge');
+    expect(db.row.tagline).toBe('T0'); // undid apply #1
+    expect(db.row.theme_class).toBe('doge-theme');
+    expect(db.row.theme_tokens).toBeNull();
+    expect(db.audits.map((a) => a.action)).toEqual(['brand-tokens.apply', 'brand-tokens.apply', 'brand-tokens.rollback', 'brand-tokens.rollback']);
+    expect(db.audits[2].snapshot._undoes).toBe('a1');
+    expect(db.audits[3].snapshot._undoes).toBe('a0');
+    await expect(runner.rollbackEntry(db, 'doge')).rejects.toThrow(/nothing to roll back/);
+  });
+
+  it('rollback refuses after an intervening edit (names the drifted fields) unless forced', async () => {
+    const db = fakeDb({ tagline: 'T0' });
+    await runner.applyEntry(db, 'doge', entry());
+    db.row.tagline = 'Edited by a brand admin';
+    await expect(runner.rollbackEntry(db, 'doge')).rejects.toThrow(/drifted: tagline/);
+    expect(db.row.tagline).toBe('Edited by a brand admin');
+    expect(db.audits).toHaveLength(1);
+    const r = await runner.rollbackEntry(db, 'doge', { force: true });
+    expect(r.drifted).toEqual(['tagline']);
+    expect(db.row.tagline).toBe('T0');
+  });
+
+  it('rollback only restores fields the apply changed (a later edit to an untouched field survives)', async () => {
+    const db = fakeDb({ tagline: data.doge.tagline }); // apply leaves tagline alone
+    await runner.applyEntry(db, 'doge', entry());
+    db.row.tagline = 'Later edit';
+    await runner.rollbackEntry(db, 'doge');
+    expect(db.row.tagline).toBe('Later edit');
+    expect(db.row.theme_class).toBe('doge-theme');
   });
 
   it('rollback with no apply audit row refuses; an unknown slug throws', async () => {

@@ -199,6 +199,19 @@ export async function applyBrandSettings(opts: {
       if (nt === Prisma.DbNull) bad('themeTokens carry super-admin overrides and can only be cleared by a super-admin');
       data = { ...data, themeTokens: { ...nt, overrides: kept } };
     }
+    // The presentation flags (hideHeaderName / hideHeroLogo) survive a save that does not mention
+    // them: a PATCH only changes a flag it explicitly sets (true or false).
+    const prevTokens = (before as any).themeTokens;
+    if (preserve && prevTokens && typeof prevTokens === 'object' && 'themeTokens' in data) {
+      const nt = (data as any).themeTokens;
+      if (nt && nt !== Prisma.DbNull && typeof nt === 'object') {
+        const keep: Record<string, boolean> = {};
+        for (const f of ['hideHeaderName', 'hideHeroLogo']) {
+          if (!(f in nt) && typeof prevTokens[f] === 'boolean') keep[f] = prevTokens[f];
+        }
+        if (Object.keys(keep).length) data = { ...data, themeTokens: { ...nt, ...keep } };
+      }
+    }
     const fields = changedFields(before as any, data as any);
     if (fields.length === 0) return { changed: [] as string[], settings: pickSettings(before as any) };
     const patch: Prisma.EventSeriesUpdateInput = Object.fromEntries(fields.map((k) => [k, (data as any)[k]]));
