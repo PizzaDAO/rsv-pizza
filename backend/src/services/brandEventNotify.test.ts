@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockPrisma = vi.hoisted(() => ({
-  party: { findUnique: vi.fn() },
+  party: { findUnique: vi.fn(), count: vi.fn() },
   admin: { findMany: vi.fn() },
 }));
 const mockBranded = vi.hoisted(() => vi.fn());
@@ -13,7 +13,7 @@ import { emailHostOfStatusChange, buildBrandedStatusEmail } from './partyStatusE
 
 const TEAM1 = { url: 'https://team1.rsv.pizza', name: 'Team1', fromEmail: 'Team1 <noreply@rsv.pizza>' };
 const party = {
-  name: 'Team1 Hack <Berlin>', customUrl: 'team1-berlin', inviteCode: 'abc', eventSeriesId: 's1',
+  name: 'Team1 Hack <Berlin>', userId: 'u1', customUrl: 'team1-berlin', inviteCode: 'abc', eventSeriesId: 's1',
   underbossStatus: 'pending', user: { email: 'host@x.com', name: 'Hana' },
 };
 
@@ -28,6 +28,7 @@ beforeEach(() => {
   delete process.env.BRAND_EVENT_NOTIFY_EMAILS;
   process.env.BRAND_EVENT_ADMIN_ALERTS = 'on';
   mockPrisma.party.findUnique.mockResolvedValue(party);
+  mockPrisma.party.count.mockResolvedValue(1);
   mockPrisma.admin.findMany.mockResolvedValue([{ email: 'A@x.com' }, { email: 'b@x.com' }, { email: 'a@x.com' }]);
   mockBranded.mockResolvedValue(TEAM1);
 });
@@ -77,6 +78,17 @@ describe('notifyAdminsOfBrandEvent', () => {
     await notifyAdminsOfBrandEvent('p1');
     mockBranded.mockResolvedValue(TEAM1);
     mockPrisma.party.findUnique.mockResolvedValue({ ...party, underbossStatus: 'approved' });
+    await notifyAdminsOfBrandEvent('p1');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('caps alerts per creator: the 4th brand event in an hour is created but not announced', async () => {
+    mockPrisma.party.count.mockResolvedValue(3);
+    await notifyAdminsOfBrandEvent('p1');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(mockPrisma.party.count).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ userId: 'u1' }) }));
+    fetchMock.mockClear();
+    mockPrisma.party.count.mockResolvedValue(4);
     await notifyAdminsOfBrandEvent('p1');
     expect(fetchMock).not.toHaveBeenCalled();
   });

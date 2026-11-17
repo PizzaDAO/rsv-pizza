@@ -12,6 +12,7 @@ import {
 } from '../helpers/underbossScope.js';
 import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
 import { formatForTelegram, postTelegramMessage } from '../lib/telegramFormat.js';
+import { siteForParty } from '../lib/siteBrand.js';
 import { isValidAppTab } from '../lib/broadcastApps.js';
 import {
   sendConnectInviteEmail,
@@ -36,19 +37,26 @@ const router = Router();
 // resolves authoritatively from each recipient's partyId.
 
 /** Public event page URL for a party. Mirrors nft.routes.ts. */
-function publicEventLink(party: { customUrl?: string | null; inviteCode?: string | null } | null | undefined): string {
+type LinkParty = { customUrl?: string | null; inviteCode?: string | null; eventSeriesId?: string | null };
+
+/** White-label: a branded-series party links to its own site; everything else stays on rsv.pizza. */ // brand-check-ignore-line
+async function partyOrigin(party: LinkParty): Promise<string> {
+  return (await siteForParty(party, 'https://rsv.pizza')).url; // brand-check-ignore-line
+}
+
+async function publicEventLink(party: LinkParty | null | undefined): Promise<string> {
   if (!party) return '';
   const slug = party.customUrl || party.inviteCode;
-  return slug ? `https://rsv.pizza/${slug}` : '';
+  return slug ? `${await partyOrigin(party)}/${slug}` : '';
 }
 
 /** Host app deep-link for a party + chosen app tab. */
-function appDeepLink(
-  party: { inviteCode?: string | null } | null | undefined,
+async function appDeepLink(
+  party: LinkParty | null | undefined,
   appTab: string | null | undefined
-): string {
+): Promise<string> {
   if (!party || !party.inviteCode || !appTab) return '';
-  return `https://rsv.pizza/host/${party.inviteCode}/${appTab}`;
+  return `${await partyOrigin(party)}/host/${party.inviteCode}/${appTab}`;
 }
 
 /**
@@ -203,7 +211,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     // flag when a USED token resolved to empty (link not added for that city).
     const usesLink = /\{link\}/.test(message);
     const usesAppLink = /\{appLink\}/.test(message);
-    const partyByCityKey = new Map<string, { customUrl: string | null; inviteCode: string | null } | null>();
+    const partyByCityKey = new Map<string, LinkParty | null>();
     if (usesLinkToken) {
       const cityKeys = Array.from(
         new Set(
@@ -216,15 +224,15 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
         // Pull candidate GPP parties; match by cityKey derived from the name.
         const candidates = await prisma.party.findMany({
           where: { name: { startsWith: 'Global Pizza Party', mode: 'insensitive' } },
-          select: { name: true, customUrl: true, inviteCode: true },
+          select: { name: true, customUrl: true, inviteCode: true, eventSeriesId: true },
         });
         const wanted = new Set(cityKeys);
-        const byKey = new Map<string, Array<{ customUrl: string | null; inviteCode: string | null }>>();
+        const byKey = new Map<string, LinkParty[]>();
         for (const p of candidates) {
           const key = cityKeyFromPartyName(p.name);
           if (!key || !wanted.has(key)) continue;
           const arr = byKey.get(key) ?? [];
-          arr.push({ customUrl: p.customUrl, inviteCode: p.inviteCode });
+          arr.push({ customUrl: p.customUrl, inviteCode: p.inviteCode, eventSeriesId: p.eventSeriesId });
           byKey.set(key, arr);
         }
         for (const key of cityKeys) {
@@ -254,8 +262,8 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
       // parmigiano-58493: resolve per-recipient link tokens from the cityKey-matched party.
       const linkedParty = usesLinkToken ? (partyByCityKey.get((city || '').toLowerCase().trim()) ?? null) : null;
-      const linkUrl = publicEventLink(linkedParty);
-      const appLinkUrl = appDeepLink(linkedParty, validatedAppTab);
+      const linkUrl = await publicEventLink(linkedParty);
+      const appLinkUrl = await appDeepLink(linkedParty, validatedAppTab);
 
       // pesto-58496: flag a recipient when a USED link token resolved to empty
       // (the link was stripped, so this recipient got the message without it).
@@ -567,18 +575,19 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
         name: true,
         customUrl: true,
         inviteCode: true,
+        eventSeriesId: true,
         city: true,
         user: { select: { name: true, email: true } },
       },
     });
     const chatByPartyId = new Map<string, bigint>();
-    const partyMetaById = new Map<string, { customUrl: string | null; inviteCode: string | null }>();
+    const partyMetaById = new Map<string, LinkParty>();
     const hostContactById = new Map<string, { email: string | null; name: string | null; city: string }>();
     for (const row of partyRows) {
       if (row.hostTelegramChatId !== null) {
         chatByPartyId.set(row.id, row.hostTelegramChatId);
       }
-      partyMetaById.set(row.id, { customUrl: row.customUrl, inviteCode: row.inviteCode });
+      partyMetaById.set(row.id, { customUrl: row.customUrl, inviteCode: row.inviteCode, eventSeriesId: row.eventSeriesId });
       hostContactById.set(row.id, {
         email: row.user?.email || null,
         name: row.user?.name || null,
@@ -613,8 +622,8 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
 
       // parmigiano-58493: resolve per-recipient link tokens from the host's party.
       const partyMeta = partyMetaById.get(partyId) ?? null;
-      const linkUrl = publicEventLink(partyMeta);
-      const appLinkUrl = appDeepLink(partyMeta, validatedAppTab);
+      const linkUrl = await publicEventLink(partyMeta);
+      const appLinkUrl = await appDeepLink(partyMeta, validatedAppTab);
 
       // pesto-58496: flag a recipient when a USED link token resolved to empty.
       const linkResolved = !((usesLink && !linkUrl) || (usesAppLink && !appLinkUrl));

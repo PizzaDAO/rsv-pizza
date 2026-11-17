@@ -17,6 +17,8 @@ import {
 import { IconInput } from '../IconInput';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getSponsors } from '../../lib/api';
+import { BRAND } from '../../config/brand';
+import { useSeriesById, seriesBrandName } from '../../lib/seriesSites';
 import {
   extractCityAndState,
   cleanCity,
@@ -42,13 +44,28 @@ export function PressReleaseWidget() {
   const [venue, setVenue] = useState('');
   const [sponsors, setSponsors] = useState('');
 
+  // White-label: GPP events keep the Global Pizza Party template; branded builds and brand-series
+  // events (series with a live site) get a neutral one with the brand's own name.
+  const series = useSeriesById(party?.eventSeriesId);
+  const neutralTemplate = party?.eventType !== 'gpp' && (BRAND.isBranded || !!series?.siteUrl);
+  const brandName = BRAND.isBranded || !series ? BRAND.name : seriesBrandName(series);
+  const defaultTemplate = neutralTemplate
+    ? t('pressRelease.defaultTemplateBrand', { brandName })
+    : t('pressRelease.defaultTemplate');
+
   // Template and output
-  const [template, setTemplate] = useState(() => t('pressRelease.defaultTemplate'));
+  const [template, setTemplate] = useState(defaultTemplate);
+  const [templateEdited, setTemplateEdited] = useState(false);
   const [generatedText, setGeneratedText] = useState('');
   const [copied, setCopied] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
 
   const partyId = party?.id;
+
+  // The party / series can resolve after mount: follow the right default until the host edits it.
+  useEffect(() => {
+    if (!templateEdited) setTemplate(defaultTemplate);
+  }, [defaultTemplate, templateEdited]);
 
   // Auto-fill fields from party data (only when the event changes, so host edits aren't wiped)
   useEffect(() => {
@@ -130,7 +147,8 @@ export function PressReleaseWidget() {
   };
 
   const handleReset = () => {
-    setTemplate(t('pressRelease.defaultTemplate'));
+    setTemplate(defaultTemplate);
+    setTemplateEdited(false);
   };
 
   return (
@@ -229,7 +247,10 @@ export function PressReleaseWidget() {
           multiline
           rows={18}
           value={template}
-          onChange={(e) => setTemplate(e.target.value)}
+          onChange={(e) => {
+            setTemplate(e.target.value);
+            setTemplateEdited(true);
+          }}
           placeholder={t('pressRelease.templatePlaceholder')}
         />
 

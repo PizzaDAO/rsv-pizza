@@ -296,6 +296,23 @@ export default async function middleware(request: Request) {
     const event = data?.event;
     if (!event) return next();
 
+    // White-label: a series-scoped deployment only emits event OG tags for its own series.
+    // Anything else (or an unresolvable series) falls through to the SPA's generic brand tags.
+    // Inlined on purpose: unbundled Node ESM cannot resolve extensionless relative imports.
+    const scopedSlug = (process.env.VITE_BRAND_SERIES_SLUG || '').trim();
+    let brandSeriesOg: string | null = null;
+    if (scopedSlug) {
+      let mine: { id: string; ogImageUrl?: string | null } | null = null;
+      try {
+        const sr = await fetch(`${apiUrl}/api/series`, { headers: { Accept: 'application/json' } });
+        if (sr.ok) mine = ((await sr.json())?.series || []).find((x: { slug: string }) => x.slug === scopedSlug) ?? null;
+      } catch {
+        mine = null;
+      }
+      if (!mine || !event.eventSeriesId || event.eventSeriesId !== mine.id) return next();
+      brandSeriesOg = (mine.ogImageUrl || '').trim() || null;
+    }
+
     // ---- Build meta tag values (mirrors EventPage.tsx logic) ----
     // Default keeps today's www host; a brand deploy sets VITE_BRAND_DOMAIN.
     const brandDomain = (process.env.VITE_BRAND_DOMAIN || '').trim().replace(/\/+$/, '');
@@ -336,7 +353,13 @@ export default async function middleware(request: Request) {
     }
 
     const ogImageUrl = (() => {
-      if (!event.eventImageUrl) return `${baseUrl}/logo.png`;
+      // Default site keeps /logo.png; a brand deploy uses its own OG image / logo.
+      if (!event.eventImageUrl) {
+        const brandImg = (process.env.VITE_BRAND_OG_IMAGE || brandSeriesOg || process.env.VITE_BRAND_LOGO_URL || '').trim();
+        if (!brandImg) return `${baseUrl}/logo.png`;
+        if (/^https?:\/\//i.test(brandImg)) return brandImg;
+        return `${baseUrl}${brandImg.startsWith('/') ? '' : '/'}${brandImg}`;
+      }
       if (event.eventImageUrl.startsWith('http')) return event.eventImageUrl;
       if (event.eventImageUrl.startsWith('/'))
         return `${baseUrl}${event.eventImageUrl}`;

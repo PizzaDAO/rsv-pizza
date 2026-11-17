@@ -24,7 +24,7 @@ import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
-import { siteForParty, brandedSeriesBySlug, brandedSiteForParty } from '../lib/siteBrand.js';
+import { siteForParty, brandedSeriesBySlug, brandedSiteForParty, seriesSlugForOrigin } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
@@ -113,7 +113,12 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
 
     // White-label: optional ?seriesSlug=<slug> scopes every list below to that series
     // (series-scoped brand builds). Unknown slug => empty result. Omitted => unchanged.
-    const seriesSlug = typeof req.query.seriesSlug === 'string' ? req.query.seriesSlug.trim() : '';
+    // A request from a registered brand origin is scoped to that brand's series regardless of the
+    // client-supplied slug (derived server-side); the query slug is only used for non-brand origins
+    // (previews, localhost).
+    const querySlug = typeof req.query.seriesSlug === 'string' ? req.query.seriesSlug.trim() : '';
+    const originSlug = await seriesSlugForOrigin(req.headers.origin);
+    const seriesSlug = originSlug ?? querySlug;
     let seriesScope: { eventSeriesId: string } | Record<string, never> = {};
     if (seriesSlug) {
       const series = await prisma.eventSeries.findUnique({ where: { slug: seriesSlug }, select: { id: true } });
@@ -379,7 +384,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         customUrl: customUrl || null,
         coHosts: finalCoHosts,
         userId: req.userId!,
-        donationEnabled: donationEnabled || false,
+        // Branded series never take donations (server-side, whatever the client sends).
+        donationEnabled: brandedSeries ? false : (donationEnabled || false),
         donationGoal: donationGoal || null,
         donationMessage: donationMessage || null,
         suggestedAmounts: suggestedAmounts || [500, 1000, 2500, 5000],
@@ -1072,6 +1078,14 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // party-password-hash: undefined = keep, null/'' = clear, string = bcrypt hash.
     const passwordToWrite = await secretForWrite(password);
 
+    // White-label: donations and attendance NFTs are not offered on branded series. Drop an attempt to
+    // turn them ON server-side (turning off stays allowed) (the rest of the save still succeeds), whatever the client sends.
+    let brandedParty = false;
+    if (donationEnabled !== undefined || nftEnabled !== undefined) {
+      const seriesRow = await prisma.party.findUnique({ where: { id }, select: { eventSeriesId: true } });
+      brandedParty = !!(await brandedSiteForParty(seriesRow));
+    }
+
     const party = await prisma.party.update({
       where: { id },
       data: {
@@ -1106,7 +1120,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
         ...(mergedCoHosts !== undefined && { coHosts: mergedCoHosts }),
         ...(selectedPizzerias !== undefined && { selectedPizzerias }),
-        ...(donationEnabled !== undefined && { donationEnabled }),
+        ...(donationEnabled !== undefined && !(brandedParty && donationEnabled) && { donationEnabled }),
         ...(donationGoal !== undefined && { donationGoal: donationGoal || null }),
         ...(donationMessage !== undefined && { donationMessage: donationMessage || null }),
         ...(suggestedAmounts !== undefined && { suggestedAmounts }),
@@ -1120,7 +1134,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(musicEnabled !== undefined && { musicEnabled }),
         ...(musicNotes !== undefined && { musicNotes: musicNotes || null }),
         ...(photoModeration !== undefined && { photoModeration }),
-        ...(nftEnabled !== undefined && { nftEnabled }),
+        ...(nftEnabled !== undefined && !(brandedParty && nftEnabled) && { nftEnabled }),
         ...(nftChain !== undefined && { nftChain: nftChain || null }),
         ...(pinnedApps !== undefined && { pinnedApps }),
         ...(region !== undefined && { region: region || null }),
