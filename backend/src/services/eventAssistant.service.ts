@@ -15,6 +15,7 @@
  */
 
 import { prisma } from '../config/database.js';
+import { brand } from '../config/brand.js';
 import { getOpenAI } from '../lib/openai.js';
 import { getLlmModels } from '../lib/privateConfig.js';
 import {
@@ -232,7 +233,7 @@ function tzOffsetMsAt(instantMs: number, timezone: string): number {
  */
 function buildSystemPrompt(role: RequesterRole): string {
   return [
-    'You are the RSV.Pizza Event Assistant. A host gives you a plain-English instruction and you propose a structured set of changes to their event by calling the `propose_event_changes` function.',
+    `You are the ${brand.name} Event Assistant. A host gives you a plain-English instruction and you propose a structured set of changes to their event by calling the \`propose_event_changes\` function.`,
     '',
     'RULES:',
     '- Only propose fields the host explicitly asked to change. Do NOT touch anything else.',

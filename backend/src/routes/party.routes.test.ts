@@ -1,5 +1,5 @@
 import { verifyGuestToken } from '../lib/guestToken.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
@@ -32,6 +32,7 @@ const mockPrisma = vi.hoisted(() => ({
     findMany: vi.fn(),
   },
   eventSeries: {
+    findUnique: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
   },
@@ -46,6 +47,7 @@ const mockPrisma = vi.hoisted(() => ({
   // the chunked-insert loop. For the function-form (used by DELETE), invoke
   // the callback with a tx proxy that includes a stub $executeRaw so the
   // audit-context helper doesn't crash.
+  $queryRaw: vi.fn(async () => []),
   $transaction: vi.fn(async (ops: any) => {
     if (Array.isArray(ops)) {
       return Promise.all(ops);
@@ -340,6 +342,91 @@ describe('Party Routes', () => {
         .send({ name: 'Test Party' });
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('white-label server-side enforcement', () => {
+    const TEAM1_SERIES = { id: 'series-team1', slug: 'team1', siteUrl: 'https://team1.rsv.pizza/', brandName: 'Team1 Pizza', displayName: 'Team1', name: 'Team1 Pizza Parties' }; // brand-check-ignore-line
+    const auth = () => `Bearer ${makeToken(HOST_USER_ID, HOST_EMAIL)}`;
+
+    beforeEach(() => {
+      _resetSiteBrandCache();
+      mockPrisma.eventSeries.findMany.mockResolvedValue([TEAM1_SERIES]);
+    });
+    afterEach(() => _resetSiteBrandCache());
+
+    it('POST: donationEnabled is forced off for a branded series, honored otherwise', async () => {
+      mockPrisma.eventSeries.findFirst.mockResolvedValue({ id: 'series-team1', slug: 'team1', publicTags: [] });
+      mockPrisma.user.findUnique.mockResolvedValue({ name: 'H' });
+      mockPrisma.party.create.mockResolvedValue({ id: PARTY_ID, name: 'P', inviteCode: 'abc', userId: HOST_USER_ID, user: { name: 'H' } });
+      mockPrisma.guest.create.mockResolvedValue({ id: 'g' });
+      let res = await request(createTestApp()).post('/api/parties').set('Authorization', auth())
+        .send({ name: 'P', seriesSlug: 'team1', donationEnabled: true });
+      expect(res.status).toBe(201);
+      expect(mockPrisma.party.create.mock.calls[0][0].data.donationEnabled).toBe(false);
+
+      mockPrisma.party.create.mockClear();
+      mockPrisma.eventSeries.findFirst.mockResolvedValue(null);
+      res = await request(createTestApp()).post('/api/parties').set('Authorization', auth())
+        .send({ name: 'P', donationEnabled: true });
+      expect(res.status).toBe(201);
+      expect(mockPrisma.party.create.mock.calls[0][0].data.donationEnabled).toBe(true);
+    });
+
+    const patch = async (eventSeriesId: string | null) => {
+      // canUserEditParty lookup, then the series lookup for the enforcement check
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce({ id: PARTY_ID, userId: HOST_USER_ID, coHosts: [] })
+        .mockResolvedValue({ eventSeriesId });
+      mockPrisma.party.update.mockResolvedValue({ id: PARTY_ID, name: 'N', userId: HOST_USER_ID, user: { name: 'H' } });
+      const res = await request(createTestApp()).patch(`/api/parties/${PARTY_ID}`).set('Authorization', auth())
+        .send({ name: 'N', donationEnabled: true, nftEnabled: true });
+      expect(res.status).toBe(200);
+      return mockPrisma.party.update.mock.calls[0][0].data;
+    };
+
+    it('PATCH: donationEnabled/nftEnabled are ignored for a branded-series party (rest of the save applies)', async () => {
+      const data = await patch('series-team1');
+      expect(data.name).toBe('N');
+      expect(data).not.toHaveProperty('donationEnabled');
+      expect(data).not.toHaveProperty('nftEnabled');
+    });
+
+    it('PATCH: a branded-series host can still turn donations/NFTs off', async () => {
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce({ id: PARTY_ID, userId: HOST_USER_ID, coHosts: [] })
+        .mockResolvedValue({ eventSeriesId: 'series-team1' });
+      mockPrisma.party.update.mockResolvedValue({ id: PARTY_ID, name: 'N', userId: HOST_USER_ID, user: { name: 'H' } });
+      const res = await request(createTestApp()).patch(`/api/parties/${PARTY_ID}`).set('Authorization', auth())
+        .send({ donationEnabled: false, nftEnabled: false });
+      expect(res.status).toBe(200);
+      const data = mockPrisma.party.update.mock.calls[0][0].data;
+      expect(data.donationEnabled).toBe(false);
+      expect(data.nftEnabled).toBe(false);
+    });
+
+    it('PATCH: unbranded party keeps donationEnabled/nftEnabled behavior', async () => {
+      const data = await patch(null);
+      expect(data.donationEnabled).toBe(true);
+      expect(data.nftEnabled).toBe(true);
+    });
+
+    it('GET /my-events: a registered brand Origin scopes to that series, overriding the client slug', async () => {
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-other' });
+      mockPrisma.party.findMany.mockResolvedValue([]);
+      mockPrisma.guest.findMany.mockResolvedValue([]);
+      await request(createTestApp()).get('/api/parties/my-events?seriesSlug=other')
+        .set('Origin', 'https://team1.rsv.pizza').set('Authorization', auth()); // brand-check-ignore-line
+      expect(mockPrisma.eventSeries.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: 'team1' } }));
+    });
+
+    it('GET /my-events: a non-brand Origin still honors the ?seriesSlug query', async () => {
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-other' });
+      mockPrisma.party.findMany.mockResolvedValue([]);
+      mockPrisma.guest.findMany.mockResolvedValue([]);
+      await request(createTestApp()).get('/api/parties/my-events?seriesSlug=other')
+        .set('Origin', 'https://preview.vercel.app').set('Authorization', auth());
+      expect(mockPrisma.eventSeries.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: 'other' } }));
     });
   });
 

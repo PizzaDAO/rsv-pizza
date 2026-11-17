@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { callMintEdge } from './nftMint.js';
+import { brandedSiteForParty } from './siteBrand.js';
 
 // buffalo-35201: mint the attendance NFT when the host approves a guest on an
 // approval-required event. Calls the same `mint-nft` Supabase edge function the
@@ -28,6 +29,8 @@ export async function mintNftOnApproval(
     ]);
     if (!guest || !party) return { minted: false, reason: 'not-found' };
     if (!party.nftEnabled || !party.eventImageUrl) return { minted: false, reason: 'nft-disabled' };
+    // White-label: no attendance NFTs on branded series (mirrors isNftEligible's `branded`).
+    if (await brandedSiteForParty(party)) return { minted: false, reason: 'branded' };
     if (guest.approved !== true) return { minted: false, reason: 'not-approved' };
     if (!guest.ethereumAddress) return { minted: false, reason: 'no-address' };
     if (guest.nftTokenId !== null && guest.nftTokenId !== undefined) {

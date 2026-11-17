@@ -91,6 +91,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         coHosts: true,
         selectedPizzerias: true,
         eventType: true,
+        eventSeriesId: true,
         eventTags: true,
         donationEnabled: true,
         donationRecipient: true,
@@ -175,6 +176,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
           coHosts: true,
           selectedPizzerias: true,
           eventType: true,
+          eventSeriesId: true,
           eventTags: true,
           donationEnabled: true,
           donationRecipient: true,
@@ -381,6 +383,8 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         coHosts: sanitizedCoHosts,
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
+        // White-label: lets a brand site redirect events that belong to another series.
+        eventSeriesId: party.eventSeriesId ?? null,
         underbossStatus: party.underbossStatus,
         // calzone-50114: strip internal control tags from the public payload.
         eventTags: publicTags(party.eventTags),

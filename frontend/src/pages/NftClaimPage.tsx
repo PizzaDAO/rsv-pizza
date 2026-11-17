@@ -7,6 +7,7 @@ import { Layout } from '../components/Layout';
 import { NftClaimForm } from '../components/NftClaimForm';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { BRAND_FEATURES } from '../config/brandScope';
+import { BRAND } from '../config/brand';
 import { getNftClaim, submitNftClaim, NftClaimError, type NftClaimInfo } from '../lib/api';
 
 /** Private claim link from the post-event email: /nft/claim/:token. The token is the capability. */
@@ -107,7 +108,7 @@ function NftClaimPageInner() {
   return (
     <Layout>
       <Helmet>
-        <title>{t('title')}</title>
+        <title>{`${t('title')} | ${BRAND.name}`}</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <div className="max-w-md mx-auto px-4 py-8">

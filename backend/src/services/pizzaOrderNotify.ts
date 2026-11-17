@@ -6,6 +6,7 @@
 import type { PizzaOrder } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
 import { sendTelegramMessage } from './telegramSend.js';
 
 function esc(s: string) {
@@ -52,11 +53,13 @@ async function sendNotices(row: PizzaOrder): Promise<void> {
       prisma.user.findUnique({ where: { id: row.userId }, select: { email: true } }),
       prisma.party.findUnique({
         where: { id: row.partyId },
-        select: { customUrl: true, inviteCode: true, hostTelegramChatId: true, userId: true },
+        select: { customUrl: true, inviteCode: true, hostTelegramChatId: true, userId: true, eventSeriesId: true },
       }),
     ]);
     if (!party) return;
-    const paymentsUrl = `${brand.url}/host/${party.customUrl ?? party.inviteCode}/payments`;
+    // White-label: a branded series' host gets that brand's origin and from-address (the Telegram DM reuses the same text).
+    const site = await siteForParty(party, brand.url);
+    const paymentsUrl = `${site.url}/host/${party.customUrl ?? party.inviteCode}/payments`;
     const { subject, text } = buildOrderNotice(row, paymentsUrl);
 
     const apiKey = process.env.RESEND_API_KEY;
@@ -66,7 +69,7 @@ async function sendNotices(row: PizzaOrder): Promise<void> {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: brand.fromEmail,
+          from: site.fromEmail,
           to: [user.email],
           subject,
           html: `<p>${esc(text)}</p>`,

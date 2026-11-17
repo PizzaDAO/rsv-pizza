@@ -22,6 +22,7 @@ import { AppError } from '../middleware/error.js';
 import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
+import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -314,6 +315,7 @@ router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Respon
       throw new AppError('status must be one of: approved, rejected, hidden', 400, 'VALIDATION_ERROR');
     }
     const email = req.userEmail || 'unknown';
+    let priorStatus: string | null = null;
     const party = await prisma.$transaction(async (tx) => {
       const before = await tx.party.findUnique({
         where: { id: partyId },
@@ -322,6 +324,7 @@ router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Respon
       if (!before || before.eventSeriesId !== id) {
         throw new AppError('Party not found in this series', 404, 'NOT_FOUND');
       }
+      priorStatus = before.underbossStatus;
       const updated = await tx.party.update({
         where: { id: partyId },
         data: { underbossStatus: status },
@@ -330,6 +333,10 @@ router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Respon
       await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, 'admin');
       return updated;
     });
+    // Same as underboss.routes.ts: tell the host of approve/reject (fire-and-forget, only on a real change).
+    if ((status === 'approved' || status === 'rejected') && priorStatus !== status) {
+      void emailHostOfStatusChange(partyId, status);
+    }
     res.json({ party });
   } catch (error) {
     next(error);

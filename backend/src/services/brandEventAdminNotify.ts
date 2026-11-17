@@ -13,6 +13,9 @@ import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
 import { brandedSiteForParty } from '../lib/siteBrand.js';
 
+/** Max admin alert emails per creator per hour; extra brand events are still created, just not announced. */
+export const ADMIN_ALERTS_PER_USER_PER_HOUR = 3;
+
 const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] as string));
 
 /** Where admins approve events (the underboss/admin dashboard lives on the main origin). */
@@ -53,13 +56,23 @@ export async function notifyAdminsOfBrandEvent(partyId: string): Promise<void> {
     const party = await prisma.party.findUnique({
       where: { id: partyId },
       select: {
-        name: true, customUrl: true, inviteCode: true, eventSeriesId: true, underbossStatus: true,
+        name: true, customUrl: true, inviteCode: true, eventSeriesId: true, underbossStatus: true, userId: true,
         user: { select: { email: true, name: true } },
       },
     });
     if (!party || party.underbossStatus !== 'pending') return;
     const site = await brandedSiteForParty(party);
     if (!site) return; // only brand-site events
+    // Spam guard: one account creating many brand events must not flood the admins' inboxes.
+    // This event is already counted, so the Nth alert is the last one sent.
+    const recent = await prisma.party.count({
+      where: {
+        userId: party.userId,
+        createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+        eventSeries: { is: { siteUrl: { not: null } } },
+      },
+    });
+    if (recent > ADMIN_ALERTS_PER_USER_PER_HOUR) return;
     const to = await resolveAdminRecipients();
     if (!to.length) return;
     const hostLabel = [party.user?.name, party.user?.email].filter(Boolean).join(' / ') || 'unknown';
