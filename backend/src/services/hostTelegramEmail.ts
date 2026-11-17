@@ -19,9 +19,13 @@
  */
 
 import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
-const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const FROM = brand.fromEmail;
+
+/** The party a host email is about; a branded series sends from its own sender. */
+type PartyRef = { eventSeriesId?: string | null } | null;
 
 /** Minimal HTML escape for user-authored text dropped into an email body. */
 function escapeHtml(s: string): string {
@@ -31,18 +35,13 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;');
 }
 
-async function resendSend(to: string, subject: string, html: string): Promise<boolean> {
+async function resendSend(to: string, subject: string, html: string, party: PartyRef = null): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
   try {
-    const resp = await fetch(RESEND_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from: FROM, to, subject, html }),
-    });
+    // No series: exactly the old deploy-level sender. Branded series: its own sender/reply-to.
+    const site = party?.eventSeriesId ? await siteForParty(party, brand.url) : { fromEmail: FROM };
+    const resp = await sendBrandedEmail({ site, apiKey, payload: { to, subject, html } });
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
       console.warn(`[hostTelegramEmail] Resend ${resp.status}: ${body.slice(0, 200)}`);
@@ -64,6 +63,7 @@ export async function sendConnectInviteEmail(params: {
   hostName?: string | null;
   cityName?: string | null;
   deeplink: string;
+  party?: PartyRef;
 }): Promise<boolean> {
   const { toEmail, hostName, cityName, deeplink } = params;
   if (!toEmail || !deeplink) return false;
@@ -79,7 +79,7 @@ export async function sendConnectInviteEmail(params: {
 <p style="color:#888;font-size:12px;">If the button doesn't work, open this link in Telegram: ${escapeHtml(deeplink)}</p>
 <p>Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>`;
 
-  return resendSend(toEmail, subject, html);
+  return resendSend(toEmail, subject, html, params.party ?? null);
 }
 
 /**
@@ -92,6 +92,7 @@ export async function sendBroadcastFallbackEmail(params: {
   hostName?: string | null;
   cityName?: string | null;
   message: string;
+  party?: PartyRef;
 }): Promise<boolean> {
   const { toEmail, hostName, cityName, message } = params;
   if (!toEmail || !message) return false;
@@ -108,5 +109,5 @@ export async function sendBroadcastFallbackEmail(params: {
 <p style="color:#888;font-size:12px;">You're getting this by email because your Telegram isn't connected to @MoltoBeneBot yet. Connect it to receive these directly on Telegram next time.</p>
 <p>Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>`;
 
-  return resendSend(toEmail, subject, html);
+  return resendSend(toEmail, subject, html, params.party ?? null);
 }

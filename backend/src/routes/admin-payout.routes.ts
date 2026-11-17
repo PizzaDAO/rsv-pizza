@@ -21,6 +21,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
+import { siteForParty } from '../lib/siteBrand.js';
 import { unaccentMatchIds } from '../lib/accentSearch.js';
 import {
   requireAuth,
@@ -7322,15 +7323,26 @@ function buildSubmitKeyboard(deeplink: string, token: string, verb: string) {
 }
 
 /**
+ * White-label: the host a nudge points at (the deploy host for unbranded parties, the series' own host
+ * for a branded one). Same series lookup as the emails, so a team1 host is told to upload to
+ * the series site, not the default one.
+ */
+export async function reminderSiteHost(party: { eventSeriesId?: string | null }): Promise<string> {
+  const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
+  return site.url.replace(/^https?:\/\//, '');
+}
+
+/**
  * suppli-58533: build the per-type GROUP (HTML, inline link) and DM (plain,
  * "just reply here") reminder bodies. `slug` is HTML-escaped for the group copy.
  * When no deeplink is available the group body falls back to the DM (plain)
  * copy; in that case the caller should send it WITHOUT parse_mode:'HTML'.
  */
-function buildReminderCopy(
+export function buildReminderCopy(
   type: ReminderType,
   slug: string,
   deeplink: string | null,
+  siteHost: string = 'rsv.pizza', // brand-check-ignore-line
 ): { groupText: string; groupHtml: boolean; dmText: string } {
   const s = escapeHtml(slug);
   const link = (label: string) =>
@@ -7340,20 +7352,20 @@ function buildReminderCopy(
   let dmText: string;
   switch (type) {
     case 'photos':
-      groupText = `Make sure you've uploaded your event photos! ${link('DM them to me')} or upload them to rsv.pizza/${s}`;
-      dmText = `Make sure you've uploaded your event photos! Just reply here with them or upload them to rsv.pizza/${slug}`;
+      groupText = `Make sure you've uploaded your event photos! ${link('DM them to me')} or upload them to ${siteHost}/${s}`;
+      dmText = `Make sure you've uploaded your event photos! Just reply here with them or upload them to ${siteHost}/${slug}`;
       break;
     case 'receipts':
-      groupText = `Make sure you've uploaded your receipts! ${link('DM them to me')} or upload them to rsv.pizza/${s}`;
-      dmText = `Make sure you've uploaded your receipts! Just reply here with them or upload them to rsv.pizza/${slug}`;
+      groupText = `Make sure you've uploaded your receipts! ${link('DM them to me')} or upload them to ${siteHost}/${s}`;
+      dmText = `Make sure you've uploaded your receipts! Just reply here with them or upload them to ${siteHost}/${slug}`;
       break;
     case 'attendance':
-      groupText = `How many people came to your event? ${link('DM me the number')} or enter it at rsv.pizza/${s}`;
-      dmText = `How many people came to your event? Just reply here with the number or enter it at rsv.pizza/${slug}`;
+      groupText = `How many people came to your event? ${link('DM me the number')} or enter it at ${siteHost}/${s}`;
+      dmText = `How many people came to your event? Just reply here with the number or enter it at ${siteHost}/${slug}`;
       break;
     case 'wallet':
-      groupText = `We need your payout wallet to reimburse you! ${link('DM it to me')} or add it at rsv.pizza/host/${s}/payments`;
-      dmText = `We need your payout wallet to reimburse you! Just reply here with it or add it at rsv.pizza/host/${slug}/payments`;
+      groupText = `We need your payout wallet to reimburse you! ${link('DM it to me')} or add it at ${siteHost}/host/${s}/payments`;
+      dmText = `We need your payout wallet to reimburse you! Just reply here with it or add it at ${siteHost}/host/${slug}/payments`;
       break;
   }
 
@@ -7384,6 +7396,7 @@ router.post(
           hostTelegramChatId: true,
           // suppli-58533: needed to build the group-only tap-to-DM deeplink.
           hostTelegramLinkToken: true,
+          eventSeriesId: true,
         },
       });
       if (!party) {
@@ -7397,7 +7410,7 @@ router.post(
       // link; DM says "just reply here".
       const submit = await resolveSubmitDeeplink(party);
       const deeplink = submit?.deeplink ?? null;
-      const { groupText, groupHtml, dmText } = buildReminderCopy('receipts', slug, deeplink);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('receipts', slug, deeplink, await reminderSiteHost(party));
       const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM them to me') : undefined;
 
       // Host DM — only when the party has a linked Telegram chat id.
@@ -7484,6 +7497,7 @@ router.post(
           hostTelegramChatId: true,
           // suppli-58533: needed to build the group-only tap-to-DM deeplink.
           hostTelegramLinkToken: true,
+          eventSeriesId: true,
         },
       });
       if (!party) {
@@ -7494,7 +7508,7 @@ router.post(
       // suppli-58533: per-type copy (wallet).
       const submit = await resolveSubmitDeeplink(party);
       const deeplink = submit?.deeplink ?? null;
-      const { groupText, groupHtml, dmText } = buildReminderCopy('wallet', slug, deeplink);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('wallet', slug, deeplink, await reminderSiteHost(party));
       const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM it to me') : undefined;
 
       let hostDmSent = false;
@@ -7577,6 +7591,7 @@ router.post(
           hostTelegramChatId: true,
           // suppli-58533: needed to build the group-only tap-to-DM deeplink.
           hostTelegramLinkToken: true,
+          eventSeriesId: true,
         },
       });
       if (!party) {
@@ -7587,7 +7602,7 @@ router.post(
       // suppli-58533: per-type copy (photos).
       const submit = await resolveSubmitDeeplink(party);
       const deeplink = submit?.deeplink ?? null;
-      const { groupText, groupHtml, dmText } = buildReminderCopy('photos', slug, deeplink);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('photos', slug, deeplink, await reminderSiteHost(party));
       const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM them to me') : undefined;
 
       let hostDmSent = false;
@@ -7670,6 +7685,7 @@ router.post(
           hostTelegramChatId: true,
           // suppli-58533: needed to build the group-only tap-to-DM deeplink.
           hostTelegramLinkToken: true,
+          eventSeriesId: true,
         },
       });
       if (!party) {
@@ -7680,7 +7696,7 @@ router.post(
       // suppli-58533: per-type copy (attendance).
       const submit = await resolveSubmitDeeplink(party);
       const deeplink = submit?.deeplink ?? null;
-      const { groupText, groupHtml, dmText } = buildReminderCopy('attendance', slug, deeplink);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('attendance', slug, deeplink, await reminderSiteHost(party));
       const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM me the number') : undefined;
 
       let hostDmSent = false;

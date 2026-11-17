@@ -7,6 +7,7 @@
     "frontend/src/i18n/",
     "backend/src/lib/siteBrand.test.ts",
     "backend/src/lib/resendSend.test.ts",
+    "backend/src/routes/seriesLinks.test.ts",
     "backend/src/routes/siteBrandPartnerSender.test.ts",
     "backend/src/routes/emailSnapshots.test.ts",
     "backend/src/routes/siteBrandCallSites.test.ts",

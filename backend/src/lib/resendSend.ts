@@ -21,6 +21,8 @@ export interface SendBrandedEmailArgs {
   /** Everything except `from`/`reply_to`: to, subject, html, text, headers, attachments, ... */
   payload: Record<string, unknown>;
   fetchImpl?: typeof fetch;
+  /** Optional abort signal (time-budgeted callers). */
+  signal?: AbortSignal;
 }
 
 /** Resend's "this sender domain is not verified" rejections (403/422). */
@@ -29,20 +31,21 @@ export function isUnverifiedDomainError(status: number, body: string): boolean {
   return /not verified|isn'?t verified|unverified|verify (your|the) domain|domain.{0,40}verif/i.test(body);
 }
 
-function post(fetchImpl: typeof fetch, apiKey: string, from: string, payload: Record<string, unknown>, replyTo?: string) {
+function post(fetchImpl: typeof fetch, apiKey: string, from: string, payload: Record<string, unknown>, replyTo?: string, signal?: AbortSignal) {
   const body: Record<string, unknown> = { from, ...payload };
   if (replyTo) body.reply_to = replyTo;
   return fetchImpl(RESEND_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
   });
 }
 
 export async function sendBrandedEmail(args: SendBrandedEmailArgs): Promise<Response> {
   const { site, apiKey, payload } = args;
   const doFetch: typeof fetch = args.fetchImpl ?? ((...a) => fetch(...a)); // global fetch looked up at call time
-  const resp = await post(doFetch, apiKey, site.fromEmail, payload, site.replyTo);
+  const resp = await post(doFetch, apiKey, site.fromEmail, payload, site.replyTo, args.signal);
 
   const usingPartnerSender = !!site.fallbackFrom && site.fallbackFrom !== site.fromEmail;
   if (resp.ok || !usingPartnerSender || (resp.status !== 403 && resp.status !== 422)) return resp;
@@ -73,5 +76,5 @@ export async function sendBrandedEmail(args: SendBrandedEmailArgs): Promise<Resp
       .catch((e) => console.error('[wl-email] failed to clear email_domain_verified_at / audit it', e));
   }
   invalidateSiteBrandCache();
-  return post(doFetch, apiKey, site.fallbackFrom!, payload, site.replyTo);
+  return post(doFetch, apiKey, site.fallbackFrom!, payload, site.replyTo, args.signal);
 }

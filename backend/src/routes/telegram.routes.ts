@@ -646,6 +646,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
             hostName: contact.name ?? hostName,
             cityName: city || contact.city,
             message: baseMessage,
+            party: partyMeta,
           });
           if (emailed) emailedCount++;
         }
