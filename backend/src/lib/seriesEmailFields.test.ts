@@ -63,7 +63,7 @@ describe('seriesEmailFields', () => {
 
   it('isApexHost / assertSubdomainHost: subdomains only', () => {
     for (const h of ['partner.com', 'partner.co.uk', 'a.io', 'partner.com.au']) expect(isApexHost(h), h).toBe(true);
-    for (const h of ['events.partner.com', 'mail.partner.co.uk', 'a.b.partner.com', 'team1.rsv.pizza']) expect(isApexHost(h), h).toBe(false);
+    for (const h of ['events.partner.com', 'mail.partner.co.uk', 'a.b.partner.com', 'team1.example.org']) expect(isApexHost(h), h).toBe(false);
     expect(() => assertSubdomainHost('partner.com', 'emailDomain')).toThrow(/subdomain/);
     expect(() => assertSubdomainHost('mail.partner.com', 'emailDomain')).not.toThrow();
   });
