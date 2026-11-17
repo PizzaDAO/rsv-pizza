@@ -86,11 +86,17 @@ export interface ThemeTokens {
   radius: ThemeRadius;
   fontHeading: FontKey;
   fontBody: FontKey;
+  /** Header shows the logo only (no brand name text beside it). Booleans, never CSS. */
+  hideHeaderName?: boolean;
+  /** Series landing page does not repeat the series logo above the title. */
+  hideHeroLogo?: boolean;
   overrides?: Record<string, string>;
 }
 
+const FLAG_KEYS = ['hideHeaderName', 'hideHeroLogo'] as const;
+
 const TOKEN_KEYS: readonly string[] = [
-  'mode', ...COLOR_KEYS, 'radius', 'fontHeading', 'fontBody', 'overrides',
+  'mode', ...COLOR_KEYS, 'radius', 'fontHeading', 'fontBody', ...FLAG_KEYS, 'overrides',
 ];
 
 // ---- colour maths -------------------------------------------------------------------------
@@ -245,6 +251,14 @@ export function parseThemeTokens(input: unknown, opts: ParseOptions = {}): Theme
   };
   const fontHeading = fontOf('fontHeading');
   const fontBody = fontOf('fontBody');
+  // An explicit true OR false is kept (so a save can tell "turned off" from "not sent").
+  const flags: Partial<Record<(typeof FLAG_KEYS)[number], boolean>> = {};
+  for (const k of FLAG_KEYS) {
+    const v = o[k];
+    if (v === undefined) continue;
+    if (typeof v !== 'boolean') errors.push(`${k} must be true or false`);
+    else flags[k] = v;
+  }
 
   let overrides: Record<string, string> | undefined;
   if (o.overrides !== undefined && opts.allowOverrides) {
@@ -286,6 +300,7 @@ export function parseThemeTokens(input: unknown, opts: ParseOptions = {}): Theme
     radius: radius as ThemeRadius,
     fontHeading,
     fontBody,
+    ...flags,
   };
   if (overrides && Object.keys(overrides).length) tokens.overrides = overrides;
   return { ok: true, tokens, warnings };

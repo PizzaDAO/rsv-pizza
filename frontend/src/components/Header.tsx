@@ -5,7 +5,7 @@ import { User, LogIn, Globe, ChevronDown } from 'lucide-react';
 import { LoginModal } from './LoginModal';
 import { MarqueeBanner } from './MarqueeBanner';
 import { useTranslation } from 'react-i18next';
-import { BRAND } from '../config/brand';
+import { BRAND, HIDE_HEADER_NAME } from '../config/brand';
 
 const LANGUAGES = [
   { code: 'de', label: 'DE', name: 'Deutsch' },
@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
             alt={BRAND.name}
             className="h-8 sm:h-10"
           />
-          {showBrandText && (
+          {showBrandText && !HIDE_HEADER_NAME && (
             <span
               className="text-theme-text hidden sm:inline"
               style={{ fontFamily: "'Bangers', cursive", fontSize: '1.3rem' }}

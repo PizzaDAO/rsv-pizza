@@ -331,6 +331,19 @@ describe('settings', () => {
       expect(m.state.writes).not.toHaveBeenCalled();
       expect(m.state.series[A].configVersion).toBe(v);
     });
+    it('a save that does not mention hideHeaderName / hideHeroLogo keeps them; an explicit value changes only that flag', async () => {
+      as('brand@partner.com');
+      m.state.series[A].themeTokens = { ...TOK, hideHeaderName: true, hideHeroLogo: true };
+      const a = await patch({ themeTokens: { ...TOK, accent: '#d92b3a' } });
+      expect(a.status).toBe(200);
+      expect(m.state.series[A].themeTokens.hideHeaderName).toBe(true);
+      expect(m.state.series[A].themeTokens.hideHeroLogo).toBe(true);
+      expect(m.state.series[A].themeTokens.accent).toBe('#d92b3a');
+      const b = await patch({ themeTokens: { ...TOK, accent: '#d92b3a', hideHeaderName: false } });
+      expect(b.status).toBe(200);
+      expect(m.state.series[A].themeTokens.hideHeaderName).toBe(false);
+      expect(m.state.series[A].themeTokens.hideHeroLogo).toBe(true);
+    });
     it('a brand admin cannot clear tokens that carry overrides (400, overrides intact)', async () => {
       as('brand@partner.com');
       m.state.series[A].themeTokens = { ...TOK, overrides: { '--bg-card': '#1a1b1c' } };

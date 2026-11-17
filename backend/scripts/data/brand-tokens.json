@@ -1,0 +1,38 @@
+{
+  "_comment": "tagline / metaDescription / faviconUrl equal the rsvpizza-doge VITE_BRAND_TAGLINE / _DESCRIPTION / _FAVICON_URL exactly, so title, meta description and OG do not change. Per-brand theme tokens for backend/scripts/apply-brand-tokens.cjs (self-serve brands PRs 9-12). Each entry is what event_series.theme_class and event_series.theme_tokens should hold. Validated against backend/src/lib/themeTokens.ts (contrast, mode-vs-bg) by the runner and by apply-brand-tokens.test.ts.",
+  "doge": {
+    "themeClass": "brand-doge",
+    "tagline": "Pizza parties for Doge Day, Nov 2 2027",
+    "metaDescription": "Throw a pizza party for Doge Day on November 2, 2027.",
+    "faviconUrl": "/brands/doge/favicon.png",
+    "themeTokens": {
+      "mode": "light",
+      "bg": "#f4ebd7",
+      "surface": "#fcf4e1",
+      "text": "#302d25",
+      "textMuted": "#6b665a",
+      "accent": "#302d25",
+      "onAccent": "#f4ebd7",
+      "border": "#afa899",
+      "radius": "round",
+      "fontHeading": "nunito",
+      "fontBody": "system",
+      "hideHeaderName": true,
+      "hideHeroLogo": true,
+      "overrides": {
+        "--bg-card-hover": "#fff6e3",
+        "--bg-surface-hover": "#fff6e3",
+        "--bg-input-focus": "#fff6e3",
+        "--bg-header": "#f4ebd7",
+        "--bg-overlay": "rgba(48, 45, 37, 0.55)",
+        "--text-secondary": "rgba(48, 45, 37, 0.85)",
+        "--text-muted": "rgba(48, 45, 37, 0.7)",
+        "--text-faint": "rgba(48, 45, 37, 0.72)",
+        "--stroke": "rgba(48, 45, 37, 0.35)",
+        "--stroke-hover": "rgba(48, 45, 37, 0.6)",
+        "--stroke-strong": "#302d25",
+        "--accent-hover": "#4a463b"
+      }
+    }
+  }
+}

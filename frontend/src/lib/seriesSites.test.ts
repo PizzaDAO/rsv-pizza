@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { foreignEventOrigin, foreignSeriesOrigin, seriesBrandName, seriesSiteOrigin } from './seriesSites';
+import { foreignEventOrigin, foreignSeriesOrigin, ownSiteOriginForSeries, seriesBrandName, seriesSiteOrigin } from './seriesSites';
 import { DEFAULT_SITE_ORIGIN } from '../config/brandScope';
 import type { PublicSeriesWithId } from './seriesApi';
 
@@ -45,5 +45,23 @@ describe('white-label foreign event / series redirects', () => {
     expect(seriesSiteOrigin(null)).toBe(DEFAULT_SITE_ORIGIN);
     expect(seriesBrandName(ALL[0])).toBe('Team1 Pizza');
     expect(seriesBrandName(mk({ brandName: null, displayName: 'Disp' }))).toBe('Disp');
+  });
+});
+
+describe('default build: /series/:slug of a series with its own site', () => {
+  const DEFAULT = DEFAULT_SITE_ORIGIN;
+  it('redirects to the series\' own site (trailing slash trimmed)', () => {
+    expect(ownSiteOriginForSeries(ALL, 'team1', DEFAULT)).toBe('https://team1.example.com');
+    expect(ownSiteOriginForSeries(ALL, 'monad', DEFAULT)).toBe('https://monad.example.com');
+  });
+  it('GPP (no siteUrl), unknown slugs and whitespace-only siteUrls are unaffected', () => {
+    expect(ownSiteOriginForSeries(ALL, 'gpp2026', DEFAULT)).toBeNull();
+    expect(ownSiteOriginForSeries(ALL, 'unknown', DEFAULT)).toBeNull();
+    expect(ownSiteOriginForSeries([mk({ id: 'w', slug: 'w', siteUrl: '  ' })], 'w', DEFAULT)).toBeNull();
+    expect(ownSiteOriginForSeries([], 'team1', DEFAULT)).toBeNull();
+  });
+  it('never redirects to the origin it is already on', () => {
+    expect(ownSiteOriginForSeries(ALL, 'team1', 'https://team1.example.com')).toBeNull();
+    expect(ownSiteOriginForSeries(ALL, 'team1', 'https://TEAM1.example.com/')).toBeNull();
   });
 });

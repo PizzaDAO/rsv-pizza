@@ -1697,7 +1697,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .wl-theme h1, .wl-theme h2, .wl-theme h3 { font-family: var(--font-heading); }
 .wl-theme h1[data-testid="event-name"] { font-family: var(--font-heading) !important; }
 .wl-theme button, .wl-theme input, .wl-theme textarea, .wl-theme select { font-family: var(--font-body); }
-.wl-theme .min-h-screen { background: transparent !important; }
+/* brand-doge keeps the page wrappers' own backgrounds (DisplayPage bg-black, series wrapper), as the old doge theme did. */
+.wl-theme:not(.brand-doge) .min-h-screen { background: transparent !important; }
 
 /* Header: solid token surface and a hairline border. */
 .wl-theme .site-header {
@@ -1814,3 +1815,209 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   .wl-theme [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
   .wl-theme [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * brand-doge: the Doge Day (Own The Doge) flourish class for the runtime-config build
+ * (plans/wl-self-serve-brands.md PR 11). Colours, fonts and the header-name / hero-logo hiding come
+ * from the theme tokens in backend/scripts/data/brand-tokens.json (+ pinned overrides) through the
+ * generic .wl-theme layer; this block is only what the tokens cannot express: the side rules, the
+ * heavy rounded type scale, 2px ink borders, countdown tiles, the lavender CTA and the pink link
+ * underline. Every selector is `.wl-theme.brand-doge ...`, so it only exists on runtime builds whose
+ * series row has theme_class = 'brand-doge' and tokens; the old `.doge-theme` rules above stay as
+ * dead CSS for one release (rollback = unset VITE_BRAND_RUNTIME), PR 18 deletes them.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.brand-doge {
+  --doge-ink: #302D25;
+  --doge-cream: #F4EBD7;
+  --doge-cream-light: #FCF4E1;
+  --doge-pink: #FF4BF4;
+  --doge-lavender: #BE91D0;
+  --eb-bg: var(--bg-main);
+  --eb-fg: var(--text-primary);
+  --eb-btn-bg: var(--accent);
+  --eb-btn-fg: var(--text-inverted);
+}
+/* Page frame: thin dark lines down both sides, like the reference site. */
+.wl-theme.brand-doge #root {
+  min-height: 100vh;
+  border-left: 2px solid var(--doge-ink);
+  border-right: 2px solid var(--doge-ink);
+}
+/* Headings + numerals: heavy rounded type, tight. */
+.wl-theme.brand-doge h1, .wl-theme.brand-doge h2, .wl-theme.brand-doge h3,
+.wl-theme.brand-doge .btn-primary, .wl-theme.brand-doge .btn-secondary,
+.wl-theme.brand-doge [role="timer"] .tabular-nums {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.wl-theme.brand-doge h1 { line-height: 1.05; }
+.wl-theme.brand-doge h1, .wl-theme.brand-doge h2 { text-wrap: balance; }
+/* Header: cream bar, thin dark border, wordmark in heavy rounded type. */
+.wl-theme.brand-doge .site-header {
+  background: var(--doge-cream) !important;
+  border-bottom: 2px solid var(--doge-ink) !important;
+  backdrop-filter: none !important;
+}
+.wl-theme.brand-doge .site-header a span {
+  font-family: var(--font-heading) !important;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+/* Cards: cream surfaces with thin dark borders, no glass blur. */
+.wl-theme.brand-doge .card {
+  background: var(--doge-cream-light) !important;
+  border: 1.5px solid var(--doge-ink) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.wl-theme.brand-doge .card:hover { border-color: var(--doge-ink) !important; }
+/* Countdown tiles (SeriesLandingPage EventCountdown). */
+.wl-theme.brand-doge [role="timer"] > div {
+  background: var(--doge-cream-light);
+  border: 1.5px solid var(--doge-ink);
+  border-radius: 16px;
+}
+.wl-theme.brand-doge [role="timer"] .tabular-nums { font-size: 2.25rem; line-height: 1.1; }
+.wl-theme.brand-doge [role="timer"] .uppercase { font-weight: 800; }
+.wl-theme.brand-doge [data-testid="event-countdown"] > p { font-weight: 800; }
+/* Buttons */
+.wl-theme.brand-doge .btn-primary {
+  background-color: var(--doge-ink);
+  color: var(--doge-cream);
+  border: 2px solid var(--doge-ink);
+  border-radius: 14px;
+}
+.wl-theme.brand-doge .btn-primary:hover:not(:disabled) {
+  background-color: var(--doge-lavender);
+  color: var(--doge-ink);
+}
+/* The landing page CTA is the "Shop"-style lavender block. */
+.wl-theme.brand-doge .text-center > a.btn-primary {
+  background-color: var(--doge-lavender);
+  color: var(--doge-ink);
+  padding: 14px 32px;
+  font-size: 1.05rem;
+}
+.wl-theme.brand-doge .text-center > a.btn-primary:hover:not(:disabled) { background-color: var(--doge-pink); }
+.wl-theme.brand-doge .btn-secondary {
+  background: transparent;
+  border: 2px solid var(--doge-ink);
+  color: var(--doge-ink);
+  border-radius: 14px;
+}
+.wl-theme.brand-doge .btn-secondary:hover { background: var(--doge-cream-light); }
+/* Hard-coded white utilities (written for dark themes) -> ink on cream. */
+.wl-theme.brand-doge .text-white, .wl-theme.brand-doge .text-white\/90 { color: var(--doge-ink); }
+.wl-theme.brand-doge .text-white\/80, .wl-theme.brand-doge .text-white\/70 { color: rgba(48, 45, 37, 0.85); }
+.wl-theme.brand-doge .text-white\/60, .wl-theme.brand-doge .text-white\/50 { color: rgba(48, 45, 37, 0.72); }
+.wl-theme.brand-doge .text-white\/40, .wl-theme.brand-doge .text-white\/30 { color: rgba(48, 45, 37, 0.6); }
+.wl-theme.brand-doge .text-white\/20 { color: rgba(48, 45, 37, 0.5); }
+.wl-theme.brand-doge .hover\:text-white:hover { color: var(--doge-ink); }
+.wl-theme.brand-doge .hover\:text-white\/60:hover { color: rgba(48, 45, 37, 0.85); }
+.wl-theme.brand-doge .border-white\/10, .wl-theme.brand-doge .border-white\/20 { border-color: rgba(48, 45, 37, 0.3); }
+.wl-theme.brand-doge .bg-white\/5, .wl-theme.brand-doge .bg-white\/6, .wl-theme.brand-doge .bg-white\/10 { background: rgba(48, 45, 37, 0.05); }
+.wl-theme.brand-doge .bg-white\/20 { background: rgba(48, 45, 37, 0.1); }
+.wl-theme.brand-doge .hover\:bg-white\/5:hover, .wl-theme.brand-doge .hover\:bg-white\/10:hover { background: rgba(48, 45, 37, 0.08); }
+.wl-theme.brand-doge .hover\:bg-white\/20:hover { background: rgba(48, 45, 37, 0.12); }
+/* Filled colour buttons keep light text. */
+.wl-theme.brand-doge .bg-red-500, .wl-theme.brand-doge .bg-red-500 .text-white { color: #fff; }
+.wl-theme.brand-doge .btn-primary .text-white { color: inherit; }
+/* Inputs */
+.wl-theme.brand-doge input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.wl-theme.brand-doge textarea, .wl-theme.brand-doge select {
+  background: var(--doge-cream-light) !important;
+  border: 1.5px solid rgba(48, 45, 37, 0.55) !important;
+  color: var(--doge-ink) !important;
+}
+.wl-theme.brand-doge input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.wl-theme.brand-doge textarea:focus, .wl-theme.brand-doge select:focus {
+  border-color: var(--doge-ink) !important;
+  background: #FFF6E3 !important;
+  box-shadow: 0 0 0 3px rgba(255, 75, 244, 0.35);
+}
+.wl-theme.brand-doge input::placeholder, .wl-theme.brand-doge textarea::placeholder { color: rgba(48, 45, 37, 0.62) !important; }
+.wl-theme.brand-doge input[type="time"], .wl-theme.brand-doge input[type="date"],
+.wl-theme.brand-doge input[type="datetime-local"] { color-scheme: light !important; }
+/* Links in running text get the hot pink underline (decorative; text stays ink). */
+.wl-theme.brand-doge a:not(.btn-primary):not(.btn-secondary) { text-decoration-color: var(--doge-pink); }
+/* Google Places dropdown (appended to <body>, outside #root). */
+.wl-theme.brand-doge .pac-container {
+  background-color: #FCF4E1 !important;
+  border: 1.5px solid var(--doge-ink) !important;
+  box-shadow: 0 8px 24px rgba(48, 45, 37, 0.2) !important;
+}
+.wl-theme.brand-doge .pac-item { background-color: #FCF4E1 !important; border-color: rgba(48, 45, 37, 0.15) !important; color: var(--doge-ink) !important; }
+.wl-theme.brand-doge .pac-item:hover { background-color: #F4EBD7 !important; }
+.wl-theme.brand-doge .pac-item-query { color: var(--doge-ink) !important; }
+/* Doge hero: the gold-framed Doge from the brand kit, centered under the title. */
+.wl-theme.brand-doge .doge-hero { border-radius: 8px; }
+/* Dark-theme footer logo is white; render it ink on cream. */
+.wl-theme.brand-doge footer img { filter: brightness(0) opacity(0.75); }
+/* Landing/event titles: heavier and tighter, like the reference's Black weight. */
+.wl-theme.brand-doge h1 { -webkit-text-stroke: 0.04em currentColor; }
+.wl-theme.brand-doge main > header > h1 { font-size: clamp(2.5rem, 7vw, 4.25rem); }
+@media (max-width: 480px) {
+  .wl-theme.brand-doge [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .wl-theme.brand-doge [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .wl-theme.brand-doge [role="timer"] .tabular-nums { font-size: 1.875rem; }
+}
+/* Brand-red utilities -> Doge palette (red stays only for real error boxes). */
+.wl-theme.brand-doge .text-\[\#ff393a\] { color: var(--doge-ink); }
+.wl-theme.brand-doge [class*="border-[#ff393a]/30"][class*="text-[#ff393a]"] { color: #b3261e; }
+.wl-theme.brand-doge .bg-\[\#ff393a\] { background-color: var(--doge-pink); color: var(--doge-ink); }
+.wl-theme.brand-doge .bg-\[\#ff393a\] .text-white, .wl-theme.brand-doge .bg-\[\#ff393a\].text-white { color: var(--doge-ink); }
+.wl-theme.brand-doge .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #F2A73A, #F7D58A); }
+.wl-theme.brand-doge .from-\[\#ff393a\] svg { color: rgba(48, 45, 37, 0.45); }
+.wl-theme.brand-doge .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--doge-pink); }
+/* Modals */
+.wl-theme.brand-doge .fixed.inset-0 .card, .wl-theme.brand-doge .fixed.inset-0 .bg-theme-header {
+  background: #FCF4E1 !important;
+  border: 2px solid var(--doge-ink) !important;
+  box-shadow: 0 16px 48px rgba(48, 45, 37, 0.3) !important;
+}
+
+/* ─── Brand-theme QA fixes (brand-page-qa) ───
+ * Status / accent colours below were picked for the dark default theme (green-400, amber-400,
+ * red-300, #39d98a, ...) and fall under 4.5:1 on the light Doge/Monad pages, and the faint /
+
+/* QA fixes: faint tiers + status hues (pinned to the old exact values) */
+.wl-theme.brand-doge .text-white\/40, .wl-theme.brand-doge .text-white\/30, .wl-theme.brand-doge .text-white\/20 { color: rgba(48, 45, 37, 0.7); }
+.wl-theme.brand-doge .text-green-400, .wl-theme.brand-doge .text-green-300, .wl-theme.brand-doge .text-emerald-400, .wl-theme.brand-doge .text-\[\#39d98a\] { color: #1f7a45; }
+.wl-theme.brand-doge .text-amber-400, .wl-theme.brand-doge .text-amber-400\/70, .wl-theme.brand-doge .text-yellow-400, .wl-theme.brand-doge .text-yellow-300, .wl-theme.brand-doge .text-orange-400 { color: #8a5a00; }
+.wl-theme.brand-doge .text-red-400, .wl-theme.brand-doge .text-red-300, .wl-theme.brand-doge .text-\[\#ff393a\]\/60 { color: #b3261e; }
+.wl-theme.brand-doge .text-\[\#5c7cfa\] { color: #3a4fc4; }
+.wl-theme.brand-doge .text-blue-400, .wl-theme.brand-doge .text-sky-400, .wl-theme.brand-doge .text-cyan-400 { color: #1d5fa8; }
+.wl-theme.brand-doge .text-purple-400, .wl-theme.brand-doge .text-violet-400, .wl-theme.brand-doge .text-pink-400 { color: #7a35b5; }
+.wl-theme.brand-doge [class*="bg-[#39d98a]/"].text-\[\#39d98a\] { color: #17663a; }
+.wl-theme.brand-doge svg[style*="color: rgb(245, 158, 11)"] { color: #8a5a00 !important; }
+.wl-theme.brand-doge svg[style*="color: rgb(57, 217, 138)"],
+.wl-theme.brand-doge svg[style*="color: rgb(34, 197, 94)"] { color: #1f7a45 !important; }
+.wl-theme.brand-doge svg[style*="color: rgb(255, 57, 58)"] { color: #b3261e !important; }
+.wl-theme.brand-doge svg[style*="color: rgb(92, 124, 250)"] { color: #3a4fc4 !important; }
+.wl-theme.brand-doge .bg-theme-accent, .wl-theme.brand-doge .bg-theme-accent .text-white { color: var(--doge-cream); }
+.wl-theme.brand-doge .text-gray-400, .wl-theme.brand-doge .text-gray-500, .wl-theme.brand-doge .text-neutral-400, .wl-theme.brand-doge .text-slate-400 { color: var(--text-muted); }
+.wl-theme.brand-doge [class*="bg-green-500/"].text-green-400 { color: #17663a; }
+.wl-theme.brand-doge [class*="bg-gray-500/"].text-gray-400 { color: var(--text-primary); }
+@media (max-width: 480px) {
+  .wl-theme.brand-doge .guest-list-head { flex-wrap: wrap; row-gap: 0.75rem; }
+  .wl-theme.brand-doge .guest-list-head > div { flex-wrap: wrap; row-gap: 0.5rem; }
+  .wl-theme.brand-doge .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .wl-theme.brand-doge .site-header > div > a img { height: 1.5rem; }
+  .wl-theme.brand-doge .site-header > div > div { gap: 0.25rem; }
+  .wl-theme.brand-doge .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .wl-theme.brand-doge .site-header button svg.lucide-chevron-down { display: none; }
+}
+
+/* The series landing page wraps itself in the series theme class (SeriesLandingPage pageThemeClass),
+ * which on the old build gave that wrapper the cream page background. The generic layer makes every
+ * .min-h-screen transparent; keep the wrapper opaque cream so the series page paints exactly as before. */
+.wl-theme .brand-doge.min-h-screen { background: var(--bg-main) !important; }
+/* The event page title carries an inline Rubik font; the old doge theme never overrode it (the inline style
+ * beat its rule), and the generic layer would force the heading font, so pin the existing look. */
+.wl-theme.brand-doge h1[data-testid="event-name"] { font-family: 'Rubik', sans-serif !important; }
+/* The wordmark is the logo image, so the old theme hid every span inside a header link: the brand name text
+ * (now the hideHeaderName flag) AND the logged-in /account link's name. Keep hiding those spans. */
+.wl-theme.brand-doge .site-header a span { display: none; }
+/* The generic layer rounds textareas like cards; the old doge theme left them at the base 12px. */
+.wl-theme.brand-doge textarea { border-radius: 12px; }

@@ -15,7 +15,7 @@
  * (.github/workflows/brand-check.yml) enforces this for new code.
  */
 
-import { applyBrandOverlay, type RuntimeBrand } from './brandRuntime';
+import { applyBrandOverlay, runtimeFlag, type RuntimeBrand } from './brandRuntime';
 
 const env = import.meta.env;
 
@@ -76,6 +76,16 @@ if (__BRAND_RUNTIME__) {
     m.applyThemeTokens((window as unknown as { __BRAND__?: { tokens?: unknown } }).__BRAND__),
   );
 }
+
+/**
+ * Presentation flags from the runtime theme tokens (always false unless VITE_BRAND_RUNTIME=1 and the
+ * brand's tokens set them): Header drops the name text beside the logo, the series landing page drops
+ * the repeated hero logo.
+ */
+const runtimeBrand = (): { tokens?: unknown } | undefined =>
+  (window as unknown as { __BRAND__?: { tokens?: unknown } }).__BRAND__;
+export const HIDE_HEADER_NAME: boolean = __BRAND_RUNTIME__ && runtimeFlag(runtimeBrand(), 'hideHeaderName');
+export const HIDE_HERO_LOGO: boolean = __BRAND_RUNTIME__ && runtimeFlag(runtimeBrand(), 'hideHeroLogo');
 
 /** Build an absolute brand URL: brandUrl('my-party') -> https://rsv.pizza/my-party */
 export function brandUrl(path = ''): string {

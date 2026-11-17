@@ -5,10 +5,10 @@ import { Loader2, MapPin, CalendarDays } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { useTheme } from '../contexts/ThemeContext';
-import { BRAND, brandUrl } from '../config/brand';
+import { BRAND, HIDE_HERO_LOGO, brandUrl } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
-import { foreignSeriesOrigin, loadPublicSeries } from '../lib/seriesSites';
+import { foreignSeriesOrigin, loadPublicSeries, ownSiteOriginForSeries } from '../lib/seriesSites';
 
 /**
  * Public landing page for a white-label event series: /series/:slug.
@@ -97,6 +97,16 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
           setNotFound(true);
           return;
         }
+        // Default (unscoped) build: a series with its own site is shown there, under its own theme.
+        if (!IS_SERIES_SCOPED && !slugOverride) {
+          const origin = ownSiteOriginForSeries(await loadPublicSeries(), slug, window.location.origin);
+          if (cancelled) return;
+          if (origin) {
+            redirecting = true;
+            window.location.replace(`${origin}/series/${slug}${window.location.search}`);
+            return;
+          }
+        }
         const { series: s } = await fetchPublicSeries(slug);
         if (cancelled) return;
         setSeries(s);
@@ -165,14 +175,14 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
         <header className="text-center mb-10">
-          {series.logoUrl && (
+          {series.logoUrl && !HIDE_HERO_LOGO && (
             <img src={series.logoUrl} alt={title} className="h-20 mx-auto mb-4 object-contain" />
           )}
           <h1 className="text-4xl font-bold text-theme-text mb-3">{title}</h1>
           {series.description && (
             <p className="text-theme-text-secondary whitespace-pre-line max-w-2xl mx-auto">{series.description}</p>
           )}
-          {globalDay && BRAND.themeClass === 'doge-theme' && (
+          {globalDay && (__BRAND_RUNTIME__ ? ['doge-theme', 'brand-doge'].includes(BRAND.themeClass) : BRAND.themeClass === 'doge-theme') && (
             <img src="/brands/doge/frame.png" alt="" className="doge-hero mx-auto mt-6 w-full max-w-md" />
           )}
         </header>
