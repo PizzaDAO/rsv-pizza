@@ -15,12 +15,14 @@
  * (.github/workflows/brand-check.yml) enforces this for new code.
  */
 
+import { applyBrandOverlay, type RuntimeBrand } from './brandRuntime';
+
 const env = import.meta.env;
 
 /** Bare domain, no scheme, no trailing slash. e.g. "rsv.pizza" */
 const domain = (env.VITE_BRAND_DOMAIN || 'rsv.pizza').trim().replace(/\/+$/, '');
 
-export const BRAND = {
+const brandDefaults = {
   /** Display name used in UI chrome + meta titles. */
   name: (env.VITE_BRAND_NAME || 'RSV.Pizza').trim(),
   /** Short tagline / product descriptor. */
@@ -55,6 +57,15 @@ export const BRAND = {
   /** True when this build is a white-label (non-default) brand. */
   isBranded: !!(env.VITE_BRAND_NAME || env.VITE_BRAND_DOMAIN || '').trim(),
 } as const;
+
+/**
+ * VITE_BRAND_RUNTIME=1 builds overlay the DB config (window.__BRAND__, set by the blocking
+ * /brand-config.js) onto these env defaults. Otherwise `__BRAND_RUNTIME__` is a compile-time false,
+ * the overlay is stripped from the bundle, and BRAND is exactly the env-derived object above.
+ */
+export const BRAND: typeof brandDefaults = __BRAND_RUNTIME__
+  ? applyBrandOverlay(brandDefaults, (window as unknown as { __BRAND__?: RuntimeBrand }).__BRAND__)
+  : brandDefaults;
 
 /** Build an absolute brand URL: brandUrl('my-party') -> https://rsv.pizza/my-party */
 export function brandUrl(path = ''): string {

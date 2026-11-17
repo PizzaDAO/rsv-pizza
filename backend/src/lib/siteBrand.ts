@@ -38,6 +38,30 @@ interface SeriesSite {
   emailReplyTo: string | null;
   emailDomain: string | null;
   emailDomainVerifiedAt: Date | null;
+  /** Public brand-config columns (served by /api/brand-config; see lib/brandConfig.ts). */
+  config: SeriesBrandRow;
+}
+
+/** The public brand columns of an active branded series (never any email/domain/wallet/tag field). */
+export interface SeriesBrandRow {
+  id: string;
+  slug: string;
+  name: string;
+  displayName: string;
+  brandName: string | null;
+  siteUrl: string | null;
+  tagline: string | null;
+  metaDescription: string | null;
+  supportEmail: string | null;
+  logoUrl: string | null;
+  logoLightUrl: string | null;
+  faviconUrl: string | null;
+  ogImageUrl: string | null;
+  themeClass: string | null;
+  themeTokens: unknown;
+  flyerTemplateKey: string | null;
+  flyerArt: unknown;
+  configVersion: number;
 }
 
 interface SiteCache {
@@ -67,6 +91,9 @@ async function load(): Promise<SiteCache> {
       id: true, slug: true, siteUrl: true, brandName: true, displayName: true, name: true,
       siteAliases: true, emailFromAddress: true, emailFromName: true, emailReplyTo: true,
       emailDomain: true, emailDomainVerifiedAt: true,
+      tagline: true, metaDescription: true, supportEmail: true, logoUrl: true, logoLightUrl: true,
+      faviconUrl: true, ogImageUrl: true, themeClass: true, themeTokens: true, flyerTemplateKey: true,
+      flyerArt: true, configVersion: true,
     },
   });
   const byId = new Map<string, SeriesSite>();
@@ -85,6 +112,14 @@ async function load(): Promise<SiteCache> {
       emailReplyTo: r.emailReplyTo ?? null,
       emailDomain: r.emailDomain ?? null,
       emailDomainVerifiedAt: r.emailDomainVerifiedAt ?? null,
+      config: {
+        id: r.id, slug: r.slug, name: r.name, displayName: r.displayName, brandName: r.brandName ?? null,
+        siteUrl: r.siteUrl ?? null, tagline: r.tagline ?? null, metaDescription: r.metaDescription ?? null,
+        supportEmail: r.supportEmail ?? null, logoUrl: r.logoUrl ?? null, logoLightUrl: r.logoLightUrl ?? null,
+        faviconUrl: r.faviconUrl ?? null, ogImageUrl: r.ogImageUrl ?? null, themeClass: r.themeClass ?? null,
+        themeTokens: r.themeTokens ?? null, flyerTemplateKey: r.flyerTemplateKey ?? null,
+        flyerArt: r.flyerArt ?? null, configVersion: r.configVersion ?? 1,
+      },
     };
     byId.set(r.id, site);
     byOrigin.set(origin, site);
@@ -138,6 +173,27 @@ export async function getSeriesOrigins(): Promise<Set<string>> {
   const out = new Set<string>();
   for (const o of byOrigin.keys()) if (HTTPS_ORIGIN.test(o)) out.add(o);
   return out;
+}
+
+/**
+ * The public brand row for a request host (site_url or alias, active series only) or a series slug.
+ * `degraded` is true when the series cache is empty because the DB load failed (callers answer 503
+ * instead of a cacheable 404). Reads only the 60 s cache above: no per-request DB query.
+ */
+export async function brandRowFor(
+  q: { host?: string | null; slug?: string | null },
+): Promise<{ row: SeriesBrandRow | null; degraded: boolean }> {
+  const { at, byId, byOrigin } = await getSeriesSites();
+  const degraded = at === 0 && byId.size === 0;
+  let site: SeriesSite | undefined;
+  if (q.slug) {
+    const slug = q.slug.trim().toLowerCase();
+    for (const s of byId.values()) if (s.slug.toLowerCase() === slug) { site = s; break; }
+  } else if (q.host) {
+    const o = normalizeOrigin(`https://${q.host}`);
+    if (o) site = byOrigin.get(o);
+  }
+  return { row: site ? site.config : null, degraded };
 }
 
 /** Drop the cached series sites so the next lookup reloads (used after a sender revert). */

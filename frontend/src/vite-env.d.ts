@@ -13,3 +13,6 @@ interface ImportMetaEnv {
   readonly VITE_BRAND_SUPPORT_EMAIL?: string;
   readonly VITE_BRAND_THEME_CLASS?: string;
 }
+
+/** Compile-time flag (vite.config.ts `define`): true only on VITE_BRAND_RUNTIME=1 builds. */
+declare const __BRAND_RUNTIME__: boolean;

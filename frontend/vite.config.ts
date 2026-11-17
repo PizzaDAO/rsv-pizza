@@ -8,8 +8,15 @@ import react from '@vitejs/plugin-react';
  * JS see the right title/OG/favicon. Defaults equal the literals in index.html,
  * so with no VITE_BRAND_* set the output is byte-identical.
  */
+/** Runtime brand config (plans/wl-self-serve-brands.md, PR 7): opt-in per build via VITE_BRAND_RUNTIME=1. */
+function brandRuntimeEnabled(mode: string): boolean {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  return (env.VITE_BRAND_RUNTIME || process.env.VITE_BRAND_RUNTIME || '').trim() === '1';
+}
+
 function brandIndexHtml(mode: string): Plugin {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
+  const runtime = brandRuntimeEnabled(mode);
   const v = (k: string, d: string) => (env[k] || process.env[k] || d).trim();
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const name = v('VITE_BRAND_NAME', 'RSV.Pizza'); // brand-check-ignore-line
@@ -41,6 +48,11 @@ function brandIndexHtml(mode: string): Plugin {
           .replace('<meta property="og:image:height" content="512" />', () => '<meta property="og:image:height" content="630" />')
           .replace('<meta name="twitter:card" content="summary" />', () => '<meta name="twitter:card" content="summary_large_image" />');
       }
+      // Runtime-brand builds load /brand-config.js (window.__BRAND__) as the FIRST, blocking head
+      // script so the brand never flashes. Without the flag the HTML is returned untouched.
+      if (runtime) {
+        return { html: out, tags: [{ tag: 'script', attrs: { src: '/brand-config.js' }, injectTo: 'head-prepend' as const }] };
+      }
       return out;
     },
   };
@@ -50,6 +62,9 @@ function brandIndexHtml(mode: string): Plugin {
 export default defineConfig(({ mode }) => ({
   plugins: [react(), brandIndexHtml(mode)],
   base: '/',
+  // Compile-time flag read by src/config/brand.ts. When false the runtime overlay is dead code and
+  // is removed from the bundle, so builds without VITE_BRAND_RUNTIME are unchanged.
+  define: { __BRAND_RUNTIME__: JSON.stringify(brandRuntimeEnabled(mode)) },
   build: {
     // forno-81402: iPhone 8 tops out at iOS 16 (Safari 16).
     target: ['es2020', 'safari15'],

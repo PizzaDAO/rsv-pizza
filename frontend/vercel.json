@@ -6,7 +6,17 @@
       "permanent": true
     }
   ],
+  "functions": {
+    "api/brand-config.ts": {
+      "includeFiles": "api/_brand-snapshot.json"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/brand-config.js",
+      "has": [{ "type": "host", "value": "(?<host>.*)" }],
+      "destination": "/api/brand-config?host=:host"
+    },
     {
       "source": "/cdn/:path*",
       "destination": "https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/:path*"
