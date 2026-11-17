@@ -62,3 +62,15 @@ export function applyBrandOverlay<T extends OverlayableBrand>(base: T, rt: Runti
     isBranded: true,
   };
 }
+
+/**
+ * Boolean presentation flags carried in the runtime theme tokens (themeTokens.ts `hideHeaderName`,
+ * `hideHeroLogo`). They replace the per-brand CSS that used to `display:none` the header name / hero
+ * logo. Only a literal `true` from the (server-validated) tokens turns one on.
+ */
+export type BrandFlag = 'hideHeaderName' | 'hideHeroLogo';
+
+export function runtimeFlag(rt: { tokens?: unknown } | null | undefined, key: BrandFlag): boolean {
+  const t = rt && typeof rt === 'object' ? rt.tokens : null;
+  return !!t && typeof t === 'object' && (t as Record<string, unknown>)[key] === true;
+}
