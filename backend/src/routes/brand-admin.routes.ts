@@ -10,7 +10,7 @@
  * limited per user. Brand admins can never touch money, domains, tags, slug, create flow, approval
  * default, other series or global settings (see lib/seriesBrandSettings.ts for the allowlist).
  *
- *   GET   /:seriesId/settings                  Editable fields + read-only context
+ *   GET   /:seriesId/settings                  Editable fields + read-only context + current image URLs (`assets`)
  *   PATCH /:seriesId/settings                  Update allowlisted fields (400 on any other key)
  *   GET   /:seriesId/audit                     Recent settings changes (brand fields only)
  *   POST  /:seriesId/revert {auditId}          Revert to the state before a settings change
@@ -42,6 +42,7 @@ import {
 import { invalidateSiteBrandCache } from '../lib/siteBrand.js';
 import { isSlot, SLOTS, validateUploadRequest, createAssetUploadUrl, attachBrandAsset, removeBrandAsset, cleanupAbandonedBrandUploads } from '../lib/brandAssets.js';
 import { writeSeriesAudit } from '../lib/seriesAudit.js';
+import { sanitizeFlyerArt } from '../lib/flyerArt.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import {
   LISTABLE_EVENT_STATUSES, listSeriesEvents, setSeriesEventStatus,
@@ -154,9 +155,19 @@ for (const name of ['itemId', 'partyId']) {
 router.use('/:seriesId', requireAuth, scoped);
 
 scoped.get('/settings', wrap(async (req, res) => {
-  const row = await prisma.eventSeries.findFirst({ where: { id: req.seriesAdmin!.seriesId }, select: BRAND_SETTINGS_SELECT });
+  const row = await prisma.eventSeries.findFirst({
+    where: { id: req.seriesAdmin!.seriesId },
+    select: { ...BRAND_SETTINGS_SELECT, logoUrl: true, logoLightUrl: true, faviconUrl: true, ogImageUrl: true, flyerArt: true },
+  });
   if (!row) throw new AppError('Not found', 404, 'NOT_FOUND');
-  res.json({ settings: pickSettings(row as any) });
+  // Read-only current image URLs for the settings page (they are written only by the upload endpoints).
+  const art = sanitizeFlyerArt((row as any).flyerArt);
+  const assets = {
+    logo: (row as any).logoUrl ?? null, logoLight: (row as any).logoLightUrl ?? null,
+    favicon: (row as any).faviconUrl ?? null, og: (row as any).ogImageUrl ?? null,
+    flyerPoster: art?.poster ?? null, flyerRollup: art?.rollup ?? null,
+  };
+  res.json({ settings: pickSettings(row as any), assets });
 }));
 
 scoped.patch('/settings', settingsLimit, wrap(async (req, res) => {

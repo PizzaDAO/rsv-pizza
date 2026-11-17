@@ -241,14 +241,25 @@ export interface BrandAssetResult {
   height?: number;
 }
 
-export async function uploadBrandAsset(seriesId: string, slot: BrandAssetSlot, file: File): Promise<BrandAssetResult> {
+export type BrandUploadStage = 'preparing' | 'uploading' | 'processing';
+
+/** `onStage` reports coarse progress (the storage client exposes no byte events). */
+export async function uploadBrandAsset(
+  seriesId: string,
+  slot: BrandAssetSlot,
+  file: File,
+  onStage?: (stage: BrandUploadStage) => void,
+): Promise<BrandAssetResult> {
+  onStage?.('preparing');
   const { supabase } = await import('./supabase');
   const target = await apiRequest<{ path: string; token: string }>(`/api/brand-admin/${seriesId}/assets/upload-url`, {
     method: 'POST',
     body: { slot, mimeType: file.type, fileSize: file.size },
   });
+  onStage?.('uploading');
   const up = await supabase.storage.from(BRAND_UPLOADS_BUCKET).uploadToSignedUrl(target.path, target.token, file, { contentType: file.type });
   if (up.error) throw new Error('The upload failed. Please try again.');
+  onStage?.('processing');
   return apiRequest<BrandAssetResult>(`/api/brand-admin/${seriesId}/assets/attach`, { method: 'POST', body: { slot, path: target.path } });
 }
 
