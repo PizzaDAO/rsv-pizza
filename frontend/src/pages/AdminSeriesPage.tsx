@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, Plus, Trash2, Tag, Type, Image, Palette, Wallet, Globe, FileText, Calendar, Clock } from 'lucide-react';
+import { Loader2, Shield, Plus, Trash2, Tag, Type, Image, Palette, Wallet, Globe, FileText, Calendar, Clock, Mail } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { IconInput } from '../components/IconInput';
@@ -37,6 +37,11 @@ const BLANK_FORM = {
   ogImageUrl: '',
   flyerTemplateKey: '',
   siteUrl: '',
+  siteAliases: '',
+  emailFromAddress: '',
+  emailFromName: '',
+  emailReplyTo: '',
+  emailDomain: '',
   brandName: '',
   createFlow: '',
   nameTemplate: '',
@@ -64,6 +69,11 @@ function seriesToForm(s: EventSeries): FormState {
     ogImageUrl: s.ogImageUrl ?? '',
     flyerTemplateKey: s.flyerTemplateKey ?? '',
     siteUrl: s.siteUrl ?? '',
+    siteAliases: (s.siteAliases ?? []).join(', '),
+    emailFromAddress: s.emailFromAddress ?? '',
+    emailFromName: s.emailFromName ?? '',
+    emailReplyTo: s.emailReplyTo ?? '',
+    emailDomain: s.emailDomain ?? '',
     brandName: s.brandName ?? '',
     createFlow: s.createFlow ?? '',
     nameTemplate: s.nameTemplate ?? '',
@@ -91,6 +101,11 @@ function formToInput(f: FormState): SeriesInput {
     ogImageUrl: f.ogImageUrl.trim() || null,
     flyerTemplateKey: f.flyerTemplateKey.trim() || null,
     siteUrl: f.siteUrl.trim() || null,
+    siteAliases: f.siteAliases.split(',').map((t) => t.trim()).filter(Boolean),
+    emailFromAddress: f.emailFromAddress.trim() || null,
+    emailFromName: f.emailFromName.trim() || null,
+    emailReplyTo: f.emailReplyTo.trim() || null,
+    emailDomain: f.emailDomain.trim() || null,
     brandName: f.brandName.trim() || null,
     createFlow: f.createFlow.trim() || null,
     nameTemplate: f.nameTemplate.trim() || null,
@@ -121,6 +136,7 @@ export function AdminSeriesPage() {
 
   const [checklist, setChecklist] = useState<SeriesChecklistDefault[]>([]);
   const [newItemName, setNewItemName] = useState('');
+  const selectedSeries = series.find((s) => s.id === selectedId) ?? null;
   const [pendingEvents, setPendingEvents] = useState<SeriesPendingEvent[]>([]);
 
   const refreshSeries = useCallback(async () => {
@@ -343,6 +359,27 @@ export function AdminSeriesPage() {
               <IconInput icon={Clock} placeholder="End time (HH:MM)" value={form.eventEndTime}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('eventEndTime', e.target.value)} />
             </div>
+
+            {/* Sender / custom domain. Verification is server-side (Resend), never set from this form. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput icon={Globe} placeholder="Site aliases (comma-separated https origins, e.g. the old brand-subdomain host)" value={form.siteAliases}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('siteAliases', e.target.value)} />
+              <IconInput icon={Mail} placeholder="From address (e.g. events@mail.partner.com)" value={form.emailFromAddress}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('emailFromAddress', e.target.value)} />
+              <IconInput icon={Type} placeholder="From name (defaults to brand name)" value={form.emailFromName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('emailFromName', e.target.value)} />
+              <IconInput icon={Mail} placeholder="Reply-to address (e.g. hello@partner.com)" value={form.emailReplyTo}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('emailReplyTo', e.target.value)} />
+              <IconInput icon={Globe} placeholder="Email sending domain (e.g. mail.partner.com)" value={form.emailDomain}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('emailDomain', e.target.value)} />
+            </div>
+            {selectedId && (
+              <p className="text-xs text-white/40">
+                {selectedSeries?.emailDomainVerifiedAt
+                  ? `Sending as ${selectedSeries.emailFromAddress} (domain verified ${new Date(selectedSeries.emailDomainVerifiedAt).toLocaleDateString()})`
+                  : 'Sending as the default sender (sender domain not verified). Changing the from address or domain resets verification.'}
+              </p>
+            )}
 
             <IconInput icon={FileText} multiline rows={5} placeholder="Description (shown on the series landing / event pages)"
               value={form.description}
