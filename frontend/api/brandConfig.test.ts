@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import vm from 'node:vm';
-import { jsonForScript, renderBrandScript, pickFromSnapshot, cleanHost, EMPTY_SCRIPT } from './_brandConfig';
+import { jsonForScript, renderBrandScript, cleanThemeVars, pickFromSnapshot, cleanHost, EMPTY_SCRIPT } from './_brandConfig';
 import handler from './brand-config';
 
 const EVIL = '</script><script>alert(1)</script>"\u2028\u2029&\'';
@@ -9,11 +9,15 @@ const EVIL = '</script><script>alert(1)</script>"\u2028\u2029&\'';
 /** Run the script in a sandbox with a minimal DOM and return what it did. */
 function runScript(code: string) {
   const classes: string[] = [];
+  const vars: Record<string, string> = {};
   const listeners: Array<() => void> = [];
   const link: { rel?: string; href?: string } = {};
   const doc = {
     title: 'static',
-    documentElement: { classList: { add: (c: string) => classes.push(c) } },
+    documentElement: {
+      classList: { add: (c: string) => classes.push(c) },
+      style: { setProperty: (k: string, v: string) => { vars[k] = v; } },
+    },
     addEventListener: (_: string, fn: () => void) => listeners.push(fn),
     querySelector: () => link,
     createElement: () => ({}),
@@ -22,7 +26,7 @@ function runScript(code: string) {
   const win: Record<string, unknown> = {};
   vm.runInNewContext(code, { window: win, document: doc });
   listeners.forEach((fn) => fn());
-  return { win, doc, classes, link };
+  return { win, doc, classes, link, vars };
 }
 
 describe('jsonForScript', () => {
@@ -57,8 +61,39 @@ describe('renderBrandScript', () => {
     expect(doc.title).toBe('static');
   });
 
+  it('applies derived theme variables and the wl-theme classes before first paint', () => {
+    const themeVars = { '--bg-main': '#0b0b10', '--font-body': "'Inter', ui-sans-serif, system-ui, sans-serif", '--radius-btn': '9999px' };
+    const dark = runScript(renderBrandScript({ slug: 'example', themeClass: 'example-theme', tokens: { mode: 'dark' }, themeVars }));
+    expect(dark.vars).toEqual(themeVars);
+    expect(dark.classes).toEqual(['example-theme', 'wl-theme']);
+    const light = runScript(renderBrandScript({ slug: 'example', tokens: { mode: 'light' }, themeVars }));
+    expect(light.classes).toEqual(['wl-theme', 'wl-light']);
+  });
+
+  it('adds no theme classes or variables when there are none, or when all are malformed', () => {
+    expect(runScript(renderBrandScript({ slug: 'example' })).classes).toEqual([]);
+    const bad = runScript(renderBrandScript({ slug: 'example', themeVars: { '--x': 'red; background:url(//evil.example.org)', color: '#000000' } }));
+    expect(bad.classes).toEqual([]);
+    expect(bad.vars).toEqual({});
+  });
+
   it('the empty script is valid JS', () => {
     expect(() => vm.runInNewContext(EMPTY_SCRIPT, {})).not.toThrow();
+  });
+});
+
+describe('cleanThemeVars', () => {
+  it('keeps well-formed pairs and drops injection attempts', () => {
+    expect(cleanThemeVars({
+      '--accent': '#e6212f', '--bg-overlay': 'rgba(0, 0, 0, 0.7)', '--font-body': "'Inter', sans-serif",
+      '--a': 'x;y', '--b': 'url(//evil.example.org/x)', '--b2': 'URL(evil)', '--c': '{}', '--d': '</style>', '--e': 'a\nb', Color: '#fff',
+      '--f': 5, '--G': '#fff', '--h': 'a:b', '--i': 'a\\b',
+    })).toEqual({ '--accent': '#e6212f', '--bg-overlay': 'rgba(0, 0, 0, 0.7)', '--font-body': "'Inter', sans-serif" });
+  });
+  it('rejects non-objects and caps the count', () => {
+    for (const v of [null, undefined, 'x', [], 5]) expect(cleanThemeVars(v)).toBeUndefined();
+    const many = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`--v${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}`, '#000000']));
+    expect(Object.keys(cleanThemeVars(many)!).length).toBe(40);
   });
 });
 

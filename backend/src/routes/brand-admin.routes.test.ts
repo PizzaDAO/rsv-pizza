@@ -37,6 +37,7 @@ vi.mock('../lib/siteBrand.js', () => ({ brandedSiteForParty: async () => null, i
 vi.mock('../lib/resendSend.js', () => ({ sendBrandedEmail: vi.fn() }));
 vi.mock('../config/secrets.js', () => ({ getJwtSecret: () => 'test-secret' }));
 
+import { Prisma } from '@prisma/client';
 import router from './brand-admin.routes.js';
 import adminSeries from './admin-series.routes.js';
 import { requireSeriesAdmin } from '../lib/seriesAccess.js';
@@ -259,7 +260,7 @@ describe('settings', () => {
     ['fundingWalletAddress', '0xdead'], ['siteUrl', 'https://evil.example'], ['siteAliases', ['https://evil.example']],
     ['emailFromAddress', 'x@evil.example'], ['emailDomain', 'evil.example'], ['emailDomainVerifiedAt', '2026-01-01'],
     ['resendDomainId', 'x'], ['pendingDomain', 'evil.example'], ['configVersion', 99], ['id', B], ['seriesId', B],
-    ['themeTokens', {}], ['flyerArt', {}], ['faviconUrl', 'x'], ['logoLightUrl', 'x'],
+    ['flyerArt', {}], ['faviconUrl', 'x'], ['logoLightUrl', 'x'],
   ];
   it.each(superOnly)('rejects super-admin-only key %s with a 400 and no write', async (key, value) => {
     const res = await patch({ tagline: 'ok', [key]: value });
@@ -267,6 +268,45 @@ describe('settings', () => {
     expect(JSON.stringify(res.body)).toContain(key);
     expect(m.state.writes).not.toHaveBeenCalled();
     expect(m.state.series[A].tagline).toBeNull();
+  });
+
+  describe('themeTokens', () => {
+    const TOK = {
+      mode: 'dark', bg: '#0b0b10', surface: '#17171f', text: '#f5f5f7', textMuted: '#a8a8b3',
+      accent: '#e6212f', onAccent: '#ffffff', border: '#2a2a35', radius: 'pill', fontHeading: 'kanit', fontBody: 'inter',
+    };
+    it('stores a valid token set (normalised) and audits it', async () => {
+      as('brand@partner.com');
+      const res = await patch({ themeTokens: { ...TOK, accent: '#E6212F' } });
+      expect(res.status).toBe(200);
+      expect(m.state.series[A].themeTokens).toEqual(TOK);
+      expect(res.body.changed).toContain('themeTokens');
+    });
+    it.each([
+      ['non-hex colour', { ...TOK, accent: 'red' }],
+      ['css injection', { ...TOK, bg: '#000000; background:url(//evil.example.org)' }],
+      ['unknown font', { ...TOK, fontBody: 'comic-sans' }],
+      ['failing contrast', { ...TOK, textMuted: '#2a2a35' }],
+      ['unknown key', { ...TOK, extra: 1 }],
+      ['overrides from a brand admin', { ...TOK, overrides: { '--bg-card': '#1a1b1c' } }],
+      ['oversize', { ...TOK, junk: 'x'.repeat(5000) }],
+      ['a string', 'x'],
+    ])('rejects %s with a 400 and no write', async (_n, themeTokens) => {
+      as('brand@partner.com');
+      const res = await patch({ themeTokens });
+      expect(res.status).toBe(400);
+      expect(m.state.writes).not.toHaveBeenCalled();
+      expect(m.state.series[A].themeTokens).toBeUndefined();
+    });
+    it('null clears, and a brand admin save keeps super-admin overrides', async () => {
+      as('brand@partner.com');
+      m.state.series[A].themeTokens = { ...TOK, overrides: { '--bg-card': '#1a1b1c' } };
+      expect((await patch({ themeTokens: { ...TOK, accent: '#d92b3a' } })).status).toBe(200);
+      expect(m.state.series[A].themeTokens.overrides).toEqual({ '--bg-card': '#1a1b1c' });
+      expect(m.state.series[A].themeTokens.accent).toBe('#d92b3a');
+      expect((await patch({ themeTokens: null })).status).toBe(200);
+      expect(m.state.series[A].themeTokens).toBe(Prisma.DbNull); // the real client stores SQL NULL
+    });
   });
 
   it('the allowlist contains none of the forbidden keys', () => {

@@ -1676,3 +1676,141 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .swc-theme [class*="bg-green-500/"].text-green-400 { color: #17663a; }
 .doge-theme [class*="bg-gray-500/"].text-gray-400, .monad-theme [class*="bg-gray-500/"].text-gray-400,
 .swc-theme [class*="bg-gray-500/"].text-gray-400 { color: var(--text-primary); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Generic white-label theme layer (plans/wl-self-serve-brands.md §2.3, PR 8).
+ *
+ * `.wl-theme` (dark) and `.wl-theme.wl-light` are put on <html> by /brand-config.js and
+ * config/themeRuntime.ts ONLY when a brand's validated theme tokens are present. Every selector
+ * below starts with `.wl-theme`, so with the class absent (rsv.pizza, every current brand build)
+ * nothing here matches and no computed style changes. It reads only CSS variables set from the
+ * tokens (config/themeTokens.ts deriveThemeVars): --bg-*, --text-*, --stroke*, --accent*,
+ * --accent-contrast, --accent-tint, --radius-btn, --radius-card, --font-heading, --font-body,
+ * --color-scheme. Bespoke art (glows, frames, hero SVGs) stays in the per-brand code classes.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.wl-theme {
+  color-scheme: var(--color-scheme, dark);
+  background: var(--bg-main);
+  font-family: var(--font-body);
+}
+.wl-theme body { background-color: var(--bg-main); color: var(--text-primary); font-family: var(--font-body); }
+.wl-theme h1, .wl-theme h2, .wl-theme h3 { font-family: var(--font-heading); }
+.wl-theme h1[data-testid="event-name"] { font-family: var(--font-heading) !important; }
+.wl-theme button, .wl-theme input, .wl-theme textarea, .wl-theme select { font-family: var(--font-body); }
+.wl-theme .min-h-screen { background: transparent !important; }
+
+/* Header: solid token surface and a hairline border. */
+.wl-theme .site-header {
+  background: var(--bg-header) !important;
+  border-bottom: 1px solid var(--stroke) !important;
+  backdrop-filter: none !important;
+}
+
+/* Cards */
+.wl-theme .card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: var(--radius-card);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.wl-theme .card:hover { border-color: var(--stroke-hover) !important; }
+
+/* Buttons */
+.wl-theme .btn-primary, .wl-theme .btn-secondary {
+  border-radius: var(--radius-btn);
+  font-family: var(--font-body);
+  font-weight: 600;
+  padding: 12px 24px;
+}
+.wl-theme .btn-primary {
+  background-color: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--accent-contrast);
+}
+.wl-theme .btn-primary:hover:not(:disabled) { background-color: var(--accent-hover); border-color: var(--accent-hover); }
+.wl-theme .btn-primary .text-white { color: inherit; }
+.wl-theme .btn-secondary {
+  background: var(--bg-surface);
+  border: 1px solid var(--stroke);
+  color: var(--text-primary);
+}
+.wl-theme .btn-secondary:hover { background: var(--bg-surface-hover); border-color: var(--stroke-hover); }
+
+/* Inputs */
+.wl-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.wl-theme textarea, .wl-theme select {
+  background: var(--bg-input) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: var(--radius-btn);
+  color: var(--text-primary) !important;
+}
+.wl-theme textarea { border-radius: var(--radius-card); }
+.wl-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.wl-theme textarea:focus, .wl-theme select:focus {
+  background: var(--bg-input-focus) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+.wl-theme input::placeholder, .wl-theme textarea::placeholder { color: var(--text-muted) !important; }
+.wl-theme input[type="time"], .wl-theme input[type="date"], .wl-theme input[type="datetime-local"] { color-scheme: var(--color-scheme, dark) !important; }
+
+/* Brand-red utilities used across the app follow the accent. */
+.wl-theme .text-\[\#ff393a\] { color: var(--accent); }
+.wl-theme .bg-\[\#ff393a\] { background-color: var(--accent); color: var(--accent-contrast); }
+.wl-theme .bg-\[\#ff393a\] .text-white, .wl-theme .bg-\[\#ff393a\].text-white { color: var(--accent-contrast); }
+.wl-theme .bg-theme-accent, .wl-theme .bg-theme-accent .text-white { color: var(--accent-contrast); }
+.wl-theme .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--accent); }
+
+/* Status hues come from the AA set for the current mode. */
+.wl-theme .text-green-400, .wl-theme .text-green-300, .wl-theme .text-emerald-400, .wl-theme .text-\[\#39d98a\] { color: var(--success); }
+.wl-theme .text-amber-400, .wl-theme .text-yellow-400, .wl-theme .text-yellow-300, .wl-theme .text-orange-400 { color: var(--warning); }
+.wl-theme .text-red-400, .wl-theme .text-red-300 { color: var(--error); }
+.wl-theme .text-gray-400, .wl-theme .text-gray-500, .wl-theme .text-neutral-400, .wl-theme .text-slate-400 { color: var(--text-muted); }
+
+/* Google Places dropdown (appended to <body>, outside the themed subtree). */
+.wl-theme .pac-container {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: var(--radius-btn);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+.wl-theme .pac-item { background-color: var(--bg-card) !important; border-color: var(--stroke) !important; color: var(--text-primary) !important; }
+.wl-theme .pac-item:hover { background-color: var(--bg-card-hover) !important; }
+.wl-theme .pac-item-query { color: var(--text-primary) !important; }
+
+/* Modals */
+.wl-theme .fixed.inset-0 .card, .wl-theme .fixed.inset-0 .bg-theme-header {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: var(--radius-card);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Light mode: the app is written for dark (white utilities); remap them to the token ink. */
+.wl-theme.wl-light .text-white, .wl-theme.wl-light .text-white\/90 { color: var(--text-primary); }
+.wl-theme.wl-light .text-white\/80, .wl-theme.wl-light .text-white\/70 { color: var(--text-secondary); }
+.wl-theme.wl-light .text-white\/60, .wl-theme.wl-light .text-white\/50,
+.wl-theme.wl-light .text-white\/40, .wl-theme.wl-light .text-white\/30 { color: var(--text-muted); }
+.wl-theme.wl-light .text-white\/20 { color: var(--text-faint); }
+.wl-theme.wl-light .hover\:text-white:hover { color: var(--text-primary); }
+.wl-theme.wl-light .hover\:text-white\/60:hover { color: var(--text-secondary); }
+.wl-theme.wl-light .border-white\/10, .wl-theme.wl-light .border-white\/20 { border-color: var(--stroke); }
+.wl-theme.wl-light .bg-white\/5, .wl-theme.wl-light .bg-white\/6, .wl-theme.wl-light .bg-white\/10 { background: var(--bg-surface); }
+.wl-theme.wl-light .bg-white\/20 { background: var(--bg-surface-hover); }
+.wl-theme.wl-light .hover\:bg-white\/5:hover, .wl-theme.wl-light .hover\:bg-white\/10:hover,
+.wl-theme.wl-light .hover\:bg-white\/20:hover { background: var(--bg-surface-hover); }
+.wl-theme.wl-light .btn-primary .text-white, .wl-theme.wl-light .bg-\[\#ff393a\] .text-white,
+.wl-theme.wl-light .bg-theme-accent .text-white { color: var(--accent-contrast); }
+.wl-theme.wl-light footer img { filter: brightness(0) opacity(0.7); }
+
+/* Mobile: keep logo, language switcher and login on one line; timer tiles share the row. */
+@media (max-width: 480px) {
+  .wl-theme .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .wl-theme .site-header > div > a img { height: 1.5rem; }
+  .wl-theme .site-header > div > div { gap: 0.25rem; }
+  .wl-theme .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .wl-theme .site-header button svg.lucide-chevron-down { display: none; }
+  .wl-theme [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .wl-theme [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+}

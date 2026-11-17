@@ -21,6 +21,8 @@ export interface RuntimeBrandConfig {
   supportEmail?: string | null;
   themeClass?: string | null;
   tokens?: Record<string, unknown> | null;
+  /** Derived CSS variables (backend deriveThemeVars). Re-validated here before they reach the page. */
+  themeVars?: Record<string, unknown> | null;
   flyer?: { templateKey?: string | null; art?: Record<string, unknown> | null } | null;
 }
 
@@ -37,18 +39,42 @@ export function jsonForScript(value: unknown): string {
     .replace(/\u2029/g, '\\u2029');
 }
 
+const VAR_NAME = /^--[a-z][a-z-]{0,40}$/;
+/** Hex / rgba / lengths / the two scheme words / quoted font stacks. No `;{}<>/:@\` or newlines, no url(). */
+const VAR_VALUE = /^(?![^]*url\()[A-Za-z0-9 #,.'"()%_-]{1,200}$/i;
+
+/**
+ * Defence in depth for the applier: only well-formed `--name: value` pairs survive (at most 40).
+ * The backend already derives these from validated tokens; this keeps a poisoned snapshot or
+ * response from reaching the page. Returns undefined when nothing is left.
+ */
+export function cleanThemeVars(v: unknown): Record<string, string> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>).slice(0, 40)) {
+    if (VAR_NAME.test(k) && typeof val === 'string' && VAR_VALUE.test(val)) out[k] = val;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /**
  * The body of /brand-config.js. Part 1 hands the data to the app (`window.__BRAND__`, read by
  * src/config/brand.ts at module eval). Part 2 is a tiny synchronous applier that only reads the
  * (already JSON-parsed) data: no config string is ever concatenated into code. Title and favicon
  * wait for DOMContentLoaded because this script runs before <head> has been parsed.
  */
-export function renderBrandScript(cfg: RuntimeBrandConfig): string {
+export function renderBrandScript(input: RuntimeBrandConfig): string {
+  const cfg: RuntimeBrandConfig = { ...input };
+  const vars = cleanThemeVars(input.themeVars);
+  if (vars) cfg.themeVars = vars;
+  else delete cfg.themeVars;
   return `window.__BRAND__=${jsonForScript(cfg)};
 (function(){
 try{
 var b=window.__BRAND__,d=document,r=d.documentElement;
 if(b.themeClass){r.classList.add(b.themeClass);}
+if(b.themeVars){var n=0;for(var k in b.themeVars){n++;r.style.setProperty(k,b.themeVars[k]);}
+if(n){r.classList.add('wl-theme');if(b.tokens&&b.tokens.mode==='light'){r.classList.add('wl-light');}}}
 d.addEventListener('DOMContentLoaded',function(){
 try{
 if(b.name){d.title=b.name+(b.tagline?' - '+b.tagline:'');}

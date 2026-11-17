@@ -67,6 +67,16 @@ export const BRAND: typeof brandDefaults = __BRAND_RUNTIME__
   ? applyBrandOverlay(brandDefaults, (window as unknown as { __BRAND__?: RuntimeBrand }).__BRAND__)
   : brandDefaults;
 
+// Theme tokens (PR 8): turn on the generic .wl-theme layer when the runtime config carries a valid
+// token set. Dynamic import on purpose: with VITE_BRAND_RUNTIME unset the whole branch (and the theme
+// module with its font table) is compiled out, so non-runtime builds keep byte-identical JS. The
+// blocking /brand-config.js has already set the class and variables, so nothing waits on this.
+if (__BRAND_RUNTIME__) {
+  void import('./themeRuntime').then((m) =>
+    m.applyThemeTokens((window as unknown as { __BRAND__?: { tokens?: unknown } }).__BRAND__),
+  );
+}
+
 /** Build an absolute brand URL: brandUrl('my-party') -> https://rsv.pizza/my-party */
 export function brandUrl(path = ''): string {
   return `${BRAND.url}/${String(path).replace(/^\/+/, '')}`;
