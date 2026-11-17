@@ -54,6 +54,7 @@ model User {
   hackathonJudgeRoles              HackathonJudge[]         @relation("HackathonJudgeUser")
   hackathonAwardsReceived          HackathonAward[]         @relation("HackathonAwardRecipient")
   hackathonVotes                   HackathonVote[]          @relation("HackathonVoteVoter")
+  seriesAdmins                     SeriesAdmin[]
 }
 
 model Party {
@@ -460,7 +461,8 @@ model SeriesAdmin {
   series          EventSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   email           String // lowercased invited address
   userId          String?     @map("user_id")
-  role            String      @default("editor") // 'owner' | 'editor' (CHECK)
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  role           String      @default("editor") // 'owner' | 'editor' (CHECK)
   status          String      @default("invited") // 'invited' | 'active' | 'revoked' (CHECK)
   alertsEnabled   Boolean     @default(true) @map("alerts_enabled")
   inviteTokenHash String?     @map("invite_token_hash")

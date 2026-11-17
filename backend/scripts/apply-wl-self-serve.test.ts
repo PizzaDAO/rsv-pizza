@@ -79,6 +79,22 @@ describe('apply-wl-self-serve.cjs', () => {
     expect(sets.every((w) => w === 'LOCAL')).toBe(true);
   });
 
+  it('rollback refuses while a new event_series column holds data, unless --force', async () => {
+    expect(RUNNER_SRC).toMatch(/const held = await columnsHoldingData\(prisma\);\s*if \(held\.length && !FORCE\)/);
+    const queries: string[] = [];
+    const db = {
+      $queryRawUnsafe: async (sql: string) => {
+        queries.push(sql);
+        if (/information_schema/.test(sql)) return [{ column_name: 'tagline' }, { column_name: 'config_version' }, { column_name: 'site_aliases' }];
+        return [{ n: /tagline/.test(sql) ? 2 : 0 }];
+      },
+    };
+    expect(await runner.columnsHoldingData(db)).toEqual(['tagline=2']);
+    // defaulted NOT NULL columns count only when they differ from the default
+    expect(queries.join('\n')).toMatch(/"config_version" <> 1/);
+    expect(queries.join('\n')).toMatch(/cardinality\("site_aliases"\) > 0/);
+  });
+
   it('only writes behind --apply / --rollback', () => {
     // every $executeRawUnsafe sits after the dry-run early return
     const dryReturn = RUNNER_SRC.indexOf("console.log('\\nDRY RUN: nothing changed.');");

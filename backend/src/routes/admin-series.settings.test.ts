@@ -92,12 +92,21 @@ describe('PATCH /api/admin/series/:id sender + audit', () => {
     ['http alias', { siteAliases: ['http://old.example.com'] }],
     ['alias with a path', { siteAliases: ['https://old.example.com/x'] }],
     ['alias equal to site url', { siteAliases: ['https://acme.example.org'] }],
+    ['apex sending domain', { emailDomain: 'partner.com' }],
+    ['apex alias', { siteAliases: ['https://partner.com'] }],
+    ['apex site url (changed)', { siteUrl: 'https://partner.com' }],
     ['alias not an array', { siteAliases: 'https://old.example.com' }],
   ])('400s %s', async (_n, body) => {
     const res = await patch(body);
     expect(res.status).toBe(400);
     expect(m.prisma.eventSeries.update).not.toHaveBeenCalled();
     expect(m.prisma.seriesAudit.create).not.toHaveBeenCalled();
+  });
+
+  it('an unchanged apex siteUrl never blocks editing other fields; a subdomain siteUrl is fine', async () => {
+    m.prisma.eventSeries.findUnique.mockResolvedValue({ ...BEFORE, siteUrl: 'https://legacy.org' });
+    expect((await patch({ siteUrl: 'https://legacy.org', brandName: 'x' })).status).toBe(200);
+    expect((await patch({ siteUrl: 'https://events.legacy.org' })).status).toBe(200);
   });
 
   it('allows an https alias origin and de-duplicates', async () => {

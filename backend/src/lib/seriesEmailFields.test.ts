@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  emailOrNull, hostnameOrNull, senderNameOrNull, addressUnderDomain, assertSenderConsistent, siteAliasesOrNull,
+  isApexHost, assertSubdomainHost, emailOrNull, hostnameOrNull, senderNameOrNull, addressUnderDomain, assertSenderConsistent, siteAliasesOrNull,
 } from './seriesEmailFields.js';
 
 const origin = (v: unknown) => {
@@ -28,7 +28,11 @@ describe('seriesEmailFields', () => {
   });
 
   it('senderNameOrNull strips header-breaking characters', () => {
-    expect(senderNameOrNull('Acme "Events" <x>\r\nBcc: a@b.co')).toBe('Acme Events xBcc: a@b.co');
+    expect(senderNameOrNull('Acme "Events" <x>\r\nBcc: a@b.co')).toBe('Acme Events xBcc ab.co');
+    // RFC 5322 specials are stripped (never quoted): no extra recipients, no lookalike address
+    expect(senderNameOrNull('Acme, Inc')).toBe('Acme Inc');
+    expect(senderNameOrNull('support@paypal.com')).toBe('supportpaypal.com');
+    expect(senderNameOrNull('A; B: (C) [D] \\E')).toBe('A B C D E');
     expect(senderNameOrNull('"<>')).toBeNull();
     expect(() => senderNameOrNull('a'.repeat(101))).toThrow();
   });
@@ -55,5 +59,22 @@ describe('seriesEmailFields', () => {
     expect(() => siteAliasesOrNull('x', origin, null)).toThrow();
     const many = Array.from({ length: 11 }, (_, i) => `https://a${i}.com`);
     expect(() => siteAliasesOrNull(many, origin, null)).toThrow();
+  });
+
+  it('isApexHost / assertSubdomainHost: subdomains only', () => {
+    for (const h of ['partner.com', 'partner.co.uk', 'a.io', 'partner.com.au']) expect(isApexHost(h), h).toBe(true);
+    for (const h of ['events.partner.com', 'mail.partner.co.uk', 'a.b.partner.com', 'team1.rsv.pizza']) expect(isApexHost(h), h).toBe(false);
+    expect(() => assertSubdomainHost('partner.com', 'emailDomain')).toThrow(/subdomain/);
+    expect(() => assertSubdomainHost('mail.partner.com', 'emailDomain')).not.toThrow();
+  });
+
+  it('hostnameOrNull subdomainOnly rejects an apex', () => {
+    expect(() => hostnameOrNull('partner.com', 'emailDomain', { subdomainOnly: true })).toThrow(/subdomain/);
+    expect(hostnameOrNull('mail.partner.com', 'emailDomain', { subdomainOnly: true })).toBe('mail.partner.com');
+    expect(hostnameOrNull('partner.com', 'x')).toBe('partner.com'); // opt-in only
+  });
+
+  it('assertSenderConsistent rejects an apex from-address domain', () => {
+    expect(() => assertSenderConsistent('a@partner.com', 'partner.com')).toThrow(/subdomain/);
   });
 });

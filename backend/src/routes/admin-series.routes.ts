@@ -27,7 +27,7 @@ import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
 import {
-  emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent,
+  emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent, assertSubdomainHost,
 } from '../lib/seriesEmailFields.js';
 import { writeSeriesAudit, diffSeries, snapshotOf } from '../lib/seriesAudit.js';
 
@@ -60,9 +60,15 @@ function siteUrlOrNull(v: unknown): string | null {
   }
   return u.origin;
 }
-/** Alias origin: same https-origin rule as siteUrl, but case-insensitive (hosts are lowercased). */
+/** Alias origin: same https-origin rule as siteUrl, but case-insensitive, and subdomains only. */
 function aliasOrigin(v: unknown): string | null {
-  return siteUrlOrNull(typeof v === 'string' ? v.toLowerCase() : v);
+  const o = siteUrlOrNull(typeof v === 'string' ? v.toLowerCase() : v);
+  if (o) assertSubdomainHost(new URL(o).hostname, 'siteAliases');
+  return o;
+}
+/** siteUrl for a partner site must be a subdomain. Unchanged values are exempt so editing other fields never breaks. */
+function checkSiteUrlSubdomain(next: string | null, current: string | null): void {
+  if (next && next !== current) assertSubdomainHost(new URL(next).hostname, 'siteUrl');
 }
 /** create_flow: one of the preset keys, or null (generic flow). Anything else is a 400. */
 function createFlowOrNull(v: unknown): string | null {
@@ -111,8 +117,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     if (!name) throw new AppError('name is required', 400, 'VALIDATION_ERROR');
 
     const siteUrl = siteUrlOrNull(b.siteUrl);
+    checkSiteUrlSubdomain(siteUrl, null);
     const emailFromAddress = emailOrNull(b.emailFromAddress, 'emailFromAddress');
-    const emailDomain = hostnameOrNull(b.emailDomain, 'emailDomain');
+    const emailDomain = hostnameOrNull(b.emailDomain, 'emailDomain', { subdomainOnly: true });
     assertSenderConsistent(emailFromAddress, emailDomain);
     const siteAliases = b.siteAliases === undefined ? [] : siteAliasesOrNull(b.siteAliases, aliasOrigin, siteUrl);
 
@@ -182,7 +189,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.flyerTemplateKey !== undefined) data.flyerTemplateKey = str(b.flyerTemplateKey) ?? null;
     const before = await prisma.eventSeries.findUnique({ where: { id: req.params.id } });
     if (!before) throw new AppError('Series not found', 404, 'NOT_FOUND');
-    if (b.siteUrl !== undefined) data.siteUrl = siteUrlOrNull(b.siteUrl);
+    if (b.siteUrl !== undefined) {
+      data.siteUrl = siteUrlOrNull(b.siteUrl);
+      checkSiteUrlSubdomain(data.siteUrl as string | null, before.siteUrl);
+    }
     if (b.brandName !== undefined) data.brandName = str(b.brandName) ?? null;
     if (b.createFlow !== undefined) data.createFlow = createFlowOrNull(b.createFlow);
     if (b.nameTemplate !== undefined) data.nameTemplate = str(b.nameTemplate) ?? null;
@@ -205,7 +215,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.emailFromName !== undefined) data.emailFromName = senderNameOrNull(b.emailFromName);
     if (b.emailReplyTo !== undefined) data.emailReplyTo = emailOrNull(b.emailReplyTo, 'emailReplyTo');
     if (b.emailFromAddress !== undefined) data.emailFromAddress = emailOrNull(b.emailFromAddress, 'emailFromAddress');
-    if (b.emailDomain !== undefined) data.emailDomain = hostnameOrNull(b.emailDomain, 'emailDomain');
+    if (b.emailDomain !== undefined) data.emailDomain = hostnameOrNull(b.emailDomain, 'emailDomain', { subdomainOnly: true });
     const senderChanged =
       (data.emailFromAddress !== undefined && data.emailFromAddress !== before.emailFromAddress) ||
       (data.emailDomain !== undefined && data.emailDomain !== before.emailDomain);

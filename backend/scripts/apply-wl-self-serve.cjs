@@ -18,7 +18,7 @@
  *                verify() inside (throws -> rollback), re-verify after commit.
  *   --rollback   DROP both new tables and the new event_series columns (one transaction). Only after
  *                the backend code that uses them has been reverted. Refuses while either table has
- *                rows unless --force (the event_series columns are dropped with their data).
+ *                rows, or while any new event_series column holds data, unless --force.
  *
  *   cd backend && node --env-file=.env scripts/apply-wl-self-serve.cjs [--apply|--rollback [--force]]
  *
@@ -203,6 +203,25 @@ function print(s) {
   }
 }
 
+/**
+ * Names of the new event_series columns that hold data: any non-null value, except the two NOT NULL
+ * defaulted columns, which count only when they differ from their default (config_version <> 1,
+ * site_aliases <> '{}'). Existing columns only; counts, never values.
+ */
+async function columnsHoldingData(db) {
+  const present = (await db.$queryRawUnsafe(
+    `SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'event_series' AND column_name = ANY($1::text[])`,
+    Object.keys(SERIES_COLUMNS))).map((r) => r.column_name);
+  const held = [];
+  for (const c of present) {
+    const cond = c === 'config_version' ? `"${c}" <> 1` : c === 'site_aliases' ? `cardinality("${c}") > 0` : `"${c}" IS NOT NULL`;
+    const [{ n }] = await db.$queryRawUnsafe(`SELECT count(*)::int AS n FROM event_series WHERE ${cond}`);
+    if (n > 0) held.push(`${c}=${n}`);
+  }
+  return held;
+}
+
 function target() {
   try {
     const u = new URL(process.env.DATABASE_URL);
@@ -256,6 +275,10 @@ async function main() {
     if (busy.length && !FORCE) {
       throw new Error(`rows exist (${busy.join(', ')}). Revert the backend code first, or pass --force.`);
     }
+    const held = await columnsHoldingData(prisma);
+    if (held.length && !FORCE) {
+      throw new Error(`event_series columns hold data (${held.join(', ')}). Dropping them loses it; pass --force to proceed.`);
+    }
     await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '5s'`);
       await tx.$executeRawUnsafe(`DROP TABLE IF EXISTS "series_admins"`);
@@ -280,4 +303,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { MODE, MIGRATION, SERIES_COLUMNS, TABLES, splitStatements, problems };
+module.exports = { MODE, MIGRATION, SERIES_COLUMNS, TABLES, splitStatements, problems, columnsHoldingData };
