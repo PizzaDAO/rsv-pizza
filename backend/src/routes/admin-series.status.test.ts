@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 
 const m = vi.hoisted(() => ({
-  prisma: { party: { findUnique: vi.fn(), update: vi.fn() }, $transaction: vi.fn() },
+  prisma: { party: { findFirst: vi.fn(), update: vi.fn() }, seriesAudit: { create: vi.fn() }, $transaction: vi.fn() },
   notify: vi.fn(),
 }));
 vi.mock('../config/database.js', () => ({ prisma: m.prisma }));
@@ -24,20 +24,21 @@ app.use('/api/admin/series', router);
 app.use(errorHandler);
 
 const SID = '11111111-1111-4111-8111-111111111111';
-const patch = (status: string) => request(app).patch(`/api/admin/series/${SID}/events/p1/status`).send({ status });
+const PID = '33333333-3333-4333-8333-333333333333';
+const patch = (status: string) => request(app).patch(`/api/admin/series/${SID}/events/${PID}/status`).send({ status });
 
 beforeEach(() => {
   vi.clearAllMocks();
   m.prisma.$transaction.mockImplementation(async (fn: any) => fn(m.prisma));
-  m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: SID, underbossStatus: 'pending' });
-  m.prisma.party.update.mockResolvedValue({ id: 'p1', underbossStatus: 'approved' });
+  m.prisma.party.findFirst.mockResolvedValue({ eventSeriesId: SID, underbossStatus: 'pending' });
+  m.prisma.party.update.mockResolvedValue({ id: PID, underbossStatus: 'approved' });
 });
 
 describe('PATCH /api/admin/series/:id/events/:partyId/status host email', () => {
   it.each(['approved', 'rejected'])('emails the host on a real change to %s', async (status) => {
     const res = await patch(status);
     expect(res.status).toBe(200);
-    expect(m.notify).toHaveBeenCalledWith('p1', status);
+    expect(m.notify).toHaveBeenCalledWith(PID, status);
   });
 
   it('does not email on hidden', async () => {
@@ -46,13 +47,13 @@ describe('PATCH /api/admin/series/:id/events/:partyId/status host email', () => 
   });
 
   it('does not email when the status is unchanged', async () => {
-    m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: SID, underbossStatus: 'approved' });
+    m.prisma.party.findFirst.mockResolvedValue({ eventSeriesId: SID, underbossStatus: 'approved' });
     expect((await patch('approved')).status).toBe(200);
     expect(m.notify).not.toHaveBeenCalled();
   });
 
   it('does not email when the party is not in the series', async () => {
-    m.prisma.party.findUnique.mockResolvedValue({ eventSeriesId: 'other', underbossStatus: 'pending' });
+    m.prisma.party.findFirst.mockResolvedValue(null); // scoped lookup {id, eventSeriesId}: another series' party is not found
     expect((await patch('approved')).status).toBe(404);
     expect(m.notify).not.toHaveBeenCalled();
   });

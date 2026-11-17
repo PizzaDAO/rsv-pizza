@@ -236,7 +236,8 @@ export function AdminSeriesPage() {
 
   const handleDeleteItem = async (id: string) => {
     try {
-      await deleteSeriesChecklistDefault(id);
+      if (!selectedId) return;
+      await deleteSeriesChecklistDefault(selectedId, id);
       setChecklist((c) => c.filter((i) => i.id !== id));
     } catch (e: any) {
       setSaveMsg(e?.message || 'Failed to delete item');

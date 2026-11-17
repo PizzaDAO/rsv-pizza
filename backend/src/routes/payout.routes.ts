@@ -13,6 +13,7 @@
  * Admin execution + approval/rejection endpoints land in PR 4 / PR 5.
  */
 
+import { isBrandOnlyApproved } from '../lib/partyApproval.js';
 import { Router, Response, NextFunction } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -453,14 +454,23 @@ async function isAnyAdmin(email?: string): Promise<boolean> {
  * exist — we don't leak the existence distinction since the action is gated
  * regardless).
  */
-async function assertPartyApproved(partyId: string): Promise<void> {
+export async function assertPartyApproved(partyId: string): Promise<void> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
-    select: { underbossStatus: true },
+    select: { underbossStatus: true, eventSeriesId: true },
   });
   if (!party || party.underbossStatus !== 'approved') {
     throw new AppError(
       'This event must be approved before submitting payments.',
+      403,
+      'PARTY_NOT_APPROVED',
+    );
+  }
+  // Brand-series events: an approval that came only from a brand admin doesn't open the money gate;
+  // PizzaDAO must approve too (lib/partyApproval.ts).
+  if (party.eventSeriesId && (await isBrandOnlyApproved(partyId))) {
+    throw new AppError(
+      'PizzaDAO must approve this event before payments can be submitted.',
       403,
       'PARTY_NOT_APPROVED',
     );

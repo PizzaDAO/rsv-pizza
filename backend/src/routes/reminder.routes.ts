@@ -27,6 +27,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { escapeHtml } from '../lib/escapeHtml.js';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { brand } from '../config/brand.js';
@@ -161,9 +162,17 @@ export function buildReminderHtml(params: {
   /** Origin that serves the banner image (the party's own site). Default: www.rsv.pizza. */ // brand-check-ignore-line
   siteUrl?: string;
 }): string {
-  const { guestName, whenText, addressText, partyName, eventUrl, unsubUrl, venueName, address, imageUrl } =
-    params;
-  const siteName = params.siteName ?? 'RSV.Pizza'; // brand-check-ignore-line
+  // Everything interpolated into the HTML is escaped: party/guest/venue text is user-controlled.
+  const guestName = escapeHtml(params.guestName);
+  const whenText = escapeHtml(params.whenText);
+  const addressText = escapeHtml(params.addressText);
+  const partyName = escapeHtml(params.partyName);
+  const eventUrl = escapeHtml(params.eventUrl);
+  const unsubUrl = escapeHtml(params.unsubUrl);
+  const venueName = params.venueName ? escapeHtml(params.venueName) : params.venueName;
+  const address = params.address ? escapeHtml(params.address) : params.address;
+  const imageUrl = params.imageUrl ? escapeHtml(params.imageUrl) : params.imageUrl;
+  const siteName = escapeHtml(params.siteName ?? 'RSV.Pizza'); // brand-check-ignore-line
   const bannerUrl = `${params.siteUrl ?? 'https://www.rsv.pizza'}/reminder-see-you-in-4-hours.png`; // brand-check-ignore-line
 
   const whereHtml = venueName && address
@@ -453,7 +462,7 @@ export function renderUnsubscribePage(
   <div class="card">
     <h1>${title}</h1>
     <p>${message}</p>
-    <p><a href="${site.url}">Back to ${site.name}</a></p>
+    <p><a href="${escapeHtml(site.url)}">Back to ${escapeHtml(site.name)}</a></p>
   </div>
 </body>
 </html>`;

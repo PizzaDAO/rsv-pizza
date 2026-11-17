@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { notBrandOnlyApproved } from '../lib/partyApproval.js';
 import { detectTrackingUrl } from '../utils/trackingUtils.js';
 
 // Valid kit statuses and tiers
@@ -131,6 +132,7 @@ router.get('/stats', requireAuth, requireShippingAuth, async (req: ShippingReque
         ...partyRegionFilter,
         region: { not: null },
         underbossStatus: 'approved',
+        ...notBrandOnlyApproved, // kits cost money: a brand-admin-only approval does not qualify
         partyKit: { is: null },
       },
     });
@@ -250,6 +252,7 @@ router.get('/kits/export', requireAuth, requireShippingAuth, async (req: Shippin
           ...explicitRegion,
           region: { not: null },
           underbossStatus: 'approved',
+          ...notBrandOnlyApproved, // kits cost money: a brand-admin-only approval does not qualify
           partyKit: { is: null },
         },
         select: {
@@ -617,6 +620,7 @@ router.get('/kits', requireAuth, requireShippingAuth, async (req: ShippingReques
           ...explicitRegion,
           region: { not: null },
           underbossStatus: 'approved',
+          ...notBrandOnlyApproved, // kits cost money: a brand-admin-only approval does not qualify
           partyKit: { is: null },
         },
         select: {

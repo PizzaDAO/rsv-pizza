@@ -22,6 +22,7 @@ import {
   type Reservation,
 } from './authRateLimit.js';
 import { sendBrandedEmail } from './resendSend.js';
+import { escapeHtml } from './escapeHtml.js';
 
 // Helper function to send magic link email (moved verbatim from auth.routes.ts)
 export async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string, site: SiteBrand) {
@@ -31,11 +32,11 @@ export async function sendMagicLinkEmail(email: string, magicLinkUrl: string, co
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sign In to ${site.name}</title>
+        <title>Sign In to ${escapeHtml(site.name)}</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to ${site.name}</h1>
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to ${escapeHtml(site.name)}</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
         </div>
 

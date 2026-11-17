@@ -28,10 +28,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { writeStatusAudit } from '../helpers/statusAudit.js';
+import { listSeriesEvents, setSeriesEventStatus } from '../lib/seriesEventStatus.js';
 import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
-import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
 import {
   emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent, assertSubdomainHost,
 } from '../lib/seriesEmailFields.js';
@@ -57,7 +56,7 @@ async function requireSuperAdmin(req: AuthRequest, _res: Response, next: NextFun
 router.use(requireSuperAdmin);
 
 // Path ids are uuids: anything else is a 404 before any query (also keeps probes cheap).
-for (const name of ['id', 'adminId']) {
+for (const name of ['id', 'adminId', 'defaultId', 'partyId']) {
   router.param(name, (_req, _res, next, value) => (UUID_RE.test(String(value)) ? next() : next(new AppError('Not found', 404, 'NOT_FOUND'))));
 }
 
@@ -286,6 +285,24 @@ router.get('/:id/checklist', async (req: AuthRequest, res: Response, next: NextF
   }
 });
 
+/** auto_rule: a short snake_case rule key (e.g. hackathon_prizes_paid), or null. */
+function autoRuleOrNull(v: unknown): string | null {
+  const s = str(v);
+  if (!s) return null;
+  if (!/^[a-z][a-z0-9_]{0,63}$/.test(s)) {
+    throw new AppError('autoRule must be a snake_case rule key (a-z, 0-9, _; max 64)', 400, 'VALIDATION_ERROR');
+  }
+  return s;
+}
+/** 'YYYY-MM-DD' -> Date at UTC midnight; null when absent; 400 when malformed. */
+function dayOrNull(v: unknown): Date | null {
+  if (!v) return null;
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new AppError('dueDate must be YYYY-MM-DD', 400, 'VALIDATION_ERROR');
+  const d = new Date(`${v}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) throw new AppError('dueDate must be a valid date', 400, 'VALIDATION_ERROR');
+  return d;
+}
+
 router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const seriesId = req.params.id;
@@ -296,22 +313,27 @@ router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: Next
     const name = str(b.name);
     if (!name) throw new AppError('name is required', 400, 'VALIDATION_ERROR');
     if (!isValidSeriesLinkTab(b.linkTab)) throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
+    const dueDate = dayOrNull(b.dueDate);
+    const autoRule = autoRuleOrNull(b.autoRule);
 
-    const max = await prisma.checklistDefault.aggregate({
-      where: { seriesId },
-      _max: { sortOrder: true },
-    });
-
-    const item = await prisma.checklistDefault.create({
-      data: {
-        seriesId,
-        name,
-        dueDate: b.dueDate ? new Date(`${b.dueDate as string}T00:00:00.000Z`) : null,
-        isAuto: bool(b.isAuto) ?? false,
-        autoRule: str(b.autoRule) ?? null,
-        linkTab: str(b.linkTab) ?? null,
-        sortOrder: typeof b.sortOrder === 'number' ? b.sortOrder : (max._max.sortOrder ?? -1) + 1,
-      },
+    const item = await prisma.$transaction(async (tx) => {
+      const max = await tx.checklistDefault.aggregate({ where: { seriesId }, _max: { sortOrder: true } });
+      const created = await tx.checklistDefault.create({
+        data: {
+          seriesId,
+          name,
+          dueDate,
+          isAuto: bool(b.isAuto) ?? false,
+          autoRule,
+          linkTab: str(b.linkTab) ?? null,
+          sortOrder: typeof b.sortOrder === 'number' ? b.sortOrder : (max._max.sortOrder ?? -1) + 1,
+        },
+      });
+      await writeSeriesAudit(tx, {
+        seriesId, actorEmail: req.userEmail || 'unknown', actorKind: 'super_admin', action: 'checklist.create',
+        changes: { checklistItem: { old: null, new: { id: created.id, name: created.name } } },
+      });
+      return created;
     });
     res.status(201).json({ item });
   } catch (error: any) {
@@ -322,8 +344,13 @@ router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: Next
   }
 });
 
-router.patch('/checklist/:defaultId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+/**
+ * Edit / delete a series checklist default. The item is always looked up by `{ id, seriesId }`, so an
+ * item of another series, or a global default (series_id null), is a 404 here.
+ */
+router.patch('/:id/checklist/:defaultId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const { id: seriesId, defaultId } = req.params;
     const b = (req.body || {}) as Record<string, unknown>;
     // Same allow-list as the GPP defaults route (+ the checklist modal sentinels).
     if (b.linkTab !== undefined && !isValidSeriesLinkTab(b.linkTab)) {
@@ -331,50 +358,57 @@ router.patch('/checklist/:defaultId', async (req: AuthRequest, res: Response, ne
     }
     const data: Prisma.ChecklistDefaultUpdateInput = {};
     if (b.name !== undefined) data.name = str(b.name);
-    if (b.dueDate !== undefined) data.dueDate = b.dueDate ? new Date(`${b.dueDate as string}T00:00:00.000Z`) : null;
+    if (b.dueDate !== undefined) data.dueDate = dayOrNull(b.dueDate);
     if (b.isAuto !== undefined) data.isAuto = bool(b.isAuto);
-    if (b.autoRule !== undefined) data.autoRule = str(b.autoRule) ?? null;
+    if (b.autoRule !== undefined) data.autoRule = autoRuleOrNull(b.autoRule);
     if (b.linkTab !== undefined) data.linkTab = str(b.linkTab) ?? null;
     if (b.sortOrder !== undefined && typeof b.sortOrder === 'number') data.sortOrder = b.sortOrder;
 
-    const before = await prisma.checklistDefault.findUnique({
-      where: { id: req.params.defaultId },
-      select: { name: true, seriesId: true },
-    });
-    const item = await prisma.checklistDefault.update({ where: { id: req.params.defaultId }, data });
-
-    // brand-checklists: like the GPP defaults PATCH, propagate due-date / link
-    // changes to the already-seeded default items of this series' parties.
     let propagated = 0;
-    if (before?.seriesId && (data.dueDate !== undefined || data.linkTab !== undefined)) {
-      const itemData: Prisma.ChecklistItemUpdateManyMutationInput = {};
-      if (data.dueDate !== undefined) itemData.dueDate = data.dueDate as Date | null;
-      if (data.linkTab !== undefined) itemData.linkTab = data.linkTab as string | null;
-      const result = await prisma.checklistItem.updateMany({
-        where: { isDefault: true, name: before.name, party: { eventSeriesId: before.seriesId } },
-        data: itemData,
+    const item = await prisma.$transaction(async (tx) => {
+      const before = await tx.checklistDefault.findFirst({ where: { id: defaultId, seriesId }, select: { id: true, name: true } });
+      if (!before) throw new AppError('Checklist default not found', 404, 'NOT_FOUND');
+      const r = await tx.checklistDefault.updateMany({ where: { id: defaultId, seriesId }, data: data as Prisma.ChecklistDefaultUpdateManyMutationInput });
+      if (r.count !== 1) throw new AppError('Checklist default not found', 404, 'NOT_FOUND');
+      const updated = await tx.checklistDefault.findFirst({ where: { id: defaultId, seriesId } });
+      await writeSeriesAudit(tx, {
+        seriesId, actorEmail: req.userEmail || 'unknown', actorKind: 'super_admin', action: 'checklist.update',
+        changes: { checklistItem: { old: { id: before.id, name: before.name }, new: { id: before.id, fields: Object.keys(data) } } },
       });
-      propagated = result.count;
-    }
+      // brand-checklists: like the GPP defaults PATCH, propagate due-date / link changes to the
+      // already-seeded default items of this series' parties.
+      if (data.dueDate !== undefined || data.linkTab !== undefined) {
+        const itemData: Prisma.ChecklistItemUpdateManyMutationInput = {};
+        if (data.dueDate !== undefined) itemData.dueDate = data.dueDate as Date | null;
+        if (data.linkTab !== undefined) itemData.linkTab = data.linkTab as string | null;
+        const result = await tx.checklistItem.updateMany({
+          where: { isDefault: true, name: before.name, party: { eventSeriesId: seriesId } },
+          data: itemData,
+        });
+        propagated = result.count;
+      }
+      return updated;
+    });
     res.json({ item, propagated });
   } catch (error: any) {
-    if (error?.code === 'P2025') return next(new AppError('Checklist default not found', 404, 'NOT_FOUND'));
+    if (error?.code === 'P2002') return next(new AppError('That checklist item name already exists for this series', 400, 'DUPLICATE'));
     next(error);
   }
 });
 
-router.delete('/checklist/:defaultId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:id/checklist/:defaultId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Only series-scoped defaults are deletable here (never the global template).
-    const existing = await prisma.checklistDefault.findUnique({
-      where: { id: req.params.defaultId },
-      select: { seriesId: true },
+    const { id: seriesId, defaultId } = req.params;
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.checklistDefault.findFirst({ where: { id: defaultId, seriesId }, select: { id: true, name: true } });
+      if (!before) throw new AppError('Checklist default not found', 404, 'NOT_FOUND');
+      const r = await tx.checklistDefault.deleteMany({ where: { id: defaultId, seriesId } });
+      if (r.count !== 1) throw new AppError('Checklist default not found', 404, 'NOT_FOUND');
+      await writeSeriesAudit(tx, {
+        seriesId, actorEmail: req.userEmail || 'unknown', actorKind: 'super_admin', action: 'checklist.delete',
+        changes: { checklistItem: { old: { id: before.id, name: before.name }, new: null } },
+      });
     });
-    if (!existing) throw new AppError('Checklist default not found', 404, 'NOT_FOUND');
-    if (!existing.seriesId) {
-      throw new AppError('Refusing to delete a global default here (use the global editor)', 400, 'VALIDATION_ERROR');
-    }
-    await prisma.checklistDefault.delete({ where: { id: req.params.defaultId } });
     res.json({ success: true });
   } catch (error) {
     next(error);
@@ -391,17 +425,7 @@ router.get('/:id/events', async (req: AuthRequest, res: Response, next: NextFunc
     if (!APPROVAL_STATUSES.includes(status)) {
       throw new AppError(`status must be one of: ${APPROVAL_STATUSES.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
-    const events = await prisma.party.findMany({
-      where: { eventSeriesId: req.params.id, underbossStatus: status, cancelledAt: null },
-      orderBy: [{ createdAt: 'desc' }],
-      select: {
-        id: true, name: true, customUrl: true, inviteCode: true, city: true, country: true,
-        date: true, venueName: true, address: true, underbossStatus: true, createdAt: true,
-        user: { select: { email: true, name: true } },
-      },
-      take: 500,
-    });
-    res.json({ events });
+    res.json({ events: await listSeriesEvents(req.params.id, status) });
   } catch (error) {
     next(error);
   }
@@ -409,34 +433,14 @@ router.get('/:id/events', async (req: AuthRequest, res: Response, next: NextFunc
 
 router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id, partyId } = req.params;
-    const status = (req.body || {}).status;
-    if (!['approved', 'rejected', 'hidden'].includes(status)) {
-      throw new AppError('status must be one of: approved, rejected, hidden', 400, 'VALIDATION_ERROR');
-    }
-    const email = req.userEmail || 'unknown';
-    let priorStatus: string | null = null;
-    const party = await prisma.$transaction(async (tx) => {
-      const before = await tx.party.findUnique({
-        where: { id: partyId },
-        select: { eventSeriesId: true, underbossStatus: true },
-      });
-      if (!before || before.eventSeriesId !== id) {
-        throw new AppError('Party not found in this series', 404, 'NOT_FOUND');
-      }
-      priorStatus = before.underbossStatus;
-      const updated = await tx.party.update({
-        where: { id: partyId },
-        data: { underbossStatus: status },
-        select: { id: true, underbossStatus: true },
-      });
-      await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, 'admin');
-      return updated;
+    // Super-admins keep a veto: no "already decided" lock, they can overrule a brand admin's decision.
+    const party = await setSeriesEventStatus({
+      seriesId: req.params.id,
+      partyId: req.params.partyId,
+      status: (req.body || {}).status,
+      actorEmail: req.userEmail || 'unknown',
+      actorKind: 'super_admin',
     });
-    // Same as underboss.routes.ts: tell the host of approve/reject (fire-and-forget, only on a real change).
-    if ((status === 'approved' || status === 'rejected') && priorStatus !== status) {
-      void emailHostOfStatusChange(partyId, status);
-    }
     res.json({ party });
   } catch (error) {
     next(error);
