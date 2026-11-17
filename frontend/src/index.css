@@ -1682,7 +1682,7 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
  *
  * `.wl-theme` (dark) and `.wl-theme.wl-light` are put on <html> by /brand-config.js and
  * config/themeRuntime.ts ONLY when a brand's validated theme tokens are present. Every selector
- * below starts with `.wl-theme`, so with the class absent (rsv.pizza, every current brand build)
+ * below starts with `.wl-theme`, so with the class absent (the default site and every current brand build)
  * nothing here matches and no computed style changes. It reads only CSS variables set from the
  * tokens (config/themeTokens.ts deriveThemeVars): --bg-*, --text-*, --stroke*, --accent*,
  * --accent-contrast, --accent-tint, --radius-btn, --radius-card, --font-heading, --font-body,

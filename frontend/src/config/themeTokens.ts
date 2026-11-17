@@ -133,26 +133,45 @@ export interface ContrastFailure {
   pair: string;
   ratio: number;
   min: number;
+  /** Text pairs block a save; the accent-vs-page UI check only warns (plan 2.3). */
+  blocking: boolean;
 }
 
+/** The derived secondary text colour (also what deriveThemeVars emits). */
+export function secondaryText(t: Pick<ThemeTokens, 'text' | 'textMuted'>): string {
+  return mix(t.text, t.textMuted, 0.5);
+}
+
+/** Relative luminance of a #rrggbb colour (0 to 1). */
+export function colorLuminance(hex: string): number {
+  return luminance(hex);
+}
+
+/** `mode` must agree with the page colour: dark needs a dark bg, light a light one. */
+export const MODE_LUMINANCE_THRESHOLD = 0.18;
+
 /**
- * WCAG AA checks for a (valid) token set. Text pairs need 4.5:1; the accent as a UI colour against
- * the page needs 3:1 (WCAG 1.4.11). Ratios are rounded down to 2 decimals so a borderline 4.497
- * can never read as 4.5.
+ * WCAG AA checks for a (valid) token set. Text pairs (text, textMuted, the derived secondary text,
+ * onAccent) need 4.5:1 and block. The accent as a UI colour against the page needs 3:1 (WCAG
+ * 1.4.11) and only warns. Ratios are rounded down to 2 decimals so a borderline 4.497 never reads
+ * as 4.5.
  */
 export function checkThemeContrast(t: Pick<ThemeTokens, ColorKey>): ContrastFailure[] {
-  const checks: Array<[string, string, string, number]> = [
-    ['text on bg', t.text, t.bg, 4.5],
-    ['text on surface', t.text, t.surface, 4.5],
-    ['textMuted on bg', t.textMuted, t.bg, 4.5],
-    ['textMuted on surface', t.textMuted, t.surface, 4.5],
-    ['onAccent on accent', t.onAccent, t.accent, 4.5],
-    ['accent on bg', t.accent, t.bg, 3],
+  const second = secondaryText(t);
+  const checks: Array<[string, string, string, number, boolean]> = [
+    ['text on bg', t.text, t.bg, 4.5, true],
+    ['text on surface', t.text, t.surface, 4.5, true],
+    ['textMuted on bg', t.textMuted, t.bg, 4.5, true],
+    ['textMuted on surface', t.textMuted, t.surface, 4.5, true],
+    ['secondary text (derived) on bg', second, t.bg, 4.5, true],
+    ['secondary text (derived) on surface', second, t.surface, 4.5, true],
+    ['onAccent on accent', t.onAccent, t.accent, 4.5, true],
+    ['accent on bg', t.accent, t.bg, 3, false],
   ];
   const out: ContrastFailure[] = [];
-  for (const [pair, fg, bgc, min] of checks) {
+  for (const [pair, fg, bgc, min, blocking] of checks) {
     const ratio = Math.floor(contrastRatio(fg, bgc) * 100) / 100;
-    if (ratio < min) out.push({ pair, ratio, min });
+    if (ratio < min) out.push({ pair, ratio, min, blocking });
   }
   return out;
 }
@@ -170,7 +189,7 @@ function overrideValueOk(v: string): boolean {
 }
 
 export type ThemeTokensResult =
-  | { ok: true; tokens: ThemeTokens }
+  | { ok: true; tokens: ThemeTokens; warnings: string[] }
   | { ok: false; errors: string[] };
 
 export interface ParseOptions {
@@ -245,14 +264,20 @@ export function parseThemeTokens(input: unknown, opts: ParseOptions = {}): Theme
 
   if (errors.length) return { ok: false, errors };
 
+  const warnings: string[] = [];
   if (opts.contrast !== false) {
-    const fails = checkThemeContrast(colors);
-    if (fails.length) {
-      return {
-        ok: false,
-        errors: fails.map((f) => `contrast too low: ${f.pair} is ${f.ratio}:1, needs ${f.min}:1`),
-      };
+    const lum = luminance(colors.bg);
+    if (mode === 'dark' && lum >= MODE_LUMINANCE_THRESHOLD) {
+      return { ok: false, errors: ['mode is "dark" but bg is a light colour; pick a dark bg or set mode to "light"'] };
     }
+    if (mode === 'light' && lum < MODE_LUMINANCE_THRESHOLD) {
+      return { ok: false, errors: ['mode is "light" but bg is a dark colour; pick a light bg or set mode to "dark"'] };
+    }
+    const fails = checkThemeContrast(colors);
+    const msg = (f: ContrastFailure) => `contrast too low: ${f.pair} is ${f.ratio}:1, needs ${f.min}:1`;
+    const blocking = fails.filter((f) => f.blocking);
+    if (blocking.length) return { ok: false, errors: blocking.map(msg) };
+    for (const f of fails) warnings.push(msg(f));
   }
 
   const tokens: ThemeTokens = {
@@ -263,7 +288,7 @@ export function parseThemeTokens(input: unknown, opts: ParseOptions = {}): Theme
     fontBody,
   };
   if (overrides && Object.keys(overrides).length) tokens.overrides = overrides;
-  return { ok: true, tokens };
+  return { ok: true, tokens, warnings };
 }
 
 /** For serving: the normalised tokens, or null when absent/invalid (shape only, no contrast gate). */
@@ -300,7 +325,7 @@ export function deriveThemeVars(t: ThemeTokens): Record<string, string> {
     '--bg-header': t.surface,
     '--bg-overlay': dark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(17, 17, 17, 0.55)',
     '--text-primary': t.text,
-    '--text-secondary': mix(t.text, t.textMuted, 0.5),
+    '--text-secondary': secondaryText(t),
     '--text-muted': t.textMuted,
     '--text-faint': mix(t.textMuted, t.bg, 0.3),
     '--text-inverted': t.bg,

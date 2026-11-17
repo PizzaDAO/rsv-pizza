@@ -30,7 +30,7 @@ describe('shared fixture (identical test runs in frontend/src/config/themeTokens
 describe('parseThemeTokens', () => {
   it('accepts a good set, lowercases colours, applies defaults', () => {
     const r = parseThemeTokens({ ...GOOD, accent: '#E6212F' });
-    expect(r).toEqual({ ok: true, tokens: { ...GOOD, radius: 'soft', fontHeading: 'system', fontBody: 'system' } });
+    expect(r).toEqual({ ok: true, tokens: { ...GOOD, radius: 'soft', fontHeading: 'system', fontBody: 'system' }, warnings: [] });
   });
 
   it.each([
@@ -87,11 +87,39 @@ describe('parseThemeTokens', () => {
     expect(r.ok).toBe(false);
     expect(!r.ok && r.errors.join(' ')).toMatch(/textMuted on bg/);
     expect(parseThemeTokens({ ...GOOD, onAccent: '#e6212f' }).ok).toBe(false);
-    expect(parseThemeTokens({ ...GOOD, accent: '#0b0b11' }).ok).toBe(false); // accent vs bg
     // borderline: #777 on white is 4.48:1 and must fail, #767676 is 4.54:1 and passes
     const light = { ...GOOD, mode: 'light', bg: '#ffffff', surface: '#ffffff', text: '#000000', accent: '#000000', onAccent: '#ffffff' };
     expect(parseThemeTokens({ ...light, textMuted: '#777777' }).ok).toBe(false);
     expect(parseThemeTokens({ ...light, textMuted: '#767676' }).ok).toBe(true);
+  });
+
+  it('accent vs bg under 3:1 is a warning, not an error', () => {
+    const r = parseThemeTokens({ ...GOOD, accent: '#0b0b11', onAccent: '#ffffff' });
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.warnings.join(' ')).toMatch(/accent on bg/);
+    // text pairs still block
+    expect(parseThemeTokens({ ...GOOD, accent: '#ffffff', onAccent: '#fafafa' }).ok).toBe(false);
+  });
+
+  it('rejects a mode that disagrees with the bg luminance', () => {
+    const light = { ...GOOD, mode: 'dark', bg: '#ffffff', surface: '#f2f2f2', text: '#111111', textMuted: '#444444', border: '#dddddd', accent: '#6e54ff' };
+    const r = parseThemeTokens(light);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.errors.join(' ')).toMatch(/mode is "dark" but bg is a light colour/);
+    expect(parseThemeTokens({ ...light, mode: 'light' }).ok).toBe(true);
+    const r2 = parseThemeTokens({ ...GOOD, mode: 'light' });
+    expect(!r2.ok && r2.errors.join(' ')).toMatch(/mode is "light" but bg is a dark colour/);
+    // serving does not re-check policy
+    expect(normalizeThemeTokens(light)).not.toBeNull();
+  });
+
+  it('checks the derived secondary text colour on bg and surface', () => {
+    const t = { ...GOOD, mode: 'light', bg: '#767676', surface: '#767676', text: '#ffffff', textMuted: '#000000', accent: '#000000', onAccent: '#ffffff', border: '#dddddd' };
+    // text 4.54:1 and textMuted 4.62:1 pass, but their 50% mix (#808080) is ~3.8:1 on #767676
+    const r = parseThemeTokens(t);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.errors.join(' ')).toMatch(/secondary text \(derived\) on bg/);
+    expect(!r.ok && r.errors.join(' ')).not.toMatch(/^text on bg/);
   });
 
   it('contrast can be skipped for serving, but shape is still enforced', () => {

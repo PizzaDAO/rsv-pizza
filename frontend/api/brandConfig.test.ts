@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import vm from 'node:vm';
-import { jsonForScript, renderBrandScript, cleanThemeVars, pickFromSnapshot, cleanHost, EMPTY_SCRIPT } from './_brandConfig';
+import { FONTS } from '../src/config/themeTokens';
+import { jsonForScript, renderBrandScript, cleanThemeVars, FONT_HREFS, fontHrefsFor, pickFromSnapshot, cleanHost, EMPTY_SCRIPT } from './_brandConfig';
 import handler from './brand-config';
 
 const EVIL = '</script><script>alert(1)</script>"\u2028\u2029&\'';
@@ -10,6 +11,7 @@ const EVIL = '</script><script>alert(1)</script>"\u2028\u2029&\'';
 function runScript(code: string) {
   const classes: string[] = [];
   const vars: Record<string, string> = {};
+  const appended: Array<Record<string, unknown>> = [];
   const listeners: Array<() => void> = [];
   const link: { rel?: string; href?: string } = {};
   const doc = {
@@ -20,13 +22,13 @@ function runScript(code: string) {
     },
     addEventListener: (_: string, fn: () => void) => listeners.push(fn),
     querySelector: () => link,
-    createElement: () => ({}),
-    head: { appendChild: () => {} },
+    createElement: () => ({ setAttribute() {} } as Record<string, unknown>),
+    head: { appendChild: (e: Record<string, unknown>) => { appended.push(e); } },
   };
   const win: Record<string, unknown> = {};
   vm.runInNewContext(code, { window: win, document: doc });
   listeners.forEach((fn) => fn());
-  return { win, doc, classes, link, vars };
+  return { win, doc, classes, link, vars, appended };
 }
 
 describe('jsonForScript', () => {
@@ -70,6 +72,30 @@ describe('renderBrandScript', () => {
     expect(light.classes).toEqual(['wl-theme', 'wl-light']);
   });
 
+  it('injects preconnect + stylesheet links for the chosen fonts before first paint', () => {
+    const themeVars = { '--bg-main': '#0b0b10' };
+    const r = runScript(renderBrandScript({ slug: 'example', tokens: { mode: 'dark', fontHeading: 'kanit', fontBody: 'inter' }, themeVars }));
+    const sheets = r.appended.filter((e) => e.rel === 'stylesheet').map((e) => e.href);
+    expect(sheets).toEqual([FONT_HREFS.kanit, FONT_HREFS.inter]);
+    const pre = r.appended.filter((e) => e.rel === 'preconnect').map((e) => e.href);
+    expect(pre).toEqual(['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
+    const sys = runScript(renderBrandScript({ slug: 'example', tokens: { mode: 'dark', fontHeading: 'system', fontBody: 'system' }, themeVars }));
+    expect(sys.appended).toEqual([]);
+  });
+
+  it('never turns an unknown or malicious font key into a link', () => {
+    const themeVars = { '--bg-main': '#0b0b10' };
+    const r = runScript(renderBrandScript({ slug: 'example', tokens: { mode: 'dark', fontHeading: 'https://evil.example.org/x.css', fontBody: 'constructor' }, themeVars }));
+    expect(r.appended).toEqual([]);
+    expect(fontHrefsFor({ fontHeading: '__proto__', fontBody: 'toString' })).toEqual([]);
+    expect(fontHrefsFor(null)).toEqual([]);
+  });
+
+  it('adds no fonts when the theme vars are rejected', () => {
+    const r = runScript(renderBrandScript({ slug: 'example', tokens: { fontBody: 'inter' }, themeVars: { '--x': 'a;b' } }));
+    expect(r.appended).toEqual([]);
+  });
+
   it('adds no theme classes or variables when there are none, or when all are malformed', () => {
     expect(runScript(renderBrandScript({ slug: 'example' })).classes).toEqual([]);
     const bad = runScript(renderBrandScript({ slug: 'example', themeVars: { '--x': 'red; background:url(//evil.example.org)', color: '#000000' } }));
@@ -79,6 +105,13 @@ describe('renderBrandScript', () => {
 
   it('the empty script is valid JS', () => {
     expect(() => vm.runInNewContext(EMPTY_SCRIPT, {})).not.toThrow();
+  });
+});
+
+describe('FONT_HREFS', () => {
+  it('matches the FONTS table in src/config/themeTokens.ts exactly', () => {
+    const expected = Object.fromEntries(Object.entries(FONTS).filter(([, f]) => f.href).map(([k, f]) => [k, f.href]));
+    expect(FONT_HREFS).toEqual(expected);
   });
 });
 

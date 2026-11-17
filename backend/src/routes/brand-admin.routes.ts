@@ -145,11 +145,12 @@ scoped.get('/settings', wrap(async (req, res) => {
 scoped.patch('/settings', settingsLimit, wrap(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AppError('Expected a JSON object', 400, 'VALIDATION_ERROR');
-  const data = validateBrandSettings(body as Record<string, unknown>);
+  const warnings: string[] = [];
+  const data = validateBrandSettings(body as Record<string, unknown>, { strict: true, warnings });
   if (Object.keys(data).length === 0) throw new AppError('Nothing to update', 400, 'VALIDATION_ERROR');
   const result = await applyBrandSettings({ ...actor(req), data, action: 'settings.update' });
   if (result.changed.length) invalidateSiteBrandCache(); // brand name / sender show up in emails within the request, not 60 s later
-  res.json(result);
+  res.json(warnings.length ? { ...result, warnings } : result);
 }));
 
 scoped.get('/audit', wrap(async (req, res) => {

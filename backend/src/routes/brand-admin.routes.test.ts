@@ -298,12 +298,81 @@ describe('settings', () => {
       expect(m.state.writes).not.toHaveBeenCalled();
       expect(m.state.series[A].themeTokens).toBeUndefined();
     });
+    it('returns accent-contrast warnings in the save response without blocking', async () => {
+      as('brand@partner.com');
+      const res = await patch({ themeTokens: { ...TOK, accent: '#0b0b11', onAccent: '#ffffff' } });
+      expect(res.status).toBe(200);
+      expect(res.body.warnings.join(' ')).toMatch(/accent on bg/);
+    });
+    it('rejects a mode that disagrees with bg and failing derived secondary text', async () => {
+      as('brand@partner.com');
+      const a = await patch({ themeTokens: { ...TOK, mode: 'dark', bg: '#ffffff', surface: '#f2f2f2', text: '#111111', textMuted: '#444444', border: '#dddddd' } });
+      expect(a.status).toBe(400);
+      expect(JSON.stringify(a.body)).toMatch(/mode is \\"dark\\" but bg is a light colour/);
+      const b = await patch({ themeTokens: { ...TOK, mode: 'light', bg: '#767676', surface: '#767676', text: '#ffffff', textMuted: '#000000', accent: '#000000', border: '#dddddd' } });
+      expect(b.status).toBe(400);
+      expect(JSON.stringify(b.body)).toMatch(/secondary text/);
+      expect(m.state.writes).not.toHaveBeenCalled();
+    });
+    it('jsonb key reordering is not a change: no write, no version bump, no audit', async () => {
+      as('brand@partner.com');
+      const reordered = Object.fromEntries(Object.entries(TOK).reverse());
+      m.state.series[A].themeTokens = { ...reordered, overrides: { '--bg-card': '#1a1b1c' } };
+      const v = m.state.series[A].configVersion;
+      const res = await patch({ themeTokens: { ...TOK } });
+      expect(res.status).toBe(200);
+      expect(res.body.changed).toEqual([]);
+      expect(m.state.writes).not.toHaveBeenCalled();
+      expect(m.state.series[A].configVersion).toBe(v);
+    });
+    it('a brand admin cannot clear tokens that carry overrides (400, overrides intact)', async () => {
+      as('brand@partner.com');
+      m.state.series[A].themeTokens = { ...TOK, overrides: { '--bg-card': '#1a1b1c' } };
+      const res = await patch({ themeTokens: null });
+      expect(res.status).toBe(400);
+      expect(m.state.series[A].themeTokens.overrides).toEqual({ '--bg-card': '#1a1b1c' });
+      expect(m.state.writes).not.toHaveBeenCalled();
+    });
+    it('revert keeps CURRENT overrides: never re-adds removed ones, never drops existing ones', async () => {
+      as('brand@partner.com');
+      // history: tokens WITH overrides, then a super-admin removed them, brand admin changes colour
+      m.state.series[A].themeTokens = { ...TOK, overrides: { '--bg-card': '#1a1b1c' } };
+      expect((await patch({ themeTokens: { ...TOK, accent: '#d92b3a' } })).status).toBe(200); // snapshot has overrides
+      m.state.series[A].themeTokens = { ...TOK, accent: '#d92b3a' }; // super-admin removed overrides
+      const hist = (await request(app).get(`/api/brand-admin/${A}/audit`)).body;
+      const id = (hist.history ?? hist.entries ?? hist.audit ?? [])[0]?.id ?? m.state.audit[m.state.audit.length - 1].id;
+      const rev = await request(app).post(`/api/brand-admin/${A}/revert`).send({ auditId: id });
+      expect(rev.status).toBe(200);
+      expect(m.state.series[A].themeTokens.overrides).toBeUndefined();
+      expect(m.state.series[A].themeTokens.accent).toBe('#e6212f');
+      // and the converse: overrides present now are kept through a revert
+      m.state.series[A].themeTokens = { ...TOK, accent: '#d92b3a', overrides: { '--bg-card': '#222222' } };
+      expect((await request(app).post(`/api/brand-admin/${A}/revert`).send({ auditId: id })).status).toBe(200);
+      expect(m.state.series[A].themeTokens.overrides).toEqual({ '--bg-card': '#222222' });
+    });
+    it('a super-admin writes overrides through admin-series PATCH (validated); a brand admin cannot', async () => {
+      as('boss@example.com');
+      const withOv = { ...TOK, overrides: { '--bg-card': '#1a1b1c' } };
+      const ok = await request(app).patch(`/api/admin/series/${A}`).send({ themeTokens: withOv });
+      expect(ok.status).toBe(200);
+      expect(m.state.series[A].themeTokens.overrides).toEqual({ '--bg-card': '#1a1b1c' });
+      const badOv = await request(app).patch(`/api/admin/series/${A}`).send({ themeTokens: { ...TOK, overrides: { '--bg-card': 'url(//evil.example.org)' } } });
+      expect(badOv.status).toBe(400);
+      const badTok = await request(app).patch(`/api/admin/series/${A}`).send({ themeTokens: { ...TOK, bg: 'red' } });
+      expect(badTok.status).toBe(400);
+      // super-admin can also remove them (no carry-over on this route)
+      expect((await request(app).patch(`/api/admin/series/${A}`).send({ themeTokens: TOK })).status).toBe(200);
+      expect(m.state.series[A].themeTokens.overrides).toBeUndefined();
+      as('brand@partner.com');
+      expect((await patch({ themeTokens: withOv })).status).toBe(400);
+    });
     it('null clears, and a brand admin save keeps super-admin overrides', async () => {
       as('brand@partner.com');
       m.state.series[A].themeTokens = { ...TOK, overrides: { '--bg-card': '#1a1b1c' } };
       expect((await patch({ themeTokens: { ...TOK, accent: '#d92b3a' } })).status).toBe(200);
       expect(m.state.series[A].themeTokens.overrides).toEqual({ '--bg-card': '#1a1b1c' });
       expect(m.state.series[A].themeTokens.accent).toBe('#d92b3a');
+      delete m.state.series[A].themeTokens.overrides; // only a super-admin can remove them
       expect((await patch({ themeTokens: null })).status).toBe(200);
       expect(m.state.series[A].themeTokens).toBe(Prisma.DbNull); // the real client stores SQL NULL
     });
