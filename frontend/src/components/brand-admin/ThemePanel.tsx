@@ -66,7 +66,7 @@ export const ThemePreview: React.FC<{ tokens: ThemeTokens; brandName: string }> 
             <span className="text-xs font-semibold" style={{ color: 'var(--error)' }}>Full</span>
           </div>
         </div>
-        <IconInput icon={Mail} placeholder="Email address" readOnly tabIndex={-1} />
+        <IconInput type="text" icon={Mail} placeholder="Email address" readOnly tabIndex={-1} />
         <Checkbox checked onChange={() => undefined} label="Notify me about new events" disabled labelClassName="text-sm" />
       </div>
     </div>
@@ -190,13 +190,13 @@ export const ThemePanel: React.FC<Props> = ({ seriesId, settings, onSaved }) => 
               checked={!!draft.hideHeaderName}
               onChange={() => set('hideHeaderName', !draft.hideHeaderName)}
               label="Logo only in the header (hide the brand name)"
-              checkboxRole
+              className="text-left" checkboxRole
             />
             <Checkbox
               checked={!!draft.hideHeroLogo}
               onChange={() => set('hideHeroLogo', !draft.hideHeroLogo)}
               label="Don't repeat the logo above the title on the series page"
-              checkboxRole
+              className="text-left" checkboxRole
             />
           </div>
 

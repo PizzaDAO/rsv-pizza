@@ -64,7 +64,7 @@ const ItemRow: React.FC<{
   if (editing) {
     return (
       <li className="px-3 py-3 rounded-lg bg-theme-surface space-y-2" data-testid="checklist-edit-row">
-        <IconInput icon={ListChecks} aria-label="Item name" placeholder="Item name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
+        <IconInput type="text" icon={ListChecks} aria-label="Item name" placeholder="Item name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
         {err && <div className="text-xs text-[#E52828]">{err}</div>}
         <div className="grid gap-2 sm:grid-cols-2">
           <IconInput icon={Calendar} type="date" aria-label="Due date" placeholder="Due date" value={due} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDue(e.target.value)} />
@@ -194,7 +194,7 @@ export const ChecklistPanel: React.FC<{ seriesId: string }> = ({ seriesId }) => 
       </ul>
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
-          <IconInput icon={Plus} aria-label="New checklist item" placeholder="New checklist item" value={newName}
+          <IconInput type="text" icon={Plus} aria-label="New checklist item" placeholder="New checklist item" value={newName}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
             onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' && newName.trim() && !nameErr && !busy) void add(); }} />
           {nameErr && <div className="text-xs text-[#E52828] mt-1">{nameErr}</div>}

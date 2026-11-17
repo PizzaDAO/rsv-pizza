@@ -88,7 +88,7 @@ export const EventsPanel: React.FC<Props> = ({ seriesId, alertsEnabled }) => {
 
       {alerts !== null && (
         <div>
-          <Checkbox checked={alerts} onChange={toggleAlerts} label="Email me when a new event needs approval" checkboxRole />
+          <Checkbox checked={alerts} onChange={toggleAlerts} label="Email me when a new event needs approval" className="text-left" checkboxRole />
           {alertsMsg && <p className="text-xs text-theme-text-muted mt-1" role="status">{alertsMsg}</p>}
         </div>
       )}

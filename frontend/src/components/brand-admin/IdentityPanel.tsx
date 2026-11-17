@@ -70,15 +70,15 @@ export const IdentityPanel: React.FC<Props> = ({ seriesId, settings, onSaved }) 
     <div className="space-y-8" data-testid="identity-panel">
       <Section title="Brand" hint="How your name appears on the site and in emails.">
         <div>
-          <IconInput icon={Type} aria-label="Brand name" placeholder="Brand name" value={draft.brandName} onChange={setText('brandName')} maxLength={TEXT_LIMITS.brandName + 20} />
+          <IconInput type="text" icon={Type} aria-label="Brand name" placeholder="Brand name" value={draft.brandName} onChange={setText('brandName')} maxLength={TEXT_LIMITS.brandName + 20} />
           {help('brandName', 'Brand name', TEXT_LIMITS.brandName)}
         </div>
         <div>
-          <IconInput icon={Tag} aria-label="Display name" placeholder="Display name" value={draft.displayName} onChange={setText('displayName')} maxLength={TEXT_LIMITS.displayName + 20} />
+          <IconInput type="text" icon={Tag} aria-label="Display name" placeholder="Display name" value={draft.displayName} onChange={setText('displayName')} maxLength={TEXT_LIMITS.displayName + 20} />
           {help('displayName', 'Display name (shown in lists and headings)', TEXT_LIMITS.displayName)}
         </div>
         <div>
-          <IconInput icon={AlignLeft} aria-label="Tagline" placeholder="Tagline" value={draft.tagline} onChange={setText('tagline')} maxLength={TEXT_LIMITS.tagline + 20} />
+          <IconInput type="text" icon={AlignLeft} aria-label="Tagline" placeholder="Tagline" value={draft.tagline} onChange={setText('tagline')} maxLength={TEXT_LIMITS.tagline + 20} />
           {help('tagline', 'Tagline', TEXT_LIMITS.tagline)}
         </div>
         <div>
@@ -99,7 +99,7 @@ export const IdentityPanel: React.FC<Props> = ({ seriesId, settings, onSaved }) 
           {help('supportEmail', 'Support email shown to hosts and guests')}
         </div>
         <div>
-          <IconInput icon={User} aria-label="Email sender name" placeholder="Email sender name" value={draft.emailFromName} onChange={setText('emailFromName')} maxLength={TEXT_LIMITS.emailFromName + 20} />
+          <IconInput type="text" icon={User} aria-label="Email sender name" placeholder="Email sender name" value={draft.emailFromName} onChange={setText('emailFromName')} maxLength={TEXT_LIMITS.emailFromName + 20} />
           {help('emailFromName', 'Email sender name (the "from" name)', TEXT_LIMITS.emailFromName)}
         </div>
         <div>
@@ -110,7 +110,7 @@ export const IdentityPanel: React.FC<Props> = ({ seriesId, settings, onSaved }) 
 
       <Section title="Events" hint="Defaults for events created on your site.">
         <div>
-          <IconInput icon={Hash} aria-label="Event name template" placeholder="Event name template, e.g. {brand} {city}" value={draft.nameTemplate} onChange={setText('nameTemplate')} maxLength={TEXT_LIMITS.nameTemplate + 20} />
+          <IconInput type="text" icon={Hash} aria-label="Event name template" placeholder="Event name template, e.g. {brand} {city}" value={draft.nameTemplate} onChange={setText('nameTemplate')} maxLength={TEXT_LIMITS.nameTemplate + 20} />
           {help('nameTemplate', 'Event name template ({city} {brand} {series})', TEXT_LIMITS.nameTemplate)}
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -128,9 +128,9 @@ export const IdentityPanel: React.FC<Props> = ({ seriesId, settings, onSaved }) 
           </div>
         </div>
         <div className="space-y-2">
-          <Checkbox checked={draft.hideGuests} onChange={toggle('hideGuests')} label="Hide guest lists on public event pages" checkboxRole />
-          <Checkbox checked={draft.photosEnabled} onChange={toggle('photosEnabled')} label="Photos enabled" checkboxRole />
-          <Checkbox checked={draft.photosPublic} onChange={toggle('photosPublic')} label="Photos are public" checkboxRole />
+          <Checkbox checked={draft.hideGuests} onChange={toggle('hideGuests')} label="Hide guest lists on public event pages" className="text-left" checkboxRole />
+          <Checkbox checked={draft.photosEnabled} onChange={toggle('photosEnabled')} label="Photos enabled" className="text-left" checkboxRole />
+          <Checkbox checked={draft.photosPublic} onChange={toggle('photosPublic')} label="Photos are public" className="text-left" checkboxRole />
         </div>
       </Section>
 

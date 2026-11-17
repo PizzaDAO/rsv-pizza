@@ -20,6 +20,7 @@ export const ColorInput: React.FC<ColorInputProps> = ({ label, value, onChange }
   return (
     <div>
       <IconInput
+        type="text"
         customIcon={
           <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center">
             <input
