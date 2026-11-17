@@ -27,9 +27,10 @@ export const INTERNAL_EVENT_TAGS = new Set<string>([
   'missed',        // payout workflow state
   'nonhub',        // admin-only SWC-Hub-gate opt-out
   REFUND_TAG,      // paccheri-58541: refund-due (overpaid open city) marker
+  'side-prelaunch', // rigatoni-58919: pre-launch gate for side events (public 'side' stays public)
 ]);
 
-const INTERNAL_TAG_PATTERNS: RegExp[] = [
+export const INTERNAL_TAG_PATTERNS: RegExp[] = [
   // numeric reimbursement-cap tags ('200', '500', '350.50').
   /^\d+(\.\d{1,2})?$/,
   // party-kit cap tags ('k40', 'k200.50').

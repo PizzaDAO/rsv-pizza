@@ -26,7 +26,7 @@ import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { siteForParty, brandedSeriesBySlug, brandedSiteForParty } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
-import { changesGuardedTags } from '../lib/eventTags.js';
+import { changesGuardedTags, mergeHostEventTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
 import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
@@ -778,51 +778,76 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // signal. Adding or removing it is restricted to payment_admin / admin /
     // super_admin — hosts and underbosses cannot toggle it via PATCH.
     // isPaymentAdmin() returns true for all three of those roles.
+    // blackolive-70521: event_tags is an admin/system switchboard. Only
+    // admin / super_admin / payment_admin and in-scope underbosses (the roles
+    // behind /payments, /underboss and /map moderation) may write arbitrary
+    // tags. Everyone else (host, co-host) can only toggle HOST_WRITABLE tags
+    // ('prepay'); all other tag differences are silently ignored (merged, not
+    // 403'd, so host UIs that send the full array keep working).
+    let eventTagsToWrite: string[] | undefined;
     if (Array.isArray(eventTags)) {
       const existing = await prisma.party.findUnique({
         where: { id },
-        select: { eventTags: true },
+        select: { eventTags: true, region: true, city: true, name: true, eventType: true },
       });
       const currentTags = existing?.eventTags || [];
-      const hadGo = currentTags.includes('go');
-      const wantsGo = eventTags.includes('go');
-      if (hadGo !== wantsGo) {
-        const canToggleGo = await isPaymentAdmin(req.userEmail);
-        if (!canToggleGo) {
-          throw new AppError(
-            "Only admins and payment admins can add or remove the 'go' tag.",
-            403,
-            'FORBIDDEN_TAG',
+      let privilegedTagWriter = await isPaymentAdmin(req.userEmail);
+      if (!privilegedTagWriter && existing && (await isUnderboss(req.userEmail))) {
+        privilegedTagWriter = partyMatchesScope(existing as any, await getUnderbossScope(req.userEmail));
+      }
+      if (!privilegedTagWriter) {
+        const merged = mergeHostEventTags(currentTags, eventTags);
+        if (merged.ignoredAdded.length || merged.ignoredRemoved.length) {
+          console.warn(
+            `[blackolive-70521][event-tags-ignored] party=${id} actor=${req.userEmail ?? 'unknown'} added=${JSON.stringify(
+              merged.ignoredAdded,
+            )} removed=${JSON.stringify(merged.ignoredRemoved)}`,
           );
         }
-      }
-      // Host fast pass: 'possible-scam' feeds the host track record and numeric
-      // ('200', '350.50') / party-kit ('k40') tags set reimbursement caps. A host
-      // must not be able to clear their own scam flag or mint a cap, so any
-      // change to these tags is restricted exactly like 'go'.
-      if (changesGuardedTags(currentTags, eventTags)) {
-        if (!(await isPaymentAdmin(req.userEmail))) {
-          throw new AppError(
-            "Only admins and payment admins can add or remove 'possible-scam' or numeric cap tags.",
-            403,
-            'FORBIDDEN_TAG',
+        eventTagsToWrite = merged.changed ? merged.tags : undefined;
+      } else {
+        eventTagsToWrite = eventTags;
+        const hadGo = currentTags.includes('go');
+        const wantsGo = eventTags.includes('go');
+        if (hadGo !== wantsGo) {
+          const canToggleGo = await isPaymentAdmin(req.userEmail);
+          if (!canToggleGo) {
+            throw new AppError(
+              "Only admins and payment admins can add or remove the 'go' tag.",
+              403,
+              'FORBIDDEN_TAG',
+            );
+          }
+        }
+        // Host fast pass: 'possible-scam' feeds the host track record and numeric
+        // ('200', '350.50') / party-kit ('k40') tags set reimbursement caps. A host
+        // must not be able to clear their own scam flag or mint a cap, so any
+        // change to these tags is restricted exactly like 'go'.
+        if (changesGuardedTags(currentTags, eventTags)) {
+          if (!(await isPaymentAdmin(req.userEmail))) {
+            throw new AppError(
+              "Only admins and payment admins can add or remove 'possible-scam' or numeric cap tags.",
+              403,
+              'FORBIDDEN_TAG',
+            );
+          }
+        }
+        // bottarga-92104: audit trail for the manual "Possible scam" flag set
+        // from /payments (PayoutsByPartyTable city Actions menu). The tag
+        // itself in `parties.event_tags` is the durable signal; this log line
+        // makes the WHO + WHEN grep-able from prod logs even without a
+        // dedicated audit table. Mirrors the lightweight audit pattern used
+        // for other manual moderation actions.
+        const hadScam = currentTags.includes('possible-scam');
+        const wantsScam = eventTags.includes('possible-scam');
+        if (hadScam !== wantsScam) {
+          console.log(
+            `[bottarga-92104][possible-scam-tag] party=${id} action=${
+              wantsScam ? 'flag' : 'unflag'
+            } actor=${req.userEmail ?? 'unknown'} at=${new Date().toISOString()}`,
           );
         }
-      }
-      // bottarga-92104: audit trail for the manual "Possible scam" flag set
-      // from /payments (PayoutsByPartyTable city Actions menu). The tag
-      // itself in `parties.event_tags` is the durable signal; this log line
-      // makes the WHO + WHEN grep-able from prod logs even without a
-      // dedicated audit table. Mirrors the lightweight audit pattern used
-      // for other manual moderation actions.
-      const hadScam = currentTags.includes('possible-scam');
-      const wantsScam = eventTags.includes('possible-scam');
-      if (hadScam !== wantsScam) {
-        console.log(
-          `[bottarga-92104][possible-scam-tag] party=${id} action=${
-            wantsScam ? 'flag' : 'unflag'
-          } actor=${req.userEmail ?? 'unknown'} at=${new Date().toISOString()}`,
-        );
+
       }
     }
 
@@ -1093,7 +1118,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(maxGuests !== undefined && { maxGuests }),
         ...(expectedGuests !== undefined && { expectedGuests: expectedGuests !== null && expectedGuests !== '' ? Number(expectedGuests) : null }),
         ...(estimatedAttendance !== undefined && { estimatedAttendance: estimatedAttendance !== null && estimatedAttendance !== '' ? Number(estimatedAttendance) : null }),
-        ...(Array.isArray(eventTags) && { eventTags }),
+        ...(eventTagsToWrite !== undefined && { eventTags: eventTagsToWrite }),
         ...(hideGuests !== undefined && { hideGuests }),
         ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),

@@ -32,10 +32,12 @@ export const INTERNAL_EVENT_TAGS = new Set<string>([
   'side-prelaunch',
 ]);
 
-const INTERNAL_TAG_PATTERNS: RegExp[] = [
+export const INTERNAL_TAG_PATTERNS: RegExp[] = [
   // numeric reimbursement-cap tags. Matches helpers/reimbursementCap.ts
   // (`^\d+(\.\d{1,2})?$`): '200', '500', '350.50'.
   /^\d+(\.\d{1,2})?$/,
+  // party-kit cap tags ('k40', 'k200.50'). Mirrors the frontend set.
+  /^k\d+(\.\d{1,2})?$/i,
   /^gpp2027$/i, // pre-launch year gate marker
 ];
 
@@ -87,4 +89,53 @@ export function changesGuardedTags(current: string[] | null | undefined, next: u
   if (a.size !== b.size) return true;
   for (const t of a) if (!b.has(t)) return true;
   return false;
+}
+
+/**
+ * blackolive-70521: `parties.event_tags` is an admin/system switchboard (payout
+ * state, partner co-host sync, launch gates, RSVP opt-ins). A host or co-host
+ * must only be able to add/remove tags in this tiny set via the party PATCH;
+ * every other tag is preserved exactly as stored.
+ *
+ * - 'prepay': the host Payments tab checkbox (PrepayCheckbox.tsx) is the only
+ *   host UI that writes event_tags. There is no host-facing taxonomy chip UI
+ *   ('side' / series publicTags are stamped server-side on create).
+ *
+ * Keep this list minimal; add a tag only when a host UI genuinely exposes it.
+ */
+export const HOST_WRITABLE_EVENT_TAGS: ReadonlySet<string> = new Set(['prepay']);
+
+export function isHostWritableTag(tag: unknown): boolean {
+  return typeof tag === 'string' && HOST_WRITABLE_EVENT_TAGS.has(tag.trim().toLowerCase());
+}
+
+/**
+ * Merge a non-privileged caller's requested tag array into the stored one.
+ * Only adds/removes of HOST_WRITABLE tags are honoured; all other differences
+ * are ignored (stored tags kept, requested extras dropped). Returns the tag
+ * list to store plus the ignored changes for logging.
+ */
+export function mergeHostEventTags(
+  current: string[] | null | undefined,
+  requested: unknown[],
+): { tags: string[]; ignoredAdded: string[]; ignoredRemoved: string[]; changed: boolean } {
+  const cur = Array.isArray(current) ? current : [];
+  const req = requested.filter((t): t is string => typeof t === 'string');
+  const curSet = new Set(cur);
+  const reqSet = new Set(req);
+  const ignoredAdded: string[] = [];
+  const ignoredRemoved: string[] = [];
+  const tags: string[] = [];
+  for (const t of cur) {
+    if (!reqSet.has(t) && isHostWritableTag(t)) continue; // allowed removal
+    if (!reqSet.has(t)) ignoredRemoved.push(t);
+    tags.push(t);
+  }
+  for (const t of req) {
+    if (curSet.has(t) || tags.includes(t)) continue;
+    if (isHostWritableTag(t)) tags.push(t);
+    else ignoredAdded.push(t);
+  }
+  const changed = tags.length !== cur.length || tags.some((t, i) => t !== cur[i]);
+  return { tags, ignoredAdded, ignoredRemoved, changed };
 }
