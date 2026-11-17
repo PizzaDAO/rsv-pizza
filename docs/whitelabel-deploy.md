@@ -109,6 +109,31 @@ Keep new brand chrome flowing through `BRAND` / `brand` / `brandUrl`.
 
 ---
 
+## 6. Partner custom domain and sending email (self-serve)
+
+Brand admins set both up at `/brand-admin` (Domain and Email tabs). Subdomains only
+(`events.partner.com`, `mail.partner.com`).
+
+Backend env (all optional; a missing one makes only that feature answer 503 "not configured"):
+`VERCEL_DOMAINS_TOKEN` + `VERCEL_TEAM_ID` (PizzaDAO-team token), `RESEND_ADMIN_KEY` (full access,
+domains API only; `RESEND_API_KEY` stays send-only), `BRAND_VERCEL_PROJECTS` (JSON
+`{"<series slug>":"<Vercel project id or name>"}`), `PARTNER_EMAIL_DOMAIN_LIMIT` (default 5),
+`RESERVED_DOMAINS` (extra blocked domains).
+
+Web domain: the partner requests a host and adds `_rsvpizza.<host> TXT rsvpizza-verify=<token>` plus a
+CNAME. Statuses: requested, dns_ok (TXT proven), attached, ready, live. A super-admin attaches the host to the
+brand's Vercel project (only after the TXT matches), then cuts over once every check is green: `site_url`
+becomes the new host, the old origin stays in `site_aliases`, and the old host is set to a 308 redirect.
+After a cutover, set `VITE_BRAND_DOMAIN` on the brand project and redeploy production (the backend never
+deploys), and add the origin to Reown. Rollback restores the previous `site_url`; the old domain is never
+detached (printed flyer QR codes). The partner removes their own DNS before we ever detach a domain.
+
+Sending domain: the backend creates the domain in Resend; `email_domain_verified_at` is set only when Resend
+reports it verified and the from address is on it. Crons (`/api/cron/recheck-domains` every 15 min,
+`/api/cron/recheck-email-domains` hourly) clear verification when the records disappear.
+
+---
+
 ## Known not-yet-parameterized (as of this doc)
 
 Cosmetic follow-ups that still contain "rsv.pizza" but are non-functional or

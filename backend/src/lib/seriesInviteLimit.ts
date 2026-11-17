@@ -23,6 +23,15 @@ export const BRAND_ADMIN_SETTINGS_BUCKET = 'series_admin_settings';
 export const BRAND_ADMIN_SETTINGS_LIMIT = 60;
 export const BRAND_ADMIN_WRITE_BUCKET = 'series_admin_write';
 export const BRAND_ADMIN_WRITE_LIMIT = 200;
+/** Domain / sending-domain flow: writes 30/h per user, live checks 30/h per user and 120/h per series, reads 120/h per user. */
+export const DOMAIN_WRITE_BUCKET = 'series_domain_write';
+export const DOMAIN_WRITE_LIMIT = 30;
+export const DOMAIN_CHECK_BUCKET = 'series_domain_check';
+export const DOMAIN_CHECK_LIMIT = 30;
+export const DOMAIN_CHECK_SERIES_BUCKET = 'series_domain_check_series';
+export const DOMAIN_CHECK_SERIES_LIMIT = 120;
+export const DOMAIN_READ_BUCKET = 'series_domain_read';
+export const DOMAIN_READ_LIMIT = 120;
 /** Image uploads: 30/h per user for upload-url and for attach, plus 200 per series per day. */
 export const BRAND_ADMIN_UPLOAD_BUCKET = 'series_asset_upload';
 export const BRAND_ADMIN_UPLOAD_LIMIT = 30;

@@ -119,6 +119,63 @@ export const setBrandEventStatus = (id: string, partyId: string, status: 'approv
 export const setBrandOwnAlerts = (id: string, alertsEnabled: boolean) =>
   apiRequest<{ admin: { alertsEnabled: boolean } }>(`${base(id)}/alerts`, { method: 'PATCH', body: { alertsEnabled } });
 
+// ----- custom domain + sending domain (PR 16) -----
+
+export type DomainStatus = 'requested' | 'dns_ok' | 'attached' | 'ready' | 'live';
+
+export interface DnsRecord {
+  purpose: 'ownership' | 'site' | 'vercel_verification' | 'email';
+  type: string;
+  name: string;
+  value: string;
+  priority?: number;
+  status?: string;
+  note?: string;
+}
+
+export interface DomainState {
+  siteUrl: string | null;
+  aliases: string[];
+  domain: string | null;
+  status: DomainStatus | null;
+  checkedAt: string | null;
+  records: DnsRecord[];
+  checks: { txtOk: boolean; cnameOk: boolean; vercel?: { attached: boolean; verified: boolean; configured: boolean }; dnsError?: boolean } | null;
+  /** Manual follow-ups returned by cutover / rollback. */
+  steps: string[];
+  changed?: boolean;
+  projectMapped: boolean;
+  configured: { vercel: boolean; resend: boolean };
+}
+
+export interface EmailDomainState {
+  emailDomain: string | null;
+  emailFromAddress: string | null;
+  verified: boolean;
+  verifiedAt: string | null;
+  /** Resend's status: not_started | pending | verified | failed | temporary_failure. */
+  status: string | null;
+  records: DnsRecord[];
+  changed?: boolean;
+  error?: string;
+  configured: { vercel: boolean; resend: boolean };
+}
+
+export const fetchBrandDomain = (id: string) => apiRequest<DomainState>(`${base(id)}/domain`);
+export const requestBrandDomain = (id: string, domain: string) => apiRequest<DomainState>(`${base(id)}/domain`, { method: 'PUT', body: { domain } });
+export const cancelBrandDomain = (id: string) => apiRequest<DomainState>(`${base(id)}/domain`, { method: 'DELETE' });
+export const checkBrandDomain = (id: string) => apiRequest<DomainState>(`${base(id)}/domain/check`, { method: 'POST', body: {} });
+export const attachBrandDomain = (id: string) => apiRequest<DomainState>(`${base(id)}/domain/attach`, { method: 'POST', body: {} });
+export const cutoverBrandDomain = (id: string, redirectOld: boolean) =>
+  apiRequest<DomainState>(`${base(id)}/domain/cutover`, { method: 'POST', body: { redirectOld } });
+export const rollbackBrandDomain = (id: string) => apiRequest<DomainState>(`${base(id)}/domain/rollback`, { method: 'POST', body: {} });
+
+export const fetchBrandEmailDomain = (id: string) => apiRequest<EmailDomainState>(`${base(id)}/email-domain`);
+export const saveBrandEmailDomain = (id: string, emailDomain: string, emailFromAddress: string) =>
+  apiRequest<EmailDomainState>(`${base(id)}/email-domain`, { method: 'PUT', body: { emailDomain, emailFromAddress } });
+export const removeBrandEmailDomain = (id: string) => apiRequest<EmailDomainState>(`${base(id)}/email-domain`, { method: 'DELETE' });
+export const checkBrandEmailDomain = (id: string) => apiRequest<EmailDomainState>(`${base(id)}/email-domain/check`, { method: 'POST', body: {} });
+
 /** Shown on the PIZZADAO_DECIDED 409: PizzaDAO set this event's status and keeps a veto. */
 export const PIZZADAO_VETO_MESSAGE =
   'PizzaDAO has set this event\'s status, so it can no longer be changed here. Contact PizzaDAO if you think it should change.';
@@ -131,6 +188,7 @@ export function describeApiError(e: unknown, fallback = 'Something went wrong. P
   if (!err) return fallback;
   if (err.code === 'PIZZADAO_DECIDED') return PIZZADAO_VETO_MESSAGE;
   if (err.code === 'RATE_LIMITED') return err.message && err.message !== 'Request failed' ? err.message : 'Too many changes. Please try again later.';
+  if (err.code === 'NOT_CONFIGURED') return 'This is not set up on the server yet. Please contact PizzaDAO.';
   if (err.code === 'UNAVAILABLE') return 'This is temporarily unavailable. Please try again shortly.';
   if (err.code === 'TIMEOUT') return err.message;
   return err.message || fallback;
