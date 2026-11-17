@@ -18,6 +18,7 @@ vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
 import serviceRouter from './service.routes.js';
 import { errorHandler } from '../middleware/error.js';
+import { brandUrl } from '../config/brand.js';
 
 const KEY = 'test-service-key-0123456789abcdef';
 const sha = (e: string) => crypto.createHash('sha256').update(e.trim().toLowerCase()).digest('hex');
@@ -94,7 +95,7 @@ describe('POST /api/service/guest-attendance', () => {
       name: 'Slice Night',
       date: '2026-05-22T18:00:00.000Z',
       city: 'Lisbon',
-      url: 'https://rsv.pizza/lisbon',
+      url: brandUrl('lisbon'),
       matchedBy: ['email'],
       hideGuestList: false,
     });
@@ -136,7 +137,7 @@ describe('POST /api/service/guest-attendance', () => {
     ]);
     const res = await post({ emailHashes: [H1] });
     expect(res.body.events.map((e: { url: string | null }) => e.url)).toEqual([
-      'https://rsv.pizza/lisbon',
+      brandUrl('lisbon'),
       null,
       null,
       null,

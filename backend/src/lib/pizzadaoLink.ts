@@ -1,9 +1,9 @@
 /**
- * "Link your rsv.pizza account" for pizzadao.org.
+ * "Link your account" for pizzadao.org.
  *
- * A pizzadao.org member lands on /link/pizzadao on rsv.pizza, signs in with the normal
+ * A pizzadao.org member lands on /link/pizzadao here, signs in with the normal
  * email login, confirms, and is sent back to an allowlisted return URL carrying a
- * short-lived ES256 token. The token proves "this browser controls the rsv.pizza account
+ * short-lived ES256 token. The token proves "this browser controls this app's account
  * whose email hashes to X" without ever carrying the address.
  *
  * Token (compact JWS, signed with the same key as /.well-known/jwks.json, so pizzadao.org

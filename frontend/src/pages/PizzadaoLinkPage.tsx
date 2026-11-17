@@ -10,7 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 /**
  * /link/pizzadao?return=<url>&state=<nonce>
  *
- * "Link your rsv.pizza account" for pizzadao.org. Signed-out visitors go through the normal
+ * "Link your account" for pizzadao.org. Signed-out visitors go through the normal
  * email login first, then land back here. Nothing is sent until the visitor taps confirm
  * (so a forged link can't silently link whichever account happens to be signed in); the
  * backend validates the return URL against its allowlist and returns the redirect target.

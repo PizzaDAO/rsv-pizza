@@ -320,7 +320,7 @@ app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public 
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config
 app.use('/api/service/telegram', serviceTelegramRoutes); // must stay before /api/service
-app.use('/api/pizzadao-link', pizzadaoLinkRoutes); // "Link your rsv.pizza account" token for pizzadao.org (signed-in user)
+app.use('/api/pizzadao-link', pizzadaoLinkRoutes); // account-link token for pizzadao.org (signed-in user)
 app.use('/api/service', serviceRoutes); // GPP host lookup for pizzadao.org missions (PIZZADAO_SERVICE_KEY gate)
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe

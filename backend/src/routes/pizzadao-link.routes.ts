@@ -1,5 +1,5 @@
 /**
- * POST /api/pizzadao-link  (Bearer session of the signed-in rsv.pizza user)
+ * POST /api/pizzadao-link  (Bearer session of the signed-in user)
  *   body { returnUrl, state } -> 200 { url }   (the frontend then navigates to `url`)
  * `returnUrl` must be on the PIZZADAO_LINK_RETURN_ORIGINS allowlist; `state` is the nonce
  * pizzadao.org bound to its own session. See lib/pizzadaoLink.ts for the token contract.
