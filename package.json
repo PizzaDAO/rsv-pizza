@@ -25,6 +25,15 @@
     },
     "deepmerge-ts": "8.0.2",
     "@walletconnect/ethereum-provider": "2.26.0",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "swagger-jsdoc": {
+      "glob": "14.0.6"
+    },
+    "readdir-glob": {
+      "minimatch": "11.0.9"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.9"
+    }
   }
 }
