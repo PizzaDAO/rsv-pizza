@@ -16,6 +16,8 @@
  */
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
 export async function emailHostOfPaymentExecution(
   payoutId: string,
@@ -29,7 +31,7 @@ export async function emailHostOfPaymentExecution(
     const payout = await prisma.payout.findUnique({
       where: { id: payoutId },
       include: {
-        party: { select: { name: true, customUrl: true, inviteCode: true } },
+        party: { select: { name: true, customUrl: true, inviteCode: true, eventSeriesId: true } },
         host: { select: { email: true, name: true } },
       },
     });
@@ -44,7 +46,9 @@ export async function emailHostOfPaymentExecution(
       payout.party.name;
     const method = payout.payoutMethod ?? 'unknown';
     const slug = payout.party.customUrl ?? payout.party.inviteCode;
-    const paymentsUrl = `https://rsv.pizza/host/${slug}/payments`;
+    // White-label: a branded series' host gets that brand's origin and sender (unbranded: unchanged).
+    const site = await siteForParty(payout.party, brand.url);
+    const paymentsUrl = `${site.url}/host/${slug}/payments`;
     const hostName = payout.host?.name ?? 'there';
 
     let subject: string;
@@ -95,19 +99,7 @@ ${errorLine}
 <p>Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>`;
     }
 
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: brand.fromEmail,
-        to: toEmail,
-        subject,
-        html,
-      }),
-    }).catch((err) => {
+    await sendBrandedEmail({ site, apiKey, payload: { to: toEmail, subject, html } }).catch((err) => {
       console.warn(
         '[emailHostOfPaymentExecution] Resend send failed:',
         err?.message || err,

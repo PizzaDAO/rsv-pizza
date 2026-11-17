@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
+import { siteForParty } from '../lib/siteBrand.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -37,6 +38,7 @@ router.get('/metadata/:partyId/:address', async (req, res) => {
         address: true,
         customUrl: true,
         inviteCode: true,
+        eventSeriesId: true,
       },
     });
 
@@ -79,7 +81,8 @@ router.get('/metadata/:partyId/:address', async (req, res) => {
       name: party.name,
       description: `Proof of attendance at ${party.name}`,
       image: party.eventImageUrl || '',
-      external_url: `https://rsv.pizza/${eventUrl}`,
+      // White-label: a branded series' NFT links back to its own site.
+      external_url: `${(await siteForParty(party, 'https://rsv.pizza')).url}/${eventUrl}`, // brand-check-ignore-line
       attributes,
     };
 

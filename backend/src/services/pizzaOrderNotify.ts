@@ -7,6 +7,7 @@ import type { PizzaOrder } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
 import { siteForParty } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 import { sendTelegramMessage } from './telegramSend.js';
 
 function esc(s: string) {
@@ -64,16 +65,11 @@ async function sendNotices(row: PizzaOrder): Promise<void> {
 
     const apiKey = process.env.RESEND_API_KEY;
     if (apiKey && user?.email) {
-      await fetch('https://api.resend.com/emails', {
+      await sendBrandedEmail({
+        site,
+        apiKey,
         signal: AbortSignal.timeout(NOTIFY_BUDGET_MS),
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: site.fromEmail,
-          to: [user.email],
-          subject,
-          html: `<p>${esc(text)}</p>`,
-        }),
+        payload: { to: [user.email], subject, html: `<p>${esc(text)}</p>` },
       }).catch(() => undefined);
     }
     // The bot link belongs to the party owner, so only DM when the placing host is that owner.
