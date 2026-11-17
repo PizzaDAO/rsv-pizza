@@ -1,10 +1,6 @@
 import { Router, Response, NextFunction, Request } from 'express';
 import { Prisma } from '@prisma/client';
-// @types/archiver@8 dropped the factory-function declaration that the
-// archiver@7 runtime still exports (archiver(format, options)); import as a
-// namespace and call it, same runtime behavior as before.
-import * as archiverNS from 'archiver';
-const archiver = archiverNS as unknown as (format: string, options?: archiverNS.ArchiverOptions) => archiverNS.Archiver;
+import { createZipArchive } from '../lib/zipArchive.js';
 import { prisma } from '../config/database.js';
 import { optionalAuth, requireAuth, AuthRequest } from '../middleware/auth.js';
 
@@ -793,9 +789,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
     res.setHeader('X-Photo-Count', String(filtered.length));
 
-    // zlib level 1 — images are already compressed (JPEG/WebP/PNG); spending
-    // CPU on level 6+ rarely shrinks the archive but adds significant latency.
-    const archive = archiver('zip', { zlib: { level: 1 } });
+    const archive = createZipArchive();
     archive.on('error', (err: Error) => {
       console.error('[salame-58291] archive error:', err);
       if (!res.headersSent) res.status(500).end();
