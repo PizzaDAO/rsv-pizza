@@ -8,19 +8,32 @@ import { acceptBrandAdminInvite } from '../lib/api';
 
 const TOKEN_KEY = 'brandAdminInviteToken';
 
+// localStorage (not sessionStorage) so the token survives the emailed sign-in link opening in a
+// new tab. It expires after an hour and is cleared on accept.
+const TOKEN_TTL_MS = 60 * 60 * 1000;
+
 function readStored(): string | null {
-  try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY);
+    if (!raw) return null;
+    const { t, exp } = JSON.parse(raw) as { t?: string; exp?: number };
+    if (typeof t !== 'string' || typeof exp !== 'number' || exp < Date.now()) {
+      localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    return t;
+  } catch { return null; }
 }
 function store(token: string | null) {
   try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
+    if (token) localStorage.setItem(TOKEN_KEY, JSON.stringify({ t: token, exp: Date.now() + TOKEN_TTL_MS }));
+    else localStorage.removeItem(TOKEN_KEY);
   } catch { /* storage blocked */ }
 }
 
 /**
  * Landing page for the emailed brand-admin invite link (`/brand-admin/accept?token=...`).
- * The token is moved out of the address bar into sessionStorage right away (the sign-in flow
+ * The token is moved out of the address bar into localStorage (1h expiry) right away (the sign-in flow
  * only returns to the path, not the query). Signed-in users accept with one tap; the server
  * requires the signed-in email to match the invited email.
  */

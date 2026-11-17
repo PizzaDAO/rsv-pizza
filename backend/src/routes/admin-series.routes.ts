@@ -34,6 +34,7 @@ import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import {
   emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent, assertSubdomainHost,
 } from '../lib/seriesEmailFields.js';
+import { UUID_RE } from '../lib/seriesAccess.js';
 import { writeSeriesAudit, diffSeries, snapshotOf } from '../lib/seriesAudit.js';
 import {
   SERIES_ADMIN_ROLES, listSeriesAdmins, inviteSeriesAdmin, resendSeriesInvite, revokeSeriesAdmin, setSeriesAdminAlerts,
@@ -53,6 +54,11 @@ async function requireSuperAdmin(req: AuthRequest, _res: Response, next: NextFun
   }
 }
 router.use(requireSuperAdmin);
+
+// Path ids are uuids: anything else is a 404 before any query (also keeps probes cheap).
+for (const name of ['id', 'adminId']) {
+  router.param(name, (_req, _res, next, value) => (UUID_RE.test(String(value)) ? next() : next(new AppError('Not found', 404, 'NOT_FOUND'))));
+}
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;

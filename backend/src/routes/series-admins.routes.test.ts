@@ -5,6 +5,12 @@ import { makeFakeDb } from '../testutil/fakeSeriesAdminDb.js';
 import { memoryRateStore } from '../lib/authRateLimit.js';
 
 const S1 = '11111111-1111-4111-8111-111111111111';
+const X1 = '00000000-0000-4000-8000-0000000000a0';
+const ALIVE = '00000000-0000-4000-8000-0000000000a1';
+const AD1 = '00000000-0000-4000-8000-0000000000a2';
+const AD2 = '00000000-0000-4000-8000-0000000000a3';
+const BD1 = '00000000-0000-4000-8000-0000000000b1';
+const BD2 = '00000000-0000-4000-8000-0000000000b2';
 const S2 = '22222222-2222-4222-8222-222222222222';
 
 const m = vi.hoisted(() => ({
@@ -70,7 +76,7 @@ describe('invite (super-admin only)', () => {
   });
 
   it('even an active brand admin cannot invite', async () => {
-    m.fake.admins.push({ id: 'x', seriesId: S1, email: 'brand@partner.com', status: 'active' });
+    m.fake.admins.push({ id: X1, seriesId: S1, email: 'brand@partner.com', status: 'active' });
     as('brand@partner.com');
     expect((await invite({ email: 'p@partner.com' })).status).toBe(403);
   });
@@ -231,11 +237,11 @@ describe('accept', () => {
 
 describe('revoke, alerts and access', () => {
   it('revoke takes effect on the very next request', async () => {
-    m.fake.admins.push({ id: 'a-live', seriesId: S1, email: 'brand@partner.com', status: 'active' });
+    m.fake.admins.push({ id: ALIVE, seriesId: S1, email: 'brand@partner.com', status: 'active' });
     as('brand@partner.com');
     expect((await request(app).get(`/api/brand-admin/${S1}/probe`)).status).toBe(200);
     as('boss@example.com');
-    const r = await request(app).patch(`/api/admin/series/${S1}/admins/a-live`).send({ status: 'revoked' });
+    const r = await request(app).patch(`/api/admin/series/${S1}/admins/${ALIVE}`).send({ status: 'revoked' });
     expect(r.status).toBe(200);
     expect(m.fake.audit.at(-1)).toMatchObject({ action: 'admin.revoke', actorKind: 'super_admin' });
     as('brand@partner.com');
@@ -243,8 +249,8 @@ describe('revoke, alerts and access', () => {
   });
 
   it('a revoked or invited member is not a series admin; other series is a 404', async () => {
-    m.fake.admins.push({ id: 'a1', seriesId: S1, email: 'brand@partner.com', status: 'active' });
-    m.fake.admins.push({ id: 'a2', seriesId: S1, email: 'pending@partner.com', status: 'invited' });
+    m.fake.admins.push({ id: AD1, seriesId: S1, email: 'brand@partner.com', status: 'active' });
+    m.fake.admins.push({ id: AD2, seriesId: S1, email: 'pending@partner.com', status: 'invited' });
     as('brand@partner.com');
     expect((await request(app).get(`/api/brand-admin/${S1}/probe`)).body).toMatchObject({ seriesId: S1, actorKind: 'series_admin' });
     expect((await request(app).get(`/api/brand-admin/${S2}/probe`)).status).toBe(404);
@@ -255,7 +261,7 @@ describe('revoke, alerts and access', () => {
 
   it('an inactive series 404s its brand admin; super-admin passes for any existing series', async () => {
     m.fake = makeFakeDb({ seriesIds: [S1, S2], inactiveSeries: [S1] });
-    m.fake.admins.push({ id: 'a1', seriesId: S1, email: 'brand@partner.com', status: 'active' });
+    m.fake.admins.push({ id: AD1, seriesId: S1, email: 'brand@partner.com', status: 'active' });
     as('brand@partner.com');
     expect((await request(app).get(`/api/brand-admin/${S1}/probe`)).status).toBe(404);
     as('boss@example.com');
@@ -264,12 +270,12 @@ describe('revoke, alerts and access', () => {
   });
 
   it("an admin id from another series is a 404 for revoke, resend and alerts (no write)", async () => {
-    m.fake.admins.push({ id: 'b1', seriesId: S2, email: 'other@partner.com', status: 'active', alertsEnabled: true });
-    m.fake.admins.push({ id: 'b2', seriesId: S2, email: 'inv@partner.com', status: 'invited' });
+    m.fake.admins.push({ id: BD1, seriesId: S2, email: 'other@partner.com', status: 'active', alertsEnabled: true });
+    m.fake.admins.push({ id: BD2, seriesId: S2, email: 'inv@partner.com', status: 'invited' });
     const before = JSON.stringify(m.fake.admins);
-    expect((await request(app).patch(`/api/admin/series/${S1}/admins/b1`).send({ status: 'revoked' })).status).toBe(404);
-    expect((await request(app).patch(`/api/admin/series/${S1}/admins/b1`).send({ alertsEnabled: false })).status).toBe(404);
-    expect((await request(app).post(`/api/admin/series/${S1}/admins/b2/resend`)).status).toBe(404);
+    expect((await request(app).patch(`/api/admin/series/${S1}/admins/${BD1}`).send({ status: 'revoked' })).status).toBe(404);
+    expect((await request(app).patch(`/api/admin/series/${S1}/admins/${BD1}`).send({ alertsEnabled: false })).status).toBe(404);
+    expect((await request(app).post(`/api/admin/series/${S1}/admins/${BD2}/resend`)).status).toBe(404);
     expect(JSON.stringify(m.fake.admins)).toBe(before);
     expect(m.fake.audit).toHaveLength(0);
   });
@@ -283,6 +289,20 @@ describe('revoke, alerts and access', () => {
     expect(m.fake.audit.at(-1)).toMatchObject({ action: 'admin.alerts' });
     const list = await request(app).get(`/api/admin/series/${S1}/admins`);
     expect(list.status).toBe(200);
+  });
+
+  it('non-uuid series or admin ids are a 404 before any query', async () => {
+    expect((await request(app).get('/api/admin/series/not-a-uuid/admins')).status).toBe(404);
+    expect((await request(app).patch(`/api/admin/series/${S1}/admins/zzz`).send({ alertsEnabled: false })).status).toBe(404);
+    expect((await request(app).post(`/api/admin/series/${S1}/admins/zzz/resend`)).status).toBe(404);
+  });
+
+  it('a concurrent duplicate invite (unique violation) is a friendly 409', async () => {
+    const orig = m.fake.db.seriesAdmin.create;
+    m.fake.db.seriesAdmin.create = async () => { throw Object.assign(new Error('dup'), { code: 'P2002' }); };
+    const res = await invite({ email: 'p@partner.com' });
+    expect(res.status).toBe(409);
+    m.fake.db.seriesAdmin.create = orig;
   });
 
   it('only revoked is an allowed status', async () => {

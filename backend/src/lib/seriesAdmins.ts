@@ -64,6 +64,7 @@ export async function inviteSeriesAdmin(opts: {
 
   const { token, hash, expiresAt } = newInviteToken();
   const admin = await prisma.$transaction(async (tx) => {
+    // Two concurrent first invites for the same email race on (series_id, email): see the catch below.
     const existing = await tx.seriesAdmin.findUnique({ where: { seriesId_email: { seriesId, email } }, select: { id: true, status: true } });
     if (existing?.status === 'active') throw new AppError('That person is already a brand admin', 409, 'DUPLICATE');
     const data = {
@@ -78,6 +79,9 @@ export async function inviteSeriesAdmin(opts: {
       changes: { email: { old: null, new: email }, role: { old: null, new: role } },
     });
     return row;
+  }).catch((e: any) => {
+    if (e?.code === 'P2002') throw new AppError('That email was just invited. Refresh and use Resend if needed.', 409, 'DUPLICATE');
+    throw e;
   });
   const emailSent = await sendInvite(seriesId, email, token);
   return { admin, emailSent };
