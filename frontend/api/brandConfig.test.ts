@@ -1,0 +1,151 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import vm from 'node:vm';
+import { jsonForScript, renderBrandScript, pickFromSnapshot, cleanHost, EMPTY_SCRIPT } from './_brandConfig';
+import handler from './brand-config';
+
+const EVIL = '</script><script>alert(1)</script>"\u2028\u2029&\'';
+
+/** Run the script in a sandbox with a minimal DOM and return what it did. */
+function runScript(code: string) {
+  const classes: string[] = [];
+  const listeners: Array<() => void> = [];
+  const link: { rel?: string; href?: string } = {};
+  const doc = {
+    title: 'static',
+    documentElement: { classList: { add: (c: string) => classes.push(c) } },
+    addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+    querySelector: () => link,
+    createElement: () => ({}),
+    head: { appendChild: () => {} },
+  };
+  const win: Record<string, unknown> = {};
+  vm.runInNewContext(code, { window: win, document: doc });
+  listeners.forEach((fn) => fn());
+  return { win, doc, classes, link };
+}
+
+describe('jsonForScript', () => {
+  it('escapes </script>, < > &, and U+2028/9 so nothing can close the tag or break the literal', () => {
+    const out = jsonForScript({ name: EVIL });
+    expect(out).not.toContain('<');
+    expect(out).not.toContain('>');
+    expect(out).not.toContain('&');
+    expect(out).not.toContain('\u2028');
+    expect(out).not.toContain('\u2029');
+    expect(JSON.parse(out).name).toBe(EVIL);
+  });
+});
+
+describe('renderBrandScript', () => {
+  it('a malicious brand name / tagline round-trips as data and never appears as markup or code', () => {
+    const code = renderBrandScript({ slug: 'example', name: EVIL, tagline: EVIL, themeClass: 'example-theme', faviconUrl: '/f.png' });
+    expect(code).not.toContain('</script>');
+    expect(code.toLowerCase()).not.toContain('<script');
+    const { win, doc, classes, link } = runScript(code);
+    expect((win.__BRAND__ as { name: string }).name).toBe(EVIL);
+    expect(doc.title).toBe(`${EVIL} - ${EVIL}`);
+    expect(classes).toEqual(['example-theme']);
+    expect(link.href).toBe('/f.png');
+    expect(win.alert).toBeUndefined();
+  });
+
+  it('is a harmless no-op when optional fields are missing', () => {
+    const { win, classes, doc } = runScript(renderBrandScript({ slug: 'example' }));
+    expect(win.__BRAND__).toEqual({ slug: 'example' });
+    expect(classes).toEqual([]);
+    expect(doc.title).toBe('static');
+  });
+
+  it('the empty script is valid JS', () => {
+    expect(() => vm.runInNewContext(EMPTY_SCRIPT, {})).not.toThrow();
+  });
+});
+
+describe('helpers', () => {
+  it('cleanHost accepts hostnames only', () => {
+    expect(cleanHost('Pizza.Example.org')).toBe('pizza.example.org');
+    for (const bad of ['', 'a/b', 'x y', '<s>', undefined, 5]) expect(cleanHost(bad)).toBe('');
+  });
+  it('pickFromSnapshot prefers slug, else host', () => {
+    const snap = { configs: [{ slug: 'a', domain: 'a.example.org' }, { slug: 'b', domain: 'b.example.org' }] };
+    expect(pickFromSnapshot(snap, 'b', '')?.slug).toBe('b');
+    expect(pickFromSnapshot(snap, '', 'a.example.org')?.slug).toBe('a');
+    expect(pickFromSnapshot(snap, '', 'zzz.example.org')).toBeNull();
+    expect(pickFromSnapshot(null, 'a', '')).toBeNull();
+  });
+});
+
+function call(query: Record<string, string> = { host: 'pizza.example.org' }) {
+  const headers: Record<string, string> = {};
+  const res: any = {
+    statusCode: 0,
+    body: '',
+    status(c: number) { res.statusCode = c; return res; },
+    setHeader(k: string, v: string) { headers[k.toLowerCase()] = v; return res; },
+    send(b: string) { res.body = b; return res; },
+  };
+  return handler({ query, headers: {} } as any, res).then(() => ({ res, headers }));
+}
+
+describe('/brand-config.js handler', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    vi.stubEnv('VITE_BRAND_RUNTIME', '1');
+    vi.stubEnv('VITE_BRAND_SERIES_SLUG', '');
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.unstubAllEnvs();
+  });
+
+  it('404s on deploys that did not opt in', async () => {
+    vi.stubEnv('VITE_BRAND_RUNTIME', '');
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as any;
+    const { res } = await call();
+    expect(res.statusCode).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('serves the script with SWR cache headers when the backend answers', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ slug: 'example', name: 'Example Pizza' }), { status: 200 })) as any;
+    const { res, headers } = await call();
+    expect(res.statusCode).toBe(200);
+    expect(headers['content-type']).toContain('text/javascript');
+    expect(headers['cache-control']).toBe('public, max-age=60, s-maxage=60, stale-while-revalidate=86400');
+    expect(res.body).toContain('"name":"Example Pizza"');
+  });
+
+  it('unknown host: an empty script (the app keeps its env defaults), not an error', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 404 })) as any;
+    const { res } = await call({ host: 'unknown.example.org' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe(EMPTY_SCRIPT);
+  });
+
+  it('API 500 falls back to this instance last good copy', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ slug: 'lg', name: 'Last Good' }), { status: 200 })) as any;
+    await call({ host: 'lg.example.org' });
+    globalThis.fetch = vi.fn(async () => new Response('boom', { status: 500 })) as any;
+    const { res, headers } = await call({ host: 'lg.example.org' });
+    expect(res.body).toContain('Last Good');
+    expect(headers['cache-control']).toContain('max-age=10');
+  });
+
+  it('API down with no last good: the build-time snapshot, then an empty script', async () => {
+    globalThis.fetch = vi.fn(async () => { throw new Error('down'); }) as any;
+    const { res } = await call({ host: 'never-seen.example.org' });
+    // The committed snapshot has no entry for this host, so the app keeps its env defaults.
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe(EMPTY_SCRIPT);
+  });
+
+  it('rejects an invalid host without calling the backend', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as any;
+    const { res } = await call({ host: 'a/../b' });
+    expect(res.body).toBe(EMPTY_SCRIPT);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

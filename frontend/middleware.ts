@@ -51,7 +51,12 @@ export const OPEN_FILES = new Set([
 
 /** Paths that bypass the gate: hashed build assets and an explicit file allowlist. */
 export function isOpenAsset(pathname: string): boolean {
-  return pathname.startsWith('/assets/') || OPEN_FILES.has(pathname);
+  // /cdn/ is a storage rewrite (vercel.json), not the SPA shell, so a prefix match is safe here.
+  return (
+    pathname.startsWith('/assets/') || pathname.startsWith('/cdn/brand-assets/') ||
+    pathname === '/brand-config.js' || // runtime brand script (VITE_BRAND_RUNTIME=1): a function, not a public file
+    OPEN_FILES.has(pathname)
+  );
 }
 
 async function hmacHex(key: string, message: string): Promise<string> {
@@ -243,6 +248,139 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
+// ---- Runtime brand config (VITE_BRAND_RUNTIME=1) ----
+// Inlined on purpose: unbundled Node ESM cannot resolve extensionless relative imports.
+export interface RuntimeBrandCfg {
+  seriesId?: string;
+  slug?: string;
+  name?: string;
+  tagline?: string | null;
+  description?: string | null;
+  url?: string;
+  logoUrl?: string | null;
+  faviconUrl?: string | null;
+  ogImageUrl?: string | null;
+  hasCustomOgImage?: boolean;
+}
+
+const BRAND_CFG_TTL_MS = 60_000;
+const brandCfgCache = new Map<string, { at: number; cfg: RuntimeBrandCfg | null }>();
+
+/** True only on builds/deploys that opted in to runtime brand config. */
+export function brandRuntimeOn(): boolean {
+  return (process.env.VITE_BRAND_RUNTIME || '').trim() === '1';
+}
+
+/**
+ * The brand config for a request, from the backend's public /api/brand-config (by series slug when
+ * the deploy is pinned to one, else by host). 60 s in-isolate cache, 2 s timeout, and a failed
+ * refresh keeps serving the last good copy. Null = unknown / unavailable: callers use env.
+ */
+export async function getBrandConfig(host: string, apiUrl: string, slug = ''): Promise<RuntimeBrandCfg | null> {
+  const key = slug ? `slug:${slug}` : `host:${host.toLowerCase()}`;
+  const hit = brandCfgCache.get(key);
+  if (hit && Date.now() - hit.at < BRAND_CFG_TTL_MS) return hit.cfg;
+  try {
+    const qs = slug ? `slug=${encodeURIComponent(slug)}` : `host=${encodeURIComponent(host.toLowerCase())}`;
+    const r = await fetch(`${apiUrl}/api/brand-config?${qs}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (r.status === 404) {
+      brandCfgCache.set(key, { at: Date.now(), cfg: null });
+      return null;
+    }
+    if (!r.ok) throw new Error(`brand-config HTTP ${r.status}`);
+    const cfg = (await r.json()) as RuntimeBrandCfg;
+    if (!cfg || typeof cfg.slug !== 'string') throw new Error('brand-config: unexpected body');
+    brandCfgCache.set(key, { at: Date.now(), cfg });
+    return cfg;
+  } catch {
+    // Keep the last good copy (even if stale) and retry in a minute.
+    const stale = hit?.cfg ?? null;
+    brandCfgCache.set(key, { at: Date.now(), cfg: stale });
+    return stale;
+  }
+}
+
+/** Absolute URL for an image path against a site origin. */
+function absoluteUrl(origin: string, value: string): string {
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${origin}${value.startsWith('/') ? '' : '/'}${value}`;
+}
+
+export interface MetaValues {
+  /** <title> text (may differ from the social title). */
+  docTitle: string;
+  title: string;
+  description?: string;
+  url: string;
+  image: string;
+  imageWidth: number;
+  imageHeight: number;
+  twitterCard: string;
+  /** og:site_name; omitted = leave the static value. */
+  siteName?: string;
+  /** Tab icon href; omitted = leave the static value. */
+  favicon?: string;
+}
+
+/**
+ * Rewrite the static SPA tags to `meta`. Every value is HTML-escaped (URLs included), and the
+ * replacements are functions so a `$&` / `$1` inside a name or description is never interpreted.
+ */
+export function rewriteMeta(html: string, meta: MetaValues): string {
+  const sub = (re: RegExp, text: string) => {
+    html = html.replace(re, () => text);
+  };
+  const e = escapeHtml;
+  sub(/<title>[^<]*<\/title>/, `<title>${e(meta.docTitle)}</title>`);
+  sub(/<meta\s+name="title"\s+content="[^"]*"\s*\/?>/, `<meta name="title" content="${e(meta.title)}" />`);
+  if (meta.description !== undefined) {
+    sub(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/, `<meta name="description" content="${e(meta.description)}" />`);
+    sub(/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/, `<meta property="og:description" content="${e(meta.description)}" />`);
+    sub(/<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/, `<meta name="twitter:description" content="${e(meta.description)}" />`);
+  }
+  sub(/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/, `<meta property="og:url" content="${e(meta.url)}" />`);
+  sub(/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/, `<meta property="og:title" content="${e(meta.title)}" />`);
+  sub(/<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/, `<meta property="og:image" content="${e(meta.image)}" />`);
+  sub(/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>/, `<meta property="og:image:width" content="${meta.imageWidth}" />`);
+  sub(/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>/, `<meta property="og:image:height" content="${meta.imageHeight}" />`);
+  sub(/<meta\s+name="twitter:card"\s+content="[^"]*"\s*\/?>/, `<meta name="twitter:card" content="${e(meta.twitterCard)}" />`);
+  sub(/<meta\s+name="twitter:url"\s+content="[^"]*"\s*\/?>/, `<meta name="twitter:url" content="${e(meta.url)}" />`);
+  sub(/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/, `<meta name="twitter:title" content="${e(meta.title)}" />`);
+  sub(/<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/, `<meta name="twitter:image" content="${e(meta.image)}" />`);
+  if (meta.siteName !== undefined) {
+    sub(/<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/, `<meta property="og:site_name" content="${e(meta.siteName)}" />`);
+  }
+  if (meta.favicon !== undefined) {
+    sub(/<link\s+rel="icon"\s+type="image\/png"\s+href="[^"]*"\s*\/?>/, `<link rel="icon" type="image/png" href="${e(meta.favicon)}" />`);
+  }
+  return html;
+}
+
+/** Meta for the home page of a runtime-configured brand. */
+export function homeMeta(cfg: RuntimeBrandCfg): MetaValues {
+  const origin = (cfg.url || '').replace(/\/+$/, '');
+  const name = (cfg.name || '').trim();
+  const tagline = (cfg.tagline || process.env.VITE_BRAND_TAGLINE || 'Pizza Party Planner').trim();
+  const title = `${name} - ${tagline}`;
+  const imgRaw = (cfg.ogImageUrl || cfg.logoUrl || '').trim() || '/logo.png';
+  const custom = !!cfg.hasCustomOgImage;
+  return {
+    docTitle: title,
+    title,
+    description: (cfg.description || '').trim() || undefined,
+    url: `${origin}/`,
+    image: absoluteUrl(origin, imgRaw),
+    imageWidth: custom ? 1200 : 512,
+    imageHeight: custom ? 630 : 512,
+    twitterCard: custom ? 'summary_large_image' : 'summary',
+    siteName: name,
+    favicon: (cfg.faviconUrl || cfg.logoUrl || '').trim() || undefined,
+  };
+}
+
 // ---- Main middleware ----
 export default async function middleware(request: Request) {
   const url = new URL(request.url);
@@ -255,8 +393,30 @@ export default async function middleware(request: Request) {
     if (gated) return gated;
   }
 
-  // Skip home page
-  if (pathname === '/') return next();
+  // Home page: only runtime-brand builds rewrite it (and only for crawlers); everything else is untouched.
+  if (pathname === '/') {
+    if (!brandRuntimeOn()) return next();
+    const ua = request.headers.get('user-agent');
+    if (!ua || ua === 'RSVPizza-OG-Rewriter' || !isCrawler(ua)) return next();
+    try {
+      const apiUrl = process.env.VITE_API_URL || 'https://backend-pizza-dao.vercel.app';
+      const cfg = await getBrandConfig(url.hostname, apiUrl, (process.env.VITE_BRAND_SERIES_SLUG || '').trim().toLowerCase());
+      if (!cfg || !cfg.name || !cfg.url) return next();
+      const original = await fetch(request.url, { headers: { 'User-Agent': 'RSVPizza-OG-Rewriter', Accept: 'text/html' } });
+      if (!original.ok) return next();
+      const html = rewriteMeta(await original.text(), homeMeta(cfg));
+      return new Response(html, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
+      });
+    } catch (error) {
+      console.error('OG middleware error (home):', error);
+      return next();
+    }
+  }
 
   // Skip known non-event paths and files with extensions (e.g. .js, .css, .png)
   if (
@@ -296,12 +456,19 @@ export default async function middleware(request: Request) {
     const event = data?.event;
     if (!event) return next();
 
+    // Runtime brand config (VITE_BRAND_RUNTIME=1): origin, name and series scope come from the DB
+    // config for this host/series. Unknown or unavailable config falls back to the env below.
+    const scopedSlug = (process.env.VITE_BRAND_SERIES_SLUG || '').trim();
+    const rt = brandRuntimeOn() ? await getBrandConfig(url.hostname, apiUrl, scopedSlug.toLowerCase()) : null;
+
     // White-label: a series-scoped deployment only emits event OG tags for its own series.
     // Anything else (or an unresolvable series) falls through to the SPA's generic brand tags.
     // Inlined on purpose: unbundled Node ESM cannot resolve extensionless relative imports.
-    const scopedSlug = (process.env.VITE_BRAND_SERIES_SLUG || '').trim();
     let brandSeriesOg: string | null = null;
-    if (scopedSlug) {
+    if (rt && rt.seriesId) {
+      if (!event.eventSeriesId || event.eventSeriesId !== rt.seriesId) return next();
+      brandSeriesOg = (rt.ogImageUrl || '').trim() || null;
+    } else if (scopedSlug) {
       let mine: { id: string; ogImageUrl?: string | null } | null = null;
       try {
         const sr = await fetch(`${apiUrl}/api/series`, { headers: { Accept: 'application/json' } });
@@ -316,8 +483,9 @@ export default async function middleware(request: Request) {
     // ---- Build meta tag values (mirrors EventPage.tsx logic) ----
     // Default keeps today's www host; a brand deploy sets VITE_BRAND_DOMAIN.
     const brandDomain = (process.env.VITE_BRAND_DOMAIN || '').trim().replace(/\/+$/, '');
-    const baseUrl = brandDomain ? `https://${brandDomain}` : 'https://www.rsv.pizza'; // brand-check-ignore-line
-    const brandName = (process.env.VITE_BRAND_NAME || 'RSV.Pizza').trim(); // brand-check-ignore-line
+    const envBaseUrl = brandDomain ? `https://${brandDomain}` : 'https://www.rsv.pizza'; // brand-check-ignore-line
+    const baseUrl = rt && rt.url ? rt.url.replace(/\/+$/, '') : envBaseUrl;
+    const brandName = rt && rt.name ? rt.name : (process.env.VITE_BRAND_NAME || 'RSV.Pizza').trim(); // brand-check-ignore-line
     const pageUrl = `${baseUrl}/${projectsPath ? trimmed : slug}`;
 
     // Hackathon gallery / project page: the public endpoints decide visibility (a hidden gallery
@@ -355,7 +523,10 @@ export default async function middleware(request: Request) {
     const ogImageUrl = (() => {
       // Default site keeps /logo.png; a brand deploy uses its own OG image / logo.
       if (!event.eventImageUrl) {
-        const brandImg = (process.env.VITE_BRAND_OG_IMAGE || brandSeriesOg || process.env.VITE_BRAND_LOGO_URL || '').trim();
+        const brandImg = (rt
+          ? (rt.ogImageUrl || rt.logoUrl || '')
+          : (process.env.VITE_BRAND_OG_IMAGE || brandSeriesOg || process.env.VITE_BRAND_LOGO_URL || '')
+        ).trim();
         if (!brandImg) return `${baseUrl}/logo.png`;
         if (/^https?:\/\//i.test(brandImg)) return brandImg;
         return `${baseUrl}${brandImg.startsWith('/') ? '' : '/'}${brandImg}`;
@@ -425,71 +596,16 @@ export default async function middleware(request: Request) {
 
     let html = await originalResponse.text();
 
-    // Replace <title>
-    html = html.replace(
-      /<title>[^<]*<\/title>/,
-      `<title>${escapeHtml(metaTitle)} | ${escapeHtml(brandName)}</title>`
-    );
-
-    // Replace meta name="title"
-    html = html.replace(
-      /<meta\s+name="title"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="title" content="${escapeHtml(metaTitle)}" />`
-    );
-
-    // Replace meta name="description"
-    html = html.replace(
-      /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="description" content="${escapeHtml(metaDescription)}" />`
-    );
-
-    // Replace OG tags
-    html = html.replace(
-      /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/,
-      `<meta property="og:url" content="${pageUrl}" />`
-    );
-    html = html.replace(
-      /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/,
-      `<meta property="og:title" content="${escapeHtml(metaTitle)}" />`
-    );
-    html = html.replace(
-      /<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/,
-      `<meta property="og:description" content="${escapeHtml(metaDescription)}" />`
-    );
-    html = html.replace(
-      /<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/,
-      `<meta property="og:image" content="${ogImageUrl}" />`
-    );
-    html = html.replace(
-      /<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>/,
-      `<meta property="og:image:width" content="1200" />`
-    );
-    html = html.replace(
-      /<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>/,
-      `<meta property="og:image:height" content="1200" />`
-    );
-
-    // Replace Twitter tags
-    html = html.replace(
-      /<meta\s+name="twitter:card"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="twitter:card" content="${twitterCard}" />`
-    );
-    html = html.replace(
-      /<meta\s+name="twitter:url"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="twitter:url" content="${pageUrl}" />`
-    );
-    html = html.replace(
-      /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="twitter:title" content="${escapeHtml(metaTitle)}" />`
-    );
-    html = html.replace(
-      /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="twitter:description" content="${escapeHtml(metaDescription)}" />`
-    );
-    html = html.replace(
-      /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/,
-      `<meta name="twitter:image" content="${ogImageUrl}" />`
-    );
+    html = rewriteMeta(html, {
+      docTitle: `${metaTitle} | ${brandName}`,
+      title: metaTitle,
+      description: metaDescription,
+      url: pageUrl,
+      image: ogImageUrl,
+      imageWidth: 1200,
+      imageHeight: 1200,
+      twitterCard,
+    });
 
     return new Response(html, {
       status: 200,
