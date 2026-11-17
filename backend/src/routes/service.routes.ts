@@ -17,11 +17,23 @@
  *     200: { ok:true, matched:boolean, events:[{ slug, city, status, type,
  *            date, role, matchedBy }] }  (no PII beyond what was sent)
  *     Rate limit: 60 requests / minute per IP on top of the global /api limiter.
+ *
+ *   POST /api/service/guest-attendance
+ *     "Which events did the person with these identifiers actually check in to?"
+ *     Feeds the "Events attended" section on pizzadao.org member profiles.
+ *     Logic: lib/guestAttendance.ts. Same x-service-key auth and limiter as above, plus
+ *     PIZZADAO_GUEST_LOOKUP_ENABLED=1 (else 503 { ok:false, reason:'disabled' }).
+ *     Body: { emailHashes?: string[<=10] (sha256 hex of lower(trim(email))),
+ *             wallets?: string[<=10] (EVM), dryRun?: boolean }
+ *     200: { ok:true, events:[{ eventId, name, date, city, url, matchedBy, hideGuestList }] }
+ *     dryRun (emailHashes only, <=100): 200 { ok:true, dryRun:true, matchedMembers:n }
+ *     No PII: never other guests, emails, names or wallets.
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { rateLimit } from 'express-rate-limit';
 import { findGppHostEvents, IdentifierError, parseIdentifiers } from '../lib/gppHostLookup.js';
+import { countMatchedMembers, findAttendedEvents, parseAttendanceQuery } from '../lib/guestAttendance.js';
 
 const router = Router();
 
@@ -70,5 +82,38 @@ router.post('/gpp-host-lookup', serviceLimiter, requireServiceKey, async (req: R
     next(error);
   }
 });
+
+/** Feature flag: 503 { ok:false, reason:'disabled' } unless the env var is `1`. */
+function requireGuestLookupEnabled(_req: Request, res: Response, next: NextFunction) {
+  if (process.env.PIZZADAO_GUEST_LOOKUP_ENABLED?.trim() !== '1') {
+    return res.status(503).json({ ok: false, reason: 'disabled' });
+  }
+  next();
+}
+
+router.post(
+  '/guest-attendance',
+  serviceLimiter,
+  requireServiceKey,
+  requireGuestLookupEnabled,
+  async (req: Request, res: Response, next: NextFunction) => {
+    res.set('Cache-Control', 'private, no-store');
+    let q;
+    try {
+      q = parseAttendanceQuery(req.body);
+    } catch (e) {
+      if (e instanceof IdentifierError) return res.status(400).json({ ok: false, reason: e.message });
+      return next(e);
+    }
+    try {
+      if (q.dryRun) {
+        return res.json({ ok: true, dryRun: true, matchedMembers: await countMatchedMembers(q) });
+      }
+      res.json({ ok: true, events: await findAttendedEvents(q) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;
