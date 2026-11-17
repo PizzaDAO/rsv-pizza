@@ -16,6 +16,12 @@
  *   DELETE /api/admin/series/checklist/:defaultId  Delete a series checklist default
  *   GET    /api/admin/series/:id/events?status=pending  List the series' events by underboss status
  *   PATCH  /api/admin/series/:id/events/:partyId/status  Approve/reject/hide a series event
+ *
+ * Brand admins (super-admin only here; plans/wl-self-serve-brands.md §2.1):
+ *   GET    /api/admin/series/:id/admins                        List brand admins
+ *   POST   /api/admin/series/:id/admins {email, role}          Invite (or re-invite a revoked) brand admin
+ *   POST   /api/admin/series/:id/admins/:adminId/resend        New invite link for a pending invite
+ *   PATCH  /api/admin/series/:id/admins/:adminId {status:'revoked'} | {alertsEnabled}
  */
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
@@ -30,6 +36,9 @@ import {
   emailOrNull, hostnameOrNull, senderNameOrNull, siteAliasesOrNull, assertSenderConsistent, assertSubdomainHost,
 } from '../lib/seriesEmailFields.js';
 import { writeSeriesAudit, diffSeries, snapshotOf } from '../lib/seriesAudit.js';
+import {
+  SERIES_ADMIN_ROLES, listSeriesAdmins, inviteSeriesAdmin, resendSeriesInvite, revokeSeriesAdmin, setSeriesAdminAlerts,
+} from '../lib/seriesAdmins.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -423,6 +432,61 @@ router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Respon
       void emailHostOfStatusChange(partyId, status);
     }
     res.json({ party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- brand admins (super-admin only; the whole router is requireSuperAdmin) ----------
+
+router.get('/:id/admins', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    res.json({ admins: await listSeriesAdmins(req.params.id) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/admins', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const b = (req.body || {}) as Record<string, unknown>;
+    const email = emailOrNull(b.email, 'email');
+    if (!email) throw new AppError('email is required', 400, 'VALIDATION_ERROR');
+    const role = b.role === undefined ? 'editor' : str(b.role);
+    if (!role || !(SERIES_ADMIN_ROLES as readonly string[]).includes(role)) {
+      throw new AppError(`role must be one of: ${SERIES_ADMIN_ROLES.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+    const result = await inviteSeriesAdmin({ seriesId: req.params.id, email, role, actorEmail: req.userEmail || 'unknown' });
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/admins/:adminId/resend', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    res.json(await resendSeriesInvite({ seriesId: req.params.id, adminId: req.params.adminId, actorEmail: req.userEmail || 'unknown' }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/:id/admins/:adminId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const b = (req.body || {}) as Record<string, unknown>;
+    const actorEmail = req.userEmail || 'unknown';
+    if (b.status !== undefined) {
+      if (b.status !== 'revoked') throw new AppError("status can only be set to 'revoked' (re-invite to restore)", 400, 'VALIDATION_ERROR');
+      return res.json({ admin: await revokeSeriesAdmin({ seriesId: req.params.id, adminId: req.params.adminId, actorEmail }) });
+    }
+    if (typeof b.alertsEnabled === 'boolean') {
+      return res.json({
+        admin: await setSeriesAdminAlerts({
+          seriesId: req.params.id, adminId: req.params.adminId, alertsEnabled: b.alertsEnabled, actorEmail, actorKind: 'super_admin',
+        }),
+      });
+    }
+    throw new AppError('Nothing to update: send status:"revoked" or alertsEnabled', 400, 'VALIDATION_ERROR');
   } catch (error) {
     next(error);
   }

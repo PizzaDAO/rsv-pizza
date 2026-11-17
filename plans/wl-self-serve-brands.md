@@ -746,7 +746,7 @@ Dependencies:
 10. Which fonts go on the safe list beyond the current 5 (Kanit, Inter, Nunito, Satoshi, system)?
 
 ## Snax decisions (2026-11-17: "defaults")
-1. Pilot brand/contact: TBD (ask Snax before PR 14 / pilot invite).
+1. Pilot brand: **Own The Doge** (doge series, Snax 2026-11-17). Contact: ask Snax before the pilot invite (PR 14).
 2. Only super-admins add brand admins in v1; brand-owner invites later.
 3. Brand-admin approvals are final, but PizzaDAO super-admins keep a veto; once a brand has an admin, PizzaDAO stops getting that brand's new-event alerts.
 4. create_flow and require_approval stay super-admin only.
