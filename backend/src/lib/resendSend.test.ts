@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockPrisma = vi.hoisted(() => ({ eventSeries: { updateMany: vi.fn() } }));
+const mockPrisma = vi.hoisted(() => ({ eventSeries: { updateMany: vi.fn() }, seriesAudit: { create: vi.fn() } }));
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 const inval = vi.hoisted(() => vi.fn());
 vi.mock('./siteBrand.js', () => ({ invalidateSiteBrandCache: inval }));
@@ -16,6 +16,7 @@ const PAYLOAD = { to: ['a@b.co'], subject: 'S', html: '<p>x</p>' };
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.eventSeries.updateMany.mockResolvedValue({ count: 1 });
+  mockPrisma.seriesAudit.create.mockResolvedValue({});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -58,6 +59,11 @@ describe('sendBrandedEmail', () => {
     expect(bodyOf(f, 1).reply_to).toBe('hi@p.com'); // reply_to kept on the retry
     expect(mockPrisma.eventSeries.updateMany).toHaveBeenCalledWith({ where: { id: 's1' }, data: { emailDomainVerifiedAt: null } });
     expect(inval).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockPrisma.seriesAudit.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.seriesAudit.create.mock.calls[0][0].data).toMatchObject({
+      seriesId: 's1', actorKind: 'system', action: 'email.verification_revoked',
+    });
   });
 
   it('does not retry on an unrelated failure or status', async () => {
@@ -69,6 +75,7 @@ describe('sendBrandedEmail', () => {
     await sendBrandedEmail({ site: partner, apiKey: 'k', payload: PAYLOAD, fetchImpl: g as any });
     expect(g).toHaveBeenCalledTimes(1);
     expect(mockPrisma.eventSeries.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.seriesAudit.create).not.toHaveBeenCalled();
   });
 
   it('does not retry when already on the fallback sender', async () => {

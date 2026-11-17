@@ -9,6 +9,7 @@ import {
   siteForParty,
   siteForOrigin,
   getSeriesSites,
+  invalidateSiteBrandCache,
   brandedSeriesBySlug,
   normalizeOrigin,
   _resetSiteBrandCache,
@@ -142,6 +143,58 @@ describe('siteBrand', () => {
       vi.advanceTimersByTime(2_000);
       await getSeriesSites();
       expect(mockPrisma.eventSeries.findMany).toHaveBeenCalledTimes(2);
+    });
+
+    describe('invalidateSiteBrandCache', () => {
+      const deferred = () => {
+        let resolve!: (v: unknown) => void;
+        const promise = new Promise((r) => { resolve = r; });
+        return { promise, resolve };
+      };
+
+      it('expires the cache (next lookup reloads) but keeps the stale copy as the failure fallback', async () => {
+        await getSeriesSites();
+        invalidateSiteBrandCache();
+        mockPrisma.eventSeries.findMany.mockRejectedValue(new Error('db down'));
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const sites = await getSeriesSites();
+        expect(mockPrisma.eventSeries.findMany).toHaveBeenCalledTimes(2); // it did try to reload
+        expect(sites.byId.get('series-team1')?.name).toBe('Team1 Pizza'); // stale copy, not empty
+        spy.mockRestore();
+      });
+
+      it('a load already in flight before the invalidation does not overwrite the newer cache', async () => {
+        const slow = deferred();
+        mockPrisma.eventSeries.findMany.mockReturnValueOnce(slow.promise);
+        const oldLoad = getSeriesSites(); // starts load #1 (will resolve late, with OLD data)
+        invalidateSiteBrandCache();
+        mockPrisma.eventSeries.findMany.mockResolvedValueOnce([{ ...TEAM1, brandName: 'Team1 NEW' }]);
+        const fresh = await getSeriesSites(); // load #2
+        expect(fresh.byId.get('series-team1')?.name).toBe('Team1 NEW');
+        slow.resolve([{ ...TEAM1, brandName: 'Team1 OLD' }]);
+        await oldLoad;
+        await Promise.resolve();
+        const after = await getSeriesSites(); // must still be the newer data, served from cache
+        expect(after.byId.get('series-team1')?.name).toBe('Team1 NEW');
+        expect(mockPrisma.eventSeries.findMany).toHaveBeenCalledTimes(2);
+      });
+
+      it('an older load finishing does not null a newer in-flight slot (no duplicate load)', async () => {
+        const slow1 = deferred();
+        const slow2 = deferred();
+        mockPrisma.eventSeries.findMany.mockReturnValueOnce(slow1.promise).mockReturnValueOnce(slow2.promise);
+        const p1 = getSeriesSites(); // load #1
+        invalidateSiteBrandCache();
+        const p2 = getSeriesSites(); // load #2 in flight
+        slow1.resolve([TEAM1]);
+        await p1;
+        await Promise.resolve();
+        const p3 = getSeriesSites(); // must join #2, not start #3
+        expect(mockPrisma.eventSeries.findMany).toHaveBeenCalledTimes(2);
+        slow2.resolve([{ ...TEAM1, brandName: 'Team1 NEW' }]);
+        expect((await p2).byId.get('series-team1')?.name).toBe('Team1 NEW');
+        expect((await p3).byId.get('series-team1')?.name).toBe('Team1 NEW');
+      });
     });
   });
 

@@ -80,6 +80,15 @@ describe('sender resolution matrix (siteBrand)', () => {
     });
   });
 
+  it.each([
+    ['Acme, Inc', 'Acme Inc'],
+    ['support@paypal.com', 'supportpaypal.com'],
+    ['A; B: (C) [D] "E" <F>', 'A B C D E F'],
+  ])('From display name %j is stripped of RFC 5322 specials at send time', async (name, shown) => {
+    const s = await resolve({ emailFromName: name });
+    expect(s.fromEmail).toBe(`${shown} <events@mail.partner.com>`);
+  });
+
   it('subdomain of the sending domain is fine; display name falls back to the brand name', async () => {
     const s = await resolve({ emailFromAddress: 'a@x.mail.partner.com', emailFromName: null });
     expect(s.fromEmail).toBe('Partner Pizza <a@x.mail.partner.com>');

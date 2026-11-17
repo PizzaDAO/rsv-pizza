@@ -11,6 +11,7 @@
  */
 import { prisma } from '../config/database.js';
 import { invalidateSiteBrandCache, type SiteBrand } from './siteBrand.js';
+import { writeSeriesAudit } from './seriesAudit.js';
 
 const RESEND_URL = 'https://api.resend.com/emails';
 
@@ -56,9 +57,20 @@ export async function sendBrandedEmail(args: SendBrandedEmailArgs): Promise<Resp
 
   console.error(`[wl-email] sender reverted to fallback (series ${site.seriesId ?? '?'}): ${text.slice(0, 200)}`);
   if (site.seriesId) {
+    const seriesId = site.seriesId;
     void prisma.eventSeries
-      .updateMany({ where: { id: site.seriesId }, data: { emailDomainVerifiedAt: null } })
-      .catch((e) => console.error('[wl-email] failed to clear email_domain_verified_at', e));
+      .updateMany({ where: { id: seriesId }, data: { emailDomainVerifiedAt: null } })
+      .then(async (r) => {
+        if (r.count === 0) return;
+        await writeSeriesAudit(prisma, {
+          seriesId,
+          actorEmail: 'system:resend-send',
+          actorKind: 'system',
+          action: 'email.verification_revoked',
+          changes: { emailDomainVerifiedAt: { old: 'verified', new: null } },
+        });
+      })
+      .catch((e) => console.error('[wl-email] failed to clear email_domain_verified_at / audit it', e));
   }
   invalidateSiteBrandCache();
   return post(doFetch, apiKey, site.fallbackFrom!, payload, site.replyTo);

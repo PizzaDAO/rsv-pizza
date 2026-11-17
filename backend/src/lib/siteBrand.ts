@@ -50,6 +50,8 @@ const CACHE_TTL_MS = 60_000;
 
 let cache: SiteCache | null = null;
 let inflight: Promise<SiteCache> | null = null;
+/** Bumped by every invalidation so a load that started earlier can't overwrite fresher state. */
+let generation = 0;
 
 /** Normalize an origin/URL for exact comparison: trim, drop trailing slashes, lowercase. */
 export function normalizeOrigin(value: string | null | undefined): string | null {
@@ -101,14 +103,18 @@ async function load(): Promise<SiteCache> {
 export async function getSeriesSites(): Promise<SiteCache> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache;
   if (!inflight) {
-    inflight = load()
+    const myGen = generation;
+    const p: Promise<SiteCache> = load()
       .then((c) => {
-        cache = c;
+        // A load that began before an invalidation may hold pre-change data: don't store it.
+        if (myGen === generation) cache = c;
         return c;
       })
       .finally(() => {
-        inflight = null;
+        // Only clear our own slot, never a newer in-flight load started after an invalidation.
+        if (inflight === p) inflight = null;
       });
+    inflight = p;
   }
   try {
     return await inflight;
@@ -120,12 +126,15 @@ export async function getSeriesSites(): Promise<SiteCache> {
 
 /** Drop the cached series sites so the next lookup reloads (used after a sender revert). */
 export function invalidateSiteBrandCache(): void {
-  cache = null;
+  generation++;
+  // Expire, don't discard: if the reload fails, getSeriesSites still falls back to this stale copy.
+  if (cache) cache = { ...cache, at: 0 };
   inflight = null;
 }
 
 /** Test helper. */
 export function _resetSiteBrandCache(): void {
+  generation++;
   cache = null;
   inflight = null;
 }
@@ -134,9 +143,13 @@ function fallbackSite(fallbackUrl: string): SiteBrand {
   return { url: fallbackUrl, name: brand.name, fromEmail: brand.fromEmail };
 }
 
-/** Strip characters that could break out of the From header's display name. */
+/**
+ * Strip every RFC 5322 special and control char from a From display name (same rule as the admin
+ * validator, `senderNameOrNull`): no quoting, so `Acme, Inc` and `support@paypal.com` can't add
+ * recipients or spoof an address.
+ */
 function headerName(v: string): string {
-  return v.replace(/[\u0000-\u001f\u007f"<>]/g, '').replace(/\s+/g, ' ').trim();
+  return v.replace(/[\u0000-\u001f\u007f"<>,;:@()[\]\\]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 /** True when the address' domain equals `domain` or is a subdomain of it. */
