@@ -26,7 +26,13 @@ export function PizzadaoLinkPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = returnUrl.length > 0 && state.length > 0;
+  let returnHost = '';
+  try {
+    returnHost = new URL(returnUrl).host;
+  } catch {
+    /* invalid: handled below */
+  }
+  const valid = returnHost.length > 0 && state.length > 0;
 
   useEffect(() => {
     if (authLoading || user || !valid) return;
@@ -70,6 +76,9 @@ export function PizzadaoLinkPage() {
           ) : (
             <>
               <p className="text-theme-text-secondary text-sm">{t('pizzadaoLink.body')}</p>
+              <p className="text-sm text-theme-text-secondary" data-testid="link-return-host">
+                {t('pizzadaoLink.returnTo', { host: returnHost })}
+              </p>
               <p className="text-sm text-theme-text">
                 {t('pizzadaoLink.signedInAs')} <strong data-testid="link-email">{user.email}</strong>
               </p>

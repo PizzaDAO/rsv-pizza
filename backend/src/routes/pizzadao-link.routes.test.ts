@@ -3,6 +3,9 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const JWT_SECRET = 'test-secret';
 const mockPrisma = vi.hoisted(() => ({ user: { findUnique: vi.fn() } }));
@@ -24,11 +27,11 @@ vi.mock('../middleware/auth.js', () => ({
 
 import linkRoutes from './pizzadao-link.routes.js';
 import { errorHandler } from '../middleware/error.js';
-import { publicJwks } from '../lib/pizzaMcpToken.js';
+import { publicJwks, mintPizzaMcpToken } from '../lib/pizzaMcpToken.js';
 import { generateSigningKeyPem } from '../testutil/pizzaFakes.js';
-import { parseReturnUrl, LinkInputError } from '../lib/pizzadaoLink.js';
+import { parseReturnUrl, buildLinkRedirect, LinkInputError } from '../lib/pizzadaoLink.js';
 
-const ENV = ['PIZZA_MCP_SIGNING_KEY', 'PIZZADAO_LINK_RETURN_ORIGINS', 'PIZZADAO_LINK_AUDIENCE'];
+const ENV = ['PIZZA_MCP_SIGNING_KEY', 'PIZZA_MCP_URL', 'PIZZADAO_LINK_RETURN_ORIGINS', 'PIZZADAO_LINK_AUDIENCE'];
 let saved: Record<string, string | undefined>;
 const STATE = 'abcDEF0123456789_-xyz';
 let uid = 0;
@@ -100,6 +103,17 @@ describe('POST /api/pizzadao-link', () => {
       'https://evil.example/x',
       'https://pizzadao.org.evil.example/x',
       'https://evil.example/https://pizzadao.org',
+      'https://evilpizzadao.org/x', // lookalike suffix
+      'https://pizzadao.org.evil.example/x',
+      'https://sub.pizzadao.org/x',
+      'https://pizzadao.org:8443/x', // port
+      'https://xn--pizzada-8ve.org/x', // IDN lookalike (punycode)
+      'https://pizzadаo.org/x', // Cyrillic a
+      'https://pizzadao.org\\@evil.example/x', // backslash
+      'https:\\\\evil.example/x',
+      'https:///evil.example/x',
+      'https://pizzadao.org/x\n',
+      'https://pizzadao.org /x',
       'https://pizzadao.org@evil.example/x',
       'http://pizzadao.org/x',
       'javascript:alert(1)',
@@ -123,11 +137,19 @@ describe('POST /api/pizzadao-link', () => {
 });
 
 describe('return URL allowlist config', () => {
-  it('honours PIZZADAO_LINK_RETURN_ORIGINS with a single-label wildcard for previews', () => {
-    process.env.PIZZADAO_LINK_RETURN_ORIGINS = 'https://pizzadao.org, https://pizzadao-*-team.vercel.app';
+  it('normalizes case and same-origin paths (uppercase host, // in path) without widening the allowlist', () => {
+    expect(parseReturnUrl('https://PIZZADAO.ORG/Profile').origin).toBe('https://pizzadao.org');
+    expect(parseReturnUrl('https://pizzadao.org//evil.example/x').origin).toBe('https://pizzadao.org');
+    expect(parseReturnUrl('https://pizzadao.org/x').toString()).toBe('https://pizzadao.org/x');
+  });
+
+  it('honours PIZZADAO_LINK_RETURN_ORIGINS as exact origins only (a wildcard is ignored, never matches)', () => {
+    process.env.PIZZADAO_LINK_RETURN_ORIGINS =
+      'https://pizzadao.org, https://pizzadao-git-feat-x-team.vercel.app/, https://pizzadao-*.vercel.app, https://*.vercel.app, https://pizzadao.org/path';
     expect(parseReturnUrl('https://pizzadao-git-feat-x-team.vercel.app/p').hostname).toBe('pizzadao-git-feat-x-team.vercel.app');
-    expect(() => parseReturnUrl('https://pizzadao-a.b-team.vercel.app/p')).toThrow(LinkInputError);
-    expect(() => parseReturnUrl('https://pizzadao-x-team.vercel.app.evil.example/p')).toThrow(LinkInputError);
+    expect(() => parseReturnUrl('https://pizzadao-git-other-team.vercel.app/p')).toThrow(LinkInputError);
+    expect(() => parseReturnUrl('https://pizzadao-evil.vercel.app/p')).toThrow(LinkInputError);
+    expect(() => parseReturnUrl('https://anything.vercel.app/p')).toThrow(LinkInputError);
     expect(() => parseReturnUrl('https://www.pizzadao.org/p')).toThrow(LinkInputError); // not listed once overridden
   });
 
@@ -135,5 +157,37 @@ describe('return URL allowlist config', () => {
     expect(() => parseReturnUrl('http://localhost:3000/p')).toThrow(LinkInputError);
     process.env.PIZZADAO_LINK_RETURN_ORIGINS = 'http://localhost:3000';
     expect(parseReturnUrl('http://localhost:3000/p').port).toBe('3000');
+    expect(() => parseReturnUrl('http://localhost:3001/p')).toThrow(LinkInputError);
+  });
+});
+
+// A link token must never be accepted by pizza-mcp's REAL verifier (PIZZA_MCP_DIR = a pizza-mcp
+// checkout with node_modules), as an access token or as a signed document.
+const MCP = process.env.PIZZA_MCP_DIR;
+describe.skipIf(!MCP)('pizza-mcp rejects a pizzadao link token (real code from PIZZA_MCP_DIR)', () => {
+  const run = (token: string) => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const r = spawnSync(join(MCP!, 'node_modules', '.bin', 'tsx'), [join(here, '..', 'testutil', 'verifyLinkTokenWithPizzaMcp.mjs')], {
+      cwd: MCP!,
+      input: JSON.stringify({
+        token,
+        jwks: publicJwks(),
+        issuer: 'https://api.rsv.pizza', // brand-check-ignore-line (OPOP issuer, fixed by the trust contract)
+        audiences: ['https://api.openpizza.xyz', 'https://api.openpizza.xyz/api/mcp', 'pizzadao.org'],
+        nowMs: Date.now(),
+      }),
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', PIZZA_MCP_DIR: MCP!, NODE_ENV: 'test' },
+      timeout: 60_000,
+    });
+    if (r.status !== 0) throw new Error(`pizza-mcp verifier failed: ${r.stderr || r.error}`);
+    return JSON.parse(r.stdout.trim().split('\n').pop()!).accepted as boolean;
+  };
+
+  it('does not accept it as an access token (even with its audience allowed), while a real access token passes', () => {
+    process.env.PIZZA_MCP_URL = 'https://api.openpizza.xyz';
+    const url = buildLinkRedirect({ email: 'a@b.co', returnUrl: 'https://pizzadao.org/x', state: STATE });
+    expect(run(mintPizzaMcpToken({ userId: 'u1' }))).toBe(true); // positive control: the harness really verifies
+    expect(run(new URL(url).searchParams.get('rsv_link')!)).toBe(false);
   });
 });

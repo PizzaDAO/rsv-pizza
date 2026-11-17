@@ -53,6 +53,7 @@ describe('PizzadaoLinkPage', () => {
     authState = { user: { email: 'me@example.org' }, loading: false };
     renderAt(URL_);
     expect((await screen.findByTestId('link-email')).textContent).toBe('me@example.org');
+    expect(screen.getByTestId('link-return-host').textContent).toBe("You'll be sent back to pizzadao.org");
     expect(fetchMock).not.toHaveBeenCalled();
 
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ url: 'https://pizzadao.org/p?rsv_link=t&state=s' }) });

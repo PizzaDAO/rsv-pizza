@@ -12,7 +12,7 @@
  *   wallets      guests.ethereum_address, compared case-insensitively (EVM addresses only).
  *
  * A row counts only when the guest was checked in (checked_in_at set), the guest row is not
- * cancelled/declined, the party is not cancelled and its type is standard, gpp or unset
+ * cancelled/declined, the party is not cancelled and its type is standard, gpp, side or unset
  * (private events are never returned).
  *
  * The result carries no PII about anyone: per event only id, name, date, city, public URL,
@@ -23,11 +23,11 @@ import { prisma } from '../config/database.js';
 import { brandUrl } from '../config/brand.js';
 import { WALLET_RE, MAX_IDENTIFIERS_PER_KIND, IdentifierError } from './gppHostLookup.js';
 
-export const MAX_DRY_RUN_HASHES = 100;
+export const MAX_DRY_RUN_HASHES = 25;
 export const MAX_ATTENDED_EVENTS = 100;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
-export const ATTENDANCE_EVENT_TYPES = ['standard', 'gpp'] as const;
+export const ATTENDANCE_EVENT_TYPES = ['standard', 'gpp', 'side'] as const;
 
 export interface AttendanceQuery {
   dryRun: boolean;
@@ -98,7 +98,7 @@ export async function findAttendedEvents(q: AttendanceQuery, db = prisma): Promi
 
   const parties = await db.party.findMany({
     where: { id: { in: [...kinds.keys()] } },
-    select: { id: true, name: true, date: true, city: true, customUrl: true, inviteCode: true, hideGuests: true, password: true },
+    select: { id: true, name: true, date: true, city: true, customUrl: true, hideGuests: true, password: true, requireApproval: true },
     orderBy: { date: 'desc' },
     take: MAX_ATTENDED_EVENTS,
   });
@@ -107,8 +107,9 @@ export async function findAttendedEvents(q: AttendanceQuery, db = prisma): Promi
     name: p.name,
     date: p.date ? p.date.toISOString() : null,
     city: p.city ?? null,
-    // Password-protected (invite-only) parties get no public link.
-    url: p.password ? null : brandUrl(p.customUrl || p.inviteCode),
+    // Only an openly listed event gets a link: a vanity URL, no password, no approval gate, guest
+    // list not hidden. The invite code is a capability for the rest, so it is never returned.
+    url: p.customUrl && !p.password && !p.requireApproval && !p.hideGuests ? brandUrl(p.customUrl) : null,
     matchedBy: [...kinds.get(p.id)!].sort(),
     hideGuestList: p.hideGuests === true,
   }));
@@ -121,20 +122,29 @@ export async function countMatchedMembers(q: AttendanceQuery, db = prisma): Prom
   return new Set(rows.map((r) => r.email_hash).filter((h): h is string => !!h && want.has(h))).size;
 }
 
+/**
+ * Two index-backed branches (see migrations/20261117000000_guest_attendance_indexes): email via
+ * public.guest_email_sha256(email), wallet via lower(ethereum_address), both partial on
+ * checked_in_at IS NOT NULL. The expressions here must stay identical to the index definitions.
+ */
 async function matchRows(q: AttendanceQuery, db = prisma): Promise<MatchRow[]> {
   return db.$queryRaw<MatchRow[]>`
-    SELECT g.party_id::text AS party_id,
-           encode(sha256(convert_to(lower(btrim(g.email)), 'UTF8')), 'hex') AS email_hash,
-           lower(g.ethereum_address) AS wallet
-    FROM guests g
-    JOIN parties p ON p.id = g.party_id
-    WHERE g.checked_in_at IS NOT NULL
-      AND g.status NOT IN ('CANCELLED', 'DECLINED')
-      AND p.cancelled_at IS NULL
+    SELECT m.party_id::text AS party_id, m.email_hash, m.wallet
+    FROM (
+      SELECT g.party_id, public.guest_email_sha256(g.email) AS email_hash, NULL::text AS wallet
+      FROM guests g
+      WHERE g.checked_in_at IS NOT NULL
+        AND g.status NOT IN ('CANCELLED', 'DECLINED')
+        AND public.guest_email_sha256(g.email) = ANY(${q.emailHashes}::text[])
+      UNION
+      SELECT g.party_id, NULL::text AS email_hash, lower(g.ethereum_address) AS wallet
+      FROM guests g
+      WHERE g.checked_in_at IS NOT NULL
+        AND g.status NOT IN ('CANCELLED', 'DECLINED')
+        AND lower(g.ethereum_address) = ANY(${q.wallets}::text[])
+    ) m
+    JOIN parties p ON p.id = m.party_id
+    WHERE p.cancelled_at IS NULL
       AND (p.event_type IS NULL OR p.event_type = ANY(${[...ATTENDANCE_EVENT_TYPES]}::text[]))
-      AND (
-        encode(sha256(convert_to(lower(btrim(g.email)), 'UTF8')), 'hex') = ANY(${q.emailHashes}::text[])
-        OR lower(g.ethereum_address) = ANY(${q.wallets}::text[])
-      )
     LIMIT 2000`;
 }

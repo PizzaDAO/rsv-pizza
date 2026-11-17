@@ -33,30 +33,40 @@ export function emailSha256(email: string): string {
   return crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
 }
 
-/** Allowed return origins from PIZZADAO_LINK_RETURN_ORIGINS (comma separated), else the defaults. */
-export function returnOriginPatterns(): string[] {
-  const raw = (process.env.PIZZADAO_LINK_RETURN_ORIGINS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase().replace(/\/+$/, ''))
-    .filter(Boolean);
-  return raw.length ? raw : DEFAULT_RETURN_ORIGINS;
+/** Canonical origin for an allowlist entry, or null if it is not a bare http(s) origin. */
+function canonicalOrigin(entry: string): string | null {
+  if (entry.includes('*')) return null; // wildcards are never supported: anyone can register a matching host
+  try {
+    const u = new URL(entry);
+    const bare = u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password;
+    return bare && (u.protocol === 'https:' || u.protocol === 'http:') ? u.origin : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Entries are exact origins ("https://pizzadao.org"); a `*` inside the host stands for one or
- * more [a-z0-9-] characters within a single label ("https://pizzadao-*.vercel.app").
+ * Allowed return origins: PIZZADAO_LINK_RETURN_ORIGINS (comma separated EXACT origins, e.g.
+ * "https://pizzadao.org,https://pizzadao-git-x-team.vercel.app"), else the defaults.
+ * Entries that are not bare origins (paths, wildcards, junk) are ignored.
  */
-function originMatches(origin: string, pattern: string): boolean {
-  if (!pattern.includes('*')) return origin === pattern;
-  const re = new RegExp(
-    '^' + pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[a-z0-9-]+') + '$',
-  );
-  return re.test(origin);
+export function returnOrigins(): string[] {
+  const configured = (process.env.PIZZADAO_LINK_RETURN_ORIGINS || '')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map(canonicalOrigin)
+    .filter((o): o is string => o !== null);
+  return configured.length ? configured : DEFAULT_RETURN_ORIGINS;
 }
 
-/** Validate the return URL against the allowlist. Returns the parsed URL or throws. */
+/** Validate the return URL against the allowlist (exact origin match). Returns the parsed URL or throws. */
 export function parseReturnUrl(raw: unknown): URL {
-  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 2000) throw new LinkInputError('Invalid returnUrl');
+  // No backslashes, whitespace or control characters: parsers disagree about them.
+  // eslint-disable-next-line no-control-regex
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 2000 || /[\\\s\u0000-\u001f\u007f]/.test(raw)) {
+    throw new LinkInputError('Invalid returnUrl');
+  }
   let u: URL;
   try {
     u = new URL(raw);
@@ -67,8 +77,7 @@ export function parseReturnUrl(raw: unknown): URL {
   if (u.username || u.password || u.hash || (u.protocol !== 'https:' && !(local && u.protocol === 'http:'))) {
     throw new LinkInputError('Invalid returnUrl');
   }
-  const origin = u.origin.toLowerCase();
-  if (!returnOriginPatterns().some((p) => originMatches(origin, p))) throw new LinkInputError('returnUrl not allowed');
+  if (!returnOrigins().includes(u.origin)) throw new LinkInputError('returnUrl not allowed');
   return u;
 }
 

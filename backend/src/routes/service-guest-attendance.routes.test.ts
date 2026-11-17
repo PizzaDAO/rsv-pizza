@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const mockPrisma = vi.hoisted(() => ({
   user: { findMany: vi.fn() },
@@ -42,9 +45,9 @@ const party = (o: Record<string, unknown> = {}) => ({
   date: new Date('2026-05-22T18:00:00Z'),
   city: 'Lisbon',
   customUrl: 'lisbon',
-  inviteCode: 'inv1',
   hideGuests: false,
   password: null,
+  requireApproval: false,
   ...o,
 });
 
@@ -98,7 +101,7 @@ describe('POST /api/service/guest-attendance', () => {
     // party select never asks for guests, emails or hosts
     const sel = mockPrisma.party.findMany.mock.calls[0][0].select;
     expect(Object.keys(sel).sort()).toEqual(
-      ['city', 'customUrl', 'date', 'hideGuests', 'id', 'inviteCode', 'name', 'password'],
+      ['city', 'customUrl', 'date', 'hideGuests', 'id', 'name', 'password', 'requireApproval'],
     );
   });
 
@@ -120,6 +123,28 @@ describe('POST /api/service/guest-attendance', () => {
     expect(mockPrisma.party.findMany.mock.calls[0][0].where.id.in.sort()).toEqual(['p1', 'p2']);
   });
 
+  it('url is null unless there is a vanity URL and no password, approval gate or hidden guest list; never the invite code', async () => {
+    mockPrisma.$queryRaw.mockResolvedValue(
+      ['a', 'b', 'c', 'd', 'e'].map((id) => ({ party_id: id, email_hash: H1, wallet: null })),
+    );
+    mockPrisma.party.findMany.mockResolvedValue([
+      party({ id: 'a' }),
+      party({ id: 'b', customUrl: null, inviteCode: 'secretcode' }),
+      party({ id: 'c', password: 'hash' }),
+      party({ id: 'd', requireApproval: true }),
+      party({ id: 'e', hideGuests: true }),
+    ]);
+    const res = await post({ emailHashes: [H1] });
+    expect(res.body.events.map((e: { url: string | null }) => e.url)).toEqual([
+      'https://rsv.pizza/lisbon',
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(JSON.stringify(res.body)).not.toContain('secretcode');
+  });
+
   it('no rows -> empty events and no party query', async () => {
     const res = await post({ emailHashes: [H1] });
     expect(res.body).toEqual({ ok: true, events: [] });
@@ -133,7 +158,19 @@ describe('POST /api/service/guest-attendance', () => {
     expect(sql).toContain("g.status NOT IN ('CANCELLED', 'DECLINED')");
     expect(sql).toContain('p.cancelled_at IS NULL');
     expect(sql).toContain('p.event_type');
-    expect(mockPrisma.$queryRaw.mock.calls[0].slice(1)).toContainEqual(['standard', 'gpp']);
+    expect(mockPrisma.$queryRaw.mock.calls[0].slice(1)).toContainEqual(['standard', 'gpp', 'side']);
+    expect(mockPrisma.$queryRaw.mock.calls[0].slice(1)).not.toContainEqual(expect.arrayContaining(['private']));
+    // two index-backed branches whose expressions match the migration's index definitions
+    expect(sql.match(/UNION/g)).toHaveLength(1);
+    expect(sql).toContain('public.guest_email_sha256(g.email) = ANY(');
+    expect(sql).toContain('lower(g.ethereum_address) = ANY(');
+    const migration = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'prisma', 'migrations', '20261117000000_guest_attendance_indexes', 'migration.sql'),
+      'utf8',
+    );
+    expect(migration).toContain('ON "guests" (public.guest_email_sha256("email"))');
+    expect(migration).toContain('ON "guests" (lower("ethereum_address"))');
+    expect(migration.match(/WHERE "checked_in_at" IS NOT NULL/g)!.length).toBeGreaterThanOrEqual(2);
   });
 
   describe('validation and limits', () => {
@@ -178,10 +215,10 @@ describe('POST /api/service/guest-attendance', () => {
       expect(mockPrisma.party.findMany).not.toHaveBeenCalled();
     });
 
-    it('accepts up to 100 hashes, rejects more, rejects wallets', async () => {
+    it('accepts up to 25 hashes, rejects more, rejects wallets', async () => {
       const many = (n: number) => Array.from({ length: n }, (_, i) => sha(`u${i}@x.org`));
-      expect((await post({ dryRun: true, emailHashes: many(100) })).status).toBe(200);
-      expect((await post({ dryRun: true, emailHashes: many(101) })).status).toBe(400);
+      expect((await post({ dryRun: true, emailHashes: many(25) })).status).toBe(200);
+      expect((await post({ dryRun: true, emailHashes: many(26) })).status).toBe(400);
       expect((await post({ dryRun: true, emailHashes: [H1], wallets: [W1] })).status).toBe(400);
     });
   });
