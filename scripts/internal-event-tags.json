@@ -1,0 +1,9 @@
+{
+  "_comment": "blackolive-70521: parity fixture for backend/src/lib/eventTags.ts and frontend/src/lib/eventTags.ts. Both tests assert INTERNAL_EVENT_TAGS (sorted) and INTERNAL_TAG_PATTERNS match this file.",
+  "tags": ["go", "missed", "nonhub", "nonpres", "paid", "possible-scam", "prepay", "refund", "side-prelaunch"],
+  "patterns": [
+    { "source": "^\\d+(\\.\\d{1,2})?$", "flags": "" },
+    { "source": "^k\\d+(\\.\\d{1,2})?$", "flags": "i" },
+    { "source": "^gpp2027$", "flags": "i" }
+  ]
+}

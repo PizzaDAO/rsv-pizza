@@ -277,7 +277,8 @@ export const EVENT_EDIT_CATALOG: readonly CatalogField[] = [
     key: 'event_tags',
     type: 'string[]',
     label: 'Event tags',
-    description: 'Filtering/grouping tags. Never add or remove the "go" tag.',
+    description: 'Admin tags. Never add or remove the "go" tag.',
+    adminOnly: true,
     format: fmtStringArray,
   },
   {

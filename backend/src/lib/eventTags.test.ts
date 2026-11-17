@@ -5,7 +5,12 @@ import {
   INTERNAL_EVENT_TAGS,
   withPaidTag,
   withoutPaidTag,
+  INTERNAL_TAG_PATTERNS,
+  mergeHostEventTags,
+  HOST_WRITABLE_EVENT_TAGS,
 } from './eventTags.js';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 describe('isInternalTag', () => {
   it('flags the known internal control tags', () => {
@@ -147,5 +152,71 @@ describe('changesGuardedTags (host cannot clear scam flag or mint a cap)', () =>
     expect(changesGuardedTags(['possible-scam', '200'], ['200', 'possible-scam', 'swc'])).toBe(false);
     expect(changesGuardedTags([], ['swc', 'gpp2026'])).toBe(false);
     expect(changesGuardedTags(null, [])).toBe(false);
+  });
+});
+
+describe('blackolive-70521: parity with scripts/internal-event-tags.json (frontend mirror)', () => {
+  const fixture = JSON.parse(
+    readFileSync(resolve(__dirname, '../../../scripts/internal-event-tags.json'), 'utf8'),
+  );
+  it('INTERNAL_EVENT_TAGS matches the fixture', () => {
+    expect([...INTERNAL_EVENT_TAGS].sort()).toEqual(fixture.tags);
+  });
+  it('INTERNAL_TAG_PATTERNS matches the fixture', () => {
+    expect(INTERNAL_TAG_PATTERNS.map((r) => ({ source: r.source, flags: r.flags }))).toEqual(
+      fixture.patterns,
+    );
+  });
+});
+
+describe('blackolive-70521: mergeHostEventTags', () => {
+  it('HOST_WRITABLE is just prepay', () => {
+    expect([...HOST_WRITABLE_EVENT_TAGS]).toEqual(['prepay']);
+  });
+  it('adds and removes prepay', () => {
+    expect(mergeHostEventTags(['swc'], ['swc', 'prepay']).tags).toEqual(['swc', 'prepay']);
+    expect(mergeHostEventTags(['swc', 'prepay'], ['swc']).tags).toEqual(['swc']);
+  });
+  it('preserves other tags and ignores adds/removes', () => {
+    const r = mergeHostEventTags(['nonhub', 'swc'], ['paid', 'gpp2027', 'side-prelaunch']);
+    expect(r.tags).toEqual(['nonhub', 'swc']);
+    expect(r.ignoredAdded).toEqual(['paid', 'gpp2027', 'side-prelaunch']);
+    expect(r.ignoredRemoved).toEqual(['nonhub', 'swc']);
+    expect(r.changed).toBe(false);
+  });
+  it('only ever stores canonical prepay, deduped', () => {
+    const r = mergeHostEventTags(['swc'], ['swc', 'PREPAY', ' prepay', 'prepay ']);
+    expect(r.tags).toEqual(['swc', 'prepay']);
+  });
+  it('canonicalizes a stored variant and dedupes stored duplicates', () => {
+    const r = mergeHostEventTags(['PREPAY', 'swc', 'prepay '], ['swc', 'prepay']);
+    expect(r.tags).toEqual(['prepay', 'swc']);
+  });
+  it('case/whitespace variants of protected tags are not host-writable', () => {
+    const r = mergeHostEventTags(['swc'], ['swc', 'PAID', ' Go ', 'NonHub']);
+    expect(r.tags).toEqual(['swc']);
+    expect(r.ignoredAdded).toEqual(['PAID', ' Go ', 'NonHub']);
+  });
+  it('ignores non-string entries', () => {
+    const r = mergeHostEventTags(['swc'], ['swc', 5, null, undefined, { a: 1 }, 'prepay']);
+    expect(r.tags).toEqual(['swc', 'prepay']);
+    expect(r.ignoredAdded).toEqual([]);
+  });
+  it('handles null/undefined current and empty request', () => {
+    expect(mergeHostEventTags(null, ['prepay']).tags).toEqual(['prepay']);
+    expect(mergeHostEventTags(undefined, []).tags).toEqual([]);
+  });
+  it('dedupes repeated ignored adds', () => {
+    expect(mergeHostEventTags([], ['paid', 'paid']).ignoredAdded).toEqual(['paid']);
+  });
+  it('partial array without protected tags keeps them (full vs partial)', () => {
+    const cur = ['swc', 'nonhub', 'refund', 'prepay'];
+    expect(mergeHostEventTags(cur, ['prepay']).tags).toEqual(['swc', 'nonhub', 'refund', 'prepay']);
+    expect(mergeHostEventTags(cur, cur).changed).toBe(false);
+  });
+  it('hidden refund (filtered by the host client) is preserved on a prepay toggle', () => {
+    const r = mergeHostEventTags(['swc', 'refund'], ['swc', 'prepay']); // client never saw refund
+    expect(r.tags).toEqual(['swc', 'refund', 'prepay']);
+    expect(mergeHostEventTags(['swc', 'refund', 'prepay'], ['swc']).tags).toEqual(['swc', 'refund']);
   });
 });

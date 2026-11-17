@@ -6,6 +6,8 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = 'test-secret';
 
+const tagRoles = vi.hoisted(() => ({} as Record<string, string>));
+
 // Use vi.hoisted to create mocks that can be referenced in vi.mock factories
 const mockPrisma = vi.hoisted(() => ({
   party: {
@@ -91,6 +93,7 @@ const mockGetOperationalLimits = vi.hoisted(() =>
 vi.mock('../lib/privateConfig.js', () => ({
   getReimbursementRules: mockGetReimbursementRules,
   getOperationalLimits: mockGetOperationalLimits,
+  getGppGlobalEditors: async () => [],
 }));
 
 const parseAuth = (req: any) => {
@@ -121,8 +124,21 @@ vi.mock('../middleware/auth.js', () => ({
     const admin = mockPrisma.admin.findUnique.mock.results[0];
     return admin?.value?.role === 'super_admin';
   },
+  // blackolive-70521: role stubs driven by `tagRoles` (email -> role)
+  isPaymentAdmin: async (email?: string) =>
+    !!email && ['payment_admin', 'admin', 'super_admin'].includes(tagRoles[email] ?? ''),
+  isAdmin: async (email?: string) => !!email && ['admin', 'super_admin'].includes(tagRoles[email] ?? ''),
+  isUnderboss: async (email?: string) => !!email && tagRoles[email] === 'underboss',
   AuthRequest: {},
 }));
+
+vi.mock('../helpers/underbossScope.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../helpers/underbossScope.js')>();
+  return {
+    ...actual,
+    getUnderbossScope: async () => ({ isAdmin: false, regions: ['LATAM'], cities: [] }),
+  };
+});
 
 import partyRoutes from './party.routes.js';
 import { _resetSiteBrandCache } from '../lib/siteBrand.js';
@@ -151,6 +167,100 @@ describe('Party Routes', () => {
     vi.clearAllMocks();
     // Default: isSuperAdmin returns false
     mockPrisma.admin.findUnique.mockResolvedValue(null);
+    for (const k of Object.keys(tagRoles)) delete tagRoles[k];
+  });
+
+  describe('PATCH /api/parties/:id - eventTags writer lock (blackolive-70521)', () => {
+    const CURRENT = ['swc', 'nonhub', 'refund', 'gpp2027', 'side-prelaunch', 'avax'];
+
+    async function patchTags(email: string, userId: string, tags: string[], current = CURRENT, partyExtra: any = {}) {
+      const app = createTestApp();
+      const party = {
+        id: PARTY_ID,
+        userId: HOST_USER_ID,
+        coHosts: [{ email: OTHER_EMAIL, canEdit: true }],
+        eventTags: current,
+        eventType: 'gpp',
+        region: 'LATAM',
+        city: 'X',
+        name: 'Global Pizza Party X',
+        ...partyExtra,
+      };
+      mockPrisma.party.findUnique.mockResolvedValue(party);
+      mockPrisma.party.update.mockResolvedValue({ ...party, user: { name: 'H' } });
+      const res = await request(app)
+        .patch(`/api/parties/${PARTY_ID}`)
+        .set('Authorization', `Bearer ${makeToken(userId, email)}`)
+        .send({ eventTags: tags });
+      return res;
+    }
+    const written = () => mockPrisma.party.update.mock.calls[0]?.[0]?.data?.eventTags;
+
+    for (const [label, email, uid] of [
+      ['host', HOST_EMAIL, HOST_USER_ID],
+      ['co-host', OTHER_EMAIL, OTHER_USER_ID],
+    ] as const) {
+      it(`${label} can toggle prepay and other tags are preserved`, async () => {
+        const res = await patchTags(email, uid, [...CURRENT, 'prepay']);
+        expect(res.status).toBe(200);
+        expect(written()).toEqual([...CURRENT, 'prepay']);
+      });
+
+      it(`${label} can remove prepay`, async () => {
+        const res = await patchTags(email, uid, CURRENT, [...CURRENT, 'prepay']);
+        expect(res.status).toBe(200);
+        expect(written()).toEqual(CURRENT);
+      });
+
+      it(`${label} cannot add or remove internal/partner/gate tags (silently preserved)`, async () => {
+        const res = await patchTags(email, uid, ['paid', 'go', 'missed', 'k40', 'wpc', 'prepay']);
+        expect(res.status).toBe(200);
+        // current kept intact; only prepay (host-writable) added; rest of request ignored
+        expect(written()).toEqual([...CURRENT, 'prepay']);
+        expect(written()).not.toContain('paid');
+        expect(written()).toContain('nonhub');
+        expect(written()).toContain('gpp2027');
+        expect(written()).toContain('side-prelaunch');
+        expect(written()).toContain('avax');
+      });
+
+      it(`${label} sending an unchanged/empty-diff array does not rewrite tags`, async () => {
+        const res = await patchTags(email, uid, [...CURRENT]);
+        expect(res.status).toBe(200);
+        expect(written()).toBeUndefined();
+      });
+    }
+
+    it('admin can write arbitrary tags', async () => {
+      tagRoles[HOST_EMAIL] = 'admin';
+      const res = await patchTags(HOST_EMAIL, HOST_USER_ID, ['nonhub', 'paid', 'avax', 'new-partner']);
+      expect(res.status).toBe(200);
+      expect(written()).toEqual(['nonhub', 'paid', 'avax', 'new-partner']);
+    });
+
+    it('payment_admin can write arbitrary tags incl. go', async () => {
+      tagRoles[HOST_EMAIL] = 'payment_admin';
+      const res = await patchTags(HOST_EMAIL, HOST_USER_ID, [...CURRENT, 'go', 'possible-scam', '200']);
+      expect(res.status).toBe(200);
+      expect(written()).toEqual([...CURRENT, 'go', 'possible-scam', '200']);
+    });
+
+    it('in-scope underboss can write arbitrary tags but still not go/scam/caps', async () => {
+      tagRoles[OTHER_EMAIL] = 'underboss';
+      const ok = await patchTags(OTHER_EMAIL, OTHER_USER_ID, ['custom:vip', 'swc']);
+      expect(ok.status).toBe(200);
+      expect(written()).toEqual(['custom:vip', 'swc']);
+      vi.clearAllMocks();
+      const bad = await patchTags(OTHER_EMAIL, OTHER_USER_ID, [...CURRENT, 'go']);
+      expect(bad.status).toBe(403);
+    });
+
+    it('out-of-scope underboss who is only a co-host is treated as a host', async () => {
+      tagRoles[OTHER_EMAIL] = 'underboss';
+      const res = await patchTags(OTHER_EMAIL, OTHER_USER_ID, ['paid'], CURRENT, { region: 'EMEA' });
+      expect(res.status).toBe(200);
+      expect(written()).toBeUndefined();
+    });
   });
 
   describe('POST /api/parties - Create party', () => {
