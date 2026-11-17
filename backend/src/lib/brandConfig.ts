@@ -5,6 +5,7 @@
  * It is an explicit allowlist built from validated columns: tags, wallet, sender/domain
  * internals, admin data and pending-domain tokens are never read, so they cannot leak.
  */
+import { sanitizeFlyerArt } from './flyerArt.js';
 import type { SeriesBrandRow } from './siteBrand.js';
 import { normalizeThemeTokens, deriveThemeVars, type ThemeTokens } from './themeTokens.js';
 
@@ -75,6 +76,6 @@ export function toBrandConfig(row: SeriesBrandRow): BrandConfig {
     themeClass: classOrNull(row.themeClass),
     tokens,
     themeVars: tokens ? deriveThemeVars(tokens) : null,
-    flyer: { templateKey: str(row.flyerTemplateKey), art: plainObject(row.flyerArt) },
+    flyer: { templateKey: str(row.flyerTemplateKey), art: sanitizeFlyerArt(row.flyerArt) },
   };
 }

@@ -30,7 +30,9 @@ import { AppError } from '../middleware/error.js';
 import { acceptSeriesInvite, setSeriesAdminAlerts } from '../lib/seriesAdmins.js';
 import { isWellFormedInviteToken } from '../lib/seriesInvites.js';
 import {
-  reserveInviteAccept, reserveUserBucket,
+  reserveInviteAccept, reserveUserBucket, reserveKeyBucket,
+  BRAND_ADMIN_UPLOAD_BUCKET, BRAND_ADMIN_UPLOAD_LIMIT, BRAND_ADMIN_ATTACH_BUCKET, BRAND_ADMIN_ATTACH_LIMIT,
+  BRAND_ASSET_DAILY_BUCKET, BRAND_ASSET_DAILY_LIMIT,
   BRAND_ADMIN_SETTINGS_BUCKET, BRAND_ADMIN_SETTINGS_LIMIT, BRAND_ADMIN_WRITE_BUCKET, BRAND_ADMIN_WRITE_LIMIT,
 } from '../lib/seriesInviteLimit.js';
 import { requireSeriesAdmin, UUID_RE, type SeriesAdminRequest } from '../lib/seriesAccess.js';
@@ -38,6 +40,7 @@ import {
   BRAND_SETTINGS_SELECT, validateBrandSettings, applyBrandSettings, pickSettings, visibleChanges, revertToAudit,
 } from '../lib/seriesBrandSettings.js';
 import { invalidateSiteBrandCache } from '../lib/siteBrand.js';
+import { isSlot, SLOTS, validateUploadRequest, createAssetUploadUrl, attachBrandAsset, removeBrandAsset } from '../lib/brandAssets.js';
 import { writeSeriesAudit } from '../lib/seriesAudit.js';
 import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import {
@@ -155,7 +158,7 @@ scoped.patch('/settings', settingsLimit, wrap(async (req, res) => {
 
 scoped.get('/audit', wrap(async (req, res) => {
   const rows = await prisma.seriesAudit.findMany({
-    where: { seriesId: req.seriesAdmin!.seriesId, action: { in: ['settings.update', 'revert'] } },
+    where: { seriesId: req.seriesAdmin!.seriesId, action: { in: ['settings.update', 'revert', 'asset.update', 'asset.remove'] } },
     orderBy: { createdAt: 'desc' },
     take: 50,
     select: { id: true, actorEmail: true, actorKind: true, action: true, changes: true, createdAt: true },
@@ -178,6 +181,47 @@ scoped.post('/revert', settingsLimit, wrap(async (req, res) => {
   if (typeof auditId !== 'string' || !UUID_RE.test(auditId)) throw new AppError('Not found', 404, 'NOT_FOUND');
   const result = await revertToAudit({ ...actor(req), auditId });
   if (result.changed.length) invalidateSiteBrandCache();
+  res.json(result);
+}));
+
+// ----- images (logo, favicon, OG, flyer art): lib/brandAssets.ts -----
+
+const uploadLimit = writeLimit(BRAND_ADMIN_UPLOAD_BUCKET, BRAND_ADMIN_UPLOAD_LIMIT);
+const attachLimit = writeLimit(BRAND_ADMIN_ATTACH_BUCKET, BRAND_ADMIN_ATTACH_LIMIT);
+
+/** Per-series daily cap on new uploads, on top of the per-user hourly budget. */
+async function seriesDailyCap(seriesId: string) {
+  let ok: boolean;
+  try {
+    ok = await reserveKeyBucket(BRAND_ASSET_DAILY_BUCKET, seriesId, BRAND_ASSET_DAILY_LIMIT, 24 * 60 * 60 * 1000);
+  } catch (err) {
+    console.error('[brand-admin] rate store unavailable', err);
+    throw new AppError('Please try again shortly', 503, 'UNAVAILABLE');
+  }
+  if (!ok) throw new AppError('This brand has reached its daily upload limit. Try again tomorrow.', 429, 'RATE_LIMITED');
+}
+
+scoped.post('/assets/upload-url', uploadLimit, wrap(async (req, res) => {
+  const { slot, mimeType, fileSize } = req.body || {};
+  const { ext } = validateUploadRequest(slot, mimeType, fileSize);
+  await seriesDailyCap(req.seriesAdmin!.seriesId);
+  const target = await createAssetUploadUrl(req.seriesAdmin!.seriesId, ext);
+  res.json({ ...target, slot });
+}));
+
+scoped.post('/assets/attach', attachLimit, wrap(async (req, res) => {
+  const { slot, path } = req.body || {};
+  if (!isSlot(slot)) throw new AppError(`slot must be one of ${SLOTS.join(', ')}`, 400, 'VALIDATION_ERROR');
+  const result = await attachBrandAsset({ ...actor(req), slot, path });
+  if (result.changed) invalidateSiteBrandCache();
+  res.json(result);
+}));
+
+scoped.delete('/assets/:slot', writeLimited, wrap(async (req, res) => {
+  const { slot } = req.params;
+  if (!isSlot(slot)) throw new AppError('Not found', 404, 'NOT_FOUND');
+  const result = await removeBrandAsset({ ...actor(req), slot });
+  if (result.changed) invalidateSiteBrandCache();
   res.json(result);
 }));
 

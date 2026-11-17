@@ -227,3 +227,31 @@ export async function setSeriesAdminAlerts(seriesId: string, adminId: string, al
 export async function acceptBrandAdminInvite(token: string): Promise<{ success: boolean; seriesId: string }> {
   return apiRequest<{ success: boolean; seriesId: string }>('/api/brand-admin/accept', { method: 'POST', body: { token } });
 }
+
+// ---- Brand images (PR 13): signed upload to the private tmp bucket, then the server re-encodes ----
+export type BrandAssetSlot = 'logo' | 'logoLight' | 'favicon' | 'og' | 'flyerPoster' | 'flyerRollup';
+export const BRAND_UPLOADS_BUCKET = 'brand-uploads';
+
+export interface BrandAssetResult {
+  slot: BrandAssetSlot;
+  /** Same-origin /cdn/brand-assets/... URL, or null after a remove. */
+  url: string | null;
+  changed: boolean;
+  width?: number;
+  height?: number;
+}
+
+export async function uploadBrandAsset(seriesId: string, slot: BrandAssetSlot, file: File): Promise<BrandAssetResult> {
+  const { supabase } = await import('./supabase');
+  const target = await apiRequest<{ path: string; token: string }>(`/api/brand-admin/${seriesId}/assets/upload-url`, {
+    method: 'POST',
+    body: { slot, mimeType: file.type, fileSize: file.size },
+  });
+  const up = await supabase.storage.from(BRAND_UPLOADS_BUCKET).uploadToSignedUrl(target.path, target.token, file, { contentType: file.type });
+  if (up.error) throw new Error('The upload failed. Please try again.');
+  return apiRequest<BrandAssetResult>(`/api/brand-admin/${seriesId}/assets/attach`, { method: 'POST', body: { slot, path: target.path } });
+}
+
+export async function removeBrandAsset(seriesId: string, slot: BrandAssetSlot): Promise<BrandAssetResult> {
+  return apiRequest<BrandAssetResult>(`/api/brand-admin/${seriesId}/assets/${slot}`, { method: 'DELETE' });
+}
