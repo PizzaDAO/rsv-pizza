@@ -4,6 +4,7 @@ import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { createHash } from 'crypto';
 import { errorHandler, AppError } from './middleware/error.js';
 import { corsOptionsDelegate } from './lib/cors.js';
+import { getSeriesOrigins } from './lib/siteBrand.js';
 import { prisma } from './config/database.js';
 import { assertSecretsConfigured, warnWeakOptionalSecrets } from './config/secrets.js';
 
@@ -143,7 +144,8 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 
 // Middleware
 // tax-form-cors: public /api/tax-form-requests/* additionally allows the pizzadao-org origins (no credentials).
-app.use(cors(corsOptionsDelegate(ALLOWED_ORIGINS)));
+// wl-cors-series: active white-label series' site_url + site_aliases are trusted from the DB too.
+app.use(cors(corsOptionsDelegate(ALLOWED_ORIGINS, getSeriesOrigins)));
 // Resend webhook MUST be mounted BEFORE express.json() so its per-route
 // express.raw() handler sees the unparsed body bytes that Svix signed.
 // bounce-rate-heuristic.

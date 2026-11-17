@@ -124,6 +124,22 @@ export async function getSeriesSites(): Promise<SiteCache> {
   }
 }
 
+/** An exact https origin: no path, no userinfo, lowercase host, optional port. */
+const HTTPS_ORIGIN = /^https:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/;
+
+/**
+ * Origins CORS should trust for white-label sites: the `site_url` and `site_aliases` of ACTIVE series
+ * (same 60 s cache as everything here; on a DB error that is the stale or empty cache, so callers
+ * fall back to the env list). Only exact https origins qualify, so a bad row can never add an
+ * `http://`, a path, or a wildcard.
+ */
+export async function getSeriesOrigins(): Promise<Set<string>> {
+  const { byOrigin } = await getSeriesSites();
+  const out = new Set<string>();
+  for (const o of byOrigin.keys()) if (HTTPS_ORIGIN.test(o)) out.add(o);
+  return out;
+}
+
 /** Drop the cached series sites so the next lookup reloads (used after a sender revert). */
 export function invalidateSiteBrandCache(): void {
   generation++;
