@@ -241,14 +241,38 @@ export interface BrandAssetResult {
   height?: number;
 }
 
-export async function uploadBrandAsset(seriesId: string, slot: BrandAssetSlot, file: File): Promise<BrandAssetResult> {
+export type BrandUploadStage = 'preparing' | 'uploading' | 'processing';
+
+/** `onStage` reports coarse progress (the storage client exposes no byte events). */
+export async function uploadBrandAsset(
+  seriesId: string,
+  slot: BrandAssetSlot,
+  file: File,
+  onStage?: (stage: BrandUploadStage) => void,
+): Promise<BrandAssetResult> {
+  onStage?.('preparing');
   const { supabase } = await import('./supabase');
   const target = await apiRequest<{ path: string; token: string }>(`/api/brand-admin/${seriesId}/assets/upload-url`, {
     method: 'POST',
     body: { slot, mimeType: file.type, fileSize: file.size },
   });
+  onStage?.('uploading');
   const up = await supabase.storage.from(BRAND_UPLOADS_BUCKET).uploadToSignedUrl(target.path, target.token, file, { contentType: file.type });
-  if (up.error) throw new Error('The upload failed. Please try again.');
+  if (up.error) {
+    // Keep the storage status so the caller can map 413 / 415 / 429 / 503 to a clear message.
+    const e = up.error as { message?: string; statusCode?: string | number; status?: number };
+    const status = Number(e.statusCode ?? e.status);
+    const err = new Error('The upload failed. Please try again.') as Error & { code?: string; status?: number };
+    if (Number.isFinite(status) && status > 0) {
+      err.status = status;
+      if (status === 413) err.code = 'FILE_TOO_BIG';
+      else if (status === 415) err.code = 'BAD_FILE_TYPE';
+      else if (status === 429) err.code = 'RATE_LIMITED';
+      else if (status === 503) err.code = 'UNAVAILABLE';
+    }
+    throw err;
+  }
+  onStage?.('processing');
   return apiRequest<BrandAssetResult>(`/api/brand-admin/${seriesId}/assets/attach`, { method: 'POST', body: { slot, path: target.path } });
 }
 

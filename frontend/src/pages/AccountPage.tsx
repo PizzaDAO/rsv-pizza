@@ -3,11 +3,12 @@ import { useNavigate, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza, Handshake, ExternalLink, Calendar } from 'lucide-react';
+import { Loader2, ShieldCheck, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza, Handshake, ExternalLink, Calendar } from 'lucide-react';
 import { IconInput } from '../components/IconInput';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
 import { getUserSponsorships, UserSponsorshipEntry } from '../lib/api';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
+import { useBrandAdminAccess } from '../lib/brandAdminAccess';
 import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 
 export function AccountPage() {
@@ -44,6 +45,10 @@ export function AccountPage() {
 
   // Sponsorships
   const [sponsorships, setSponsorships] = useState<UserSponsorshipEntry[]>([]);
+
+  // Brand admins (and super-admins) get a link to this site's brand settings; nobody else sees anything.
+  const brandAdmin = useBrandAdminAccess(!!user, user?.id ?? null);
+  const showBrandAdminLink = brandAdmin.status === 'ready' && brandAdmin.series.length > 0;
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -696,6 +701,17 @@ export function AccountPage() {
                 </div>
               </div>
             </div>
+
+            {/* Brand admins only: link to this site's brand settings */}
+            {showBrandAdminLink && (
+              <div className="pt-6 border-t border-theme-stroke">
+                <Link to="/brand-admin" className="inline-flex items-center gap-2 text-theme-text hover:underline" data-testid="brand-admin-link">
+                  <ShieldCheck className="w-5 h-5 text-[#ff393a]" />
+                  <span className="font-semibold">Brand settings</span>
+                </Link>
+                <p className="text-xs text-theme-text-muted mt-1">Manage your brand's look, images, checklist and events.</p>
+              </div>
+            )}
 
             {/* Sponsorships Section - only show if user has sponsorships */}
             {sponsorships.length > 0 && (

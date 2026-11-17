@@ -245,6 +245,17 @@ describe('settings', () => {
     expect(res.body.settings).toMatchObject({ brandName: 'Acme Pizza', slug: 'acme', requireApproval: true, createFlow: 'meetup' });
   });
 
+  it('GET also returns the current image URLs (read-only) under `assets`', async () => {
+    m.state.series[A].logoUrl = `/cdn/brand-assets/${A}/logo/x.png`;
+    m.state.series[A].flyerArt = { poster: `/cdn/brand-assets/${A}/flyerPoster/p.png`, bespokeKey: 'k', evil: 'x' };
+    const res = await request(app).get(`/api/brand-admin/${A}/settings`);
+    expect(res.body.assets).toEqual({
+      logo: `/cdn/brand-assets/${A}/logo/x.png`, logoLight: null, favicon: null, og: null,
+      flyerPoster: `/cdn/brand-assets/${A}/flyerPoster/p.png`, flyerRollup: null,
+    });
+    expect(res.body.settings).not.toHaveProperty('logoUrl');
+  });
+
   it('updates allowlisted fields, bumps config_version, audits as series_admin with a pre-change snapshot', async () => {
     const res = await patch({ brandName: "Acme & Co's Pizza!", tagline: 'Slices for all', supportEmail: 'Help@Partner.com', hideGuests: true });
     expect(res.status).toBe(200);
