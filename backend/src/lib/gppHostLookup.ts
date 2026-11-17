@@ -48,7 +48,7 @@ export class IdentifierError extends Error {}
 
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
 // EVM (0x + 40 hex) or a base58-ish address (Solana etc.). Compared case-insensitively.
-const WALLET_RE = /^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/;
+export const WALLET_RE = /^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/;
 const TG_RE = /^[a-z0-9_]{3,32}$/;
 
 function list(v: unknown, name: string): unknown[] {

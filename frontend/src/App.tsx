@@ -14,6 +14,7 @@ const DayOfRunPage = React.lazy(() => import('./pages/DayOfRunPage').then(m => (
 const ArtDisplayPage = React.lazy(() => import('./pages/ArtDisplayPage').then(m => ({ default: m.ArtDisplayPage })));
 import { EventPage } from './pages/EventPage';
 import { AuthVerifyPage } from './pages/AuthVerifyPage';
+import { PizzadaoLinkPage } from './pages/PizzadaoLinkPage';
 import { LoginPage } from './pages/LoginPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { AccountPage } from './pages/AccountPage';
@@ -187,6 +188,7 @@ function App() {
             <Route path="/photos" element={gppOnly("/photos", <PhotosFeedPage />)} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
+            <Route path="/link/pizzadao" element={<PizzadaoLinkPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />
             <Route path="/venue-report/:slug" element={<PublicVenueReportPage />} />
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />

@@ -98,6 +98,17 @@ export interface MintInput {
   nowS?: number;
 }
 
+/**
+ * Sign an arbitrary claim set with the service key (same key + kid as the access tokens and
+ * documents). The caller owns iss/aud/iat/exp and picks a distinct `typ` so the result can
+ * never be mistaken for an access token or a price document. Throws if the key is unset.
+ */
+export function signEs256(claims: Record<string, unknown>, typ: string): string {
+  const key = privateKey();
+  const kid = kidFor(crypto.createPublicKey(key).export({ format: 'jwk' }));
+  return jwt.sign(claims, key, { algorithm: 'ES256', keyid: kid, header: { alg: 'ES256', kid, typ } });
+}
+
 /** Mint the per-request bearer for one host. Throws if the key or audience is unset. */
 export function mintPizzaMcpToken(input: MintInput): string {
   const aud = pizzaMcpAudience();
