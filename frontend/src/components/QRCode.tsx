@@ -33,7 +33,7 @@ export function QRCode({ value, size, alt = 'QR code', className, margin = 1, da
 
   if (!src) {
     // Reserve the space so layout doesn't jump while the code renders.
-    return <div className={className} style={{ width: size, height: size }} aria-hidden="true" />;
+    return <div className={className} style={{ width: size, height: size }} aria-hidden="true" data-qr-pending="true" />;
   }
   return <img src={src} alt={alt} width={size} height={size} className={className} data-qr-url={value} />;
 }

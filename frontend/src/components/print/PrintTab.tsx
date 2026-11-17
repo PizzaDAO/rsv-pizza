@@ -1,4 +1,7 @@
 import { Download, Tag } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { NametagBuilder } from './nametags/NametagBuilder';
+import { TableTentBuilder } from './tents/TableTentBuilder';
 import { usePizza } from '../../contexts/PizzaContext';
 import { PosterGenerator } from '../generative/PosterGenerator';
 import { RollupGenerator } from '../generative/RollupGenerator';
@@ -124,7 +127,8 @@ export function PrintMaterials() {
   return <PrintContent showAllSwc />;
 }
 
-export function PrintTab() {
+export function PrintTab({ canViewGuests = false }: { canViewGuests?: boolean }) {
+  const { t } = useTranslation('host');
   const { party } = usePizza();
   const eventTags = party?.eventTags || [];
   return (
@@ -140,6 +144,14 @@ export function PrintTab() {
             <h3 className="text-lg font-semibold text-theme-text mb-3">Roll-Up Banner</h3>
             <RollupGenerator />
           </section>
+        </>
+      )}
+      {/* Builders live here only (never in PrintContent, which /shipping reuses). */}
+      {party && (
+        <>
+          <NametagBuilder canViewGuests={canViewGuests} />
+          <TableTentBuilder />
+          <h2 className="text-xl font-semibold text-theme-text">{t('print.sheet.readyMade')}</h2>
         </>
       )}
       <PrintContent eventTags={eventTags} showHeader={false} />

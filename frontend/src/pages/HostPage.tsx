@@ -623,7 +623,7 @@ function HostPageContent() {
               )}
 
               {activeTab === 'print' && party && (
-                <PrintTab />
+                <PrintTab canViewGuests={allowedTabs === 'all' || allowedTabs.includes('guests')} />
               )}
 
               {activeTab === 'payments' && party && isApproved && (() => {
