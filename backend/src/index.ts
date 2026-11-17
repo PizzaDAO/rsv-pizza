@@ -68,6 +68,7 @@ import leaderboardRoutes from './routes/leaderboard.routes.js';
 import publicLeaderboardRoutes from './routes/publicLeaderboard.routes.js';
 import seriesRoutes from './routes/series.routes.js';
 import serviceTelegramRoutes from './routes/service-telegram.routes.js'; // PizzaDAO app send-only Telegram proxy (x-pizzadao-telegram-key gate)
+import pizzadaoLinkRoutes from './routes/pizzadao-link.routes.js';
 import serviceRoutes from './routes/service.routes.js'; // PizzaDAO member app service-to-service (x-service-key gate)
 import adminSeriesRoutes from './routes/admin-series.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
@@ -319,6 +320,7 @@ app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public 
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config
 app.use('/api/service/telegram', serviceTelegramRoutes); // must stay before /api/service
+app.use('/api/pizzadao-link', pizzadaoLinkRoutes); // "Link your rsv.pizza account" token for pizzadao.org (signed-in user)
 app.use('/api/service', serviceRoutes); // GPP host lookup for pizzadao.org missions (PIZZADAO_SERVICE_KEY gate)
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe
