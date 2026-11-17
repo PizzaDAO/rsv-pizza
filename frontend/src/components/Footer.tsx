@@ -6,7 +6,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
-  // White-label builds carry no PizzaDAO/RSV.Pizza footer branding; nothing
+  // White-label builds carry no PizzaDAO footer branding; nothing
   // brand-relevant lives here, so render nothing (no empty bar or border).
   if (BRAND.isBranded) return null;
 
