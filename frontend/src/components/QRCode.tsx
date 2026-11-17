@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import QRCodeLib from 'qrcode';
 
 interface QRCodeProps {
@@ -10,12 +10,13 @@ interface QRCodeProps {
   className?: string;
   /** Quiet zone in modules (default 1, matching the old qrserver look). */
   margin?: number;
+  style?: CSSProperties;
   dark?: string;
   light?: string;
 }
 
 /** Local QR code (replaces api.qrserver.com so event / check-in links stay private). */
-export function QRCode({ value, size, alt = 'QR code', className, margin = 1, dark = '#000000', light = '#ffffff' }: QRCodeProps) {
+export function QRCode({ value, size, alt = 'QR code', className, style, margin = 1, dark = '#000000', light = '#ffffff' }: QRCodeProps) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function QRCode({ value, size, alt = 'QR code', className, margin = 1, da
 
   if (!src) {
     // Reserve the space so layout doesn't jump while the code renders.
-    return <div className={className} style={{ width: size, height: size }} aria-hidden="true" />;
+    return <div className={className} style={{ width: size, height: size, ...style }} aria-hidden="true" data-qr-pending="true" />;
   }
-  return <img src={src} alt={alt} width={size} height={size} className={className} data-qr-url={value} />;
+  return <img src={src} alt={alt} width={size} height={size} className={className} style={style} data-qr-url={value} />;
 }
