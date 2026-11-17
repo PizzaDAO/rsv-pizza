@@ -502,7 +502,7 @@ describe('review hardening', () => {
   const ev = (partyId: string, status: string) => request(app).patch(`/api/brand-admin/${A}/events/${partyId}/status`).send({ status });
   const base = `/api/brand-admin/${A}/checklist`;
 
-  it.each(['PizzaDAO', 'Pizza-DAO Events', 'pizza dao', 'RSV.Pizza', 'R S V Pizza', 'The RSV Pizza Team'])(
+  it.each(['PizzaDAO', 'Pizza-DAO Events', 'pizza dao', 'RSV.Pizza', 'R S V Pizza', 'The RSV Pizza Team'])( // brand-check-ignore-line (reserved-name test)
     'rejects reserved brand name %s (brandName, displayName and emailFromName)', async (n) => {
       expect((await settings({ brandName: n })).status).toBe(400);
       expect((await settings({ displayName: n })).status).toBe(400);
