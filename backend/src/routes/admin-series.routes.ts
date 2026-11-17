@@ -36,6 +36,7 @@ import {
 } from '../lib/seriesEmailFields.js';
 import { UUID_RE } from '../lib/seriesAccess.js';
 import { writeSeriesAudit, diffSeries, snapshotOf } from '../lib/seriesAudit.js';
+import { superAdminThemeTokens } from '../lib/seriesBrandSettings.js';
 import {
   SERIES_ADMIN_ROLES, listSeriesAdmins, inviteSeriesAdmin, resendSeriesInvite, revokeSeriesAdmin, setSeriesAdminAlerts,
 } from '../lib/seriesAdmins.js';
@@ -194,6 +195,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const b = (req.body || {}) as Record<string, unknown>;
     const data: Prisma.EventSeriesUpdateInput = {};
+    const warnings: string[] = [];
+    // Theme tokens incl. super-admin-only `overrides`; same strict validation as brand admins.
+    if (b.themeTokens !== undefined) data.themeTokens = superAdminThemeTokens(b.themeTokens, warnings);
     if (b.name !== undefined) data.name = str(b.name);
     if (b.displayName !== undefined) data.displayName = str(b.displayName);
     if (b.isActive !== undefined) data.isActive = bool(b.isActive);
@@ -264,7 +268,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
       return updated;
     });
-    res.json({ series });
+    res.json(warnings.length ? { series, warnings } : { series });
   } catch (error: any) {
     if (error?.code === 'P2025') return next(new AppError('Series not found', 404, 'NOT_FOUND'));
     next(error);

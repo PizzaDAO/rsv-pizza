@@ -1,0 +1,151 @@
+{
+  "valid": [
+    {
+      "input": {
+        "mode": "dark",
+        "bg": "#0B0B10",
+        "surface": "#17171f",
+        "text": "#F5F5F7",
+        "textMuted": "#A8A8B3",
+        "accent": "#E6212F",
+        "onAccent": "#FFFFFF",
+        "border": "#2a2a35",
+        "radius": "pill",
+        "fontHeading": "kanit",
+        "fontBody": "inter"
+      },
+      "tokens": {
+        "mode": "dark",
+        "bg": "#0b0b10",
+        "surface": "#17171f",
+        "text": "#f5f5f7",
+        "textMuted": "#a8a8b3",
+        "accent": "#e6212f",
+        "onAccent": "#ffffff",
+        "border": "#2a2a35",
+        "radius": "pill",
+        "fontHeading": "kanit",
+        "fontBody": "inter"
+      },
+      "vars": {
+        "--bg-main": "#0b0b10",
+        "--bg-card": "#17171f",
+        "--bg-card-hover": "#24242c",
+        "--bg-surface": "#17171f",
+        "--bg-surface-hover": "#24242c",
+        "--bg-input": "#17171f",
+        "--bg-input-focus": "#202028",
+        "--bg-header": "#17171f",
+        "--bg-overlay": "rgba(0, 0, 0, 0.7)",
+        "--text-primary": "#f5f5f7",
+        "--text-secondary": "#cfcfd5",
+        "--text-muted": "#a8a8b3",
+        "--text-faint": "#797982",
+        "--text-inverted": "#0b0b10",
+        "--stroke": "#2a2a35",
+        "--stroke-hover": "#5d5d66",
+        "--stroke-strong": "#909096",
+        "--accent": "#e6212f",
+        "--accent-hover": "#e8414d",
+        "--accent-contrast": "#ffffff",
+        "--success": "#39d98a",
+        "--warning": "#ffb347",
+        "--error": "#ff393a",
+        "--color-scheme": "dark",
+        "--radius-btn": "9999px",
+        "--radius-card": "24px",
+        "--font-heading": "'Kanit', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+        "--font-body": "'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+        "--accent-tint": "rgba(230, 33, 47, 0.14)"
+      }
+    },
+    {
+      "input": {
+        "mode": "light",
+        "bg": "#FAFAFA",
+        "surface": "#FFFFFF",
+        "text": "#111111",
+        "textMuted": "#555566",
+        "accent": "#6E54FF",
+        "onAccent": "#FFFFFF",
+        "border": "#E5E3EC",
+        "radius": "soft",
+        "fontHeading": "space-grotesk",
+        "overrides": {
+          "--bg-card": "#1A1B1C",
+          "--bg-overlay": "rgba(14, 9, 28, 0.55)"
+        }
+      },
+      "tokens": {
+        "mode": "light",
+        "bg": "#fafafa",
+        "surface": "#ffffff",
+        "text": "#111111",
+        "textMuted": "#555566",
+        "accent": "#6e54ff",
+        "onAccent": "#ffffff",
+        "border": "#e5e3ec",
+        "radius": "soft",
+        "fontHeading": "space-grotesk",
+        "fontBody": "system",
+        "overrides": {
+          "--bg-card": "#1A1B1C",
+          "--bg-overlay": "rgba(14, 9, 28, 0.55)"
+        }
+      },
+      "vars": {
+        "--bg-main": "#fafafa",
+        "--bg-card": "#1A1B1C",
+        "--bg-card-hover": "#f1f1f1",
+        "--bg-surface": "#ffffff",
+        "--bg-surface-hover": "#f1f1f1",
+        "--bg-input": "#ffffff",
+        "--bg-input-focus": "#f5f5f5",
+        "--bg-header": "#ffffff",
+        "--bg-overlay": "rgba(14, 9, 28, 0.55)",
+        "--text-primary": "#111111",
+        "--text-secondary": "#33333c",
+        "--text-muted": "#555566",
+        "--text-faint": "#878792",
+        "--text-inverted": "#fafafa",
+        "--stroke": "#e5e3ec",
+        "--stroke-hover": "#b0afb5",
+        "--stroke-strong": "#7b7a7f",
+        "--accent": "#6e54ff",
+        "--accent-hover": "#604adb",
+        "--accent-contrast": "#ffffff",
+        "--success": "#1f7a45",
+        "--warning": "#8a5a00",
+        "--error": "#b3261e",
+        "--color-scheme": "light",
+        "--radius-btn": "8px",
+        "--radius-card": "12px",
+        "--font-heading": "'Space Grotesk', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+        "--font-body": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+        "--accent-tint": "rgba(110, 84, 255, 0.14)"
+      }
+    }
+  ],
+  "contrast": [
+    {
+      "a": "#000000",
+      "b": "#ffffff",
+      "ratio": 21
+    },
+    {
+      "a": "#777777",
+      "b": "#ffffff",
+      "ratio": 4.48
+    },
+    {
+      "a": "#ffffff",
+      "b": "#ffffff",
+      "ratio": 1
+    },
+    {
+      "a": "#0b0b10",
+      "b": "#f5f5f7",
+      "ratio": 18.03
+    }
+  ]
+}

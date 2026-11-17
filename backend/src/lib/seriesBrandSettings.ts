@@ -5,8 +5,11 @@
  * Anything not listed here is super-admin only. That includes: slug, internal name, is_active,
  * theme_class, flyer_template_key, create_flow, require_approval, event_type, public/internal tags,
  * funding wallet, site_url / aliases, email sender address and sending domain, the verified flag, the
- * Resend domain id, pending-domain fields, theme tokens and every image URL (these arrive with the
- * validated upload / token PRs). Unknown or super-only keys in a request are a 400, never ignored.
+ * Resend domain id, pending-domain fields and every image URL (these arrive with the validated
+ * upload PR). Unknown or super-only keys in a request are a 400, never ignored.
+ *
+ * Theme tokens ARE brand-editable (PR 8): strict shape, size and WCAG AA validation in
+ * lib/themeTokens.ts. `overrides` inside them is super-admin only (a brand admin's save keeps them).
  *
  * Text rules: no angle brackets and no control chars, so brand-controlled strings can't carry markup
  * into pages or emails (emails escape them again regardless).
@@ -15,12 +18,13 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { emailOrNull, senderNameOrNull } from './seriesEmailFields.js';
+import { parseThemeTokens } from './themeTokens.js';
 import { writeSeriesAudit, snapshotOf, type SeriesActorKind } from './seriesAudit.js';
 
 export const BRAND_ADMIN_FIELDS = [
   'brandName', 'displayName', 'tagline', 'metaDescription', 'supportEmail', 'description',
   'nameTemplate', 'hideGuests', 'photosEnabled', 'photosPublic',
-  'eventDate', 'eventStartTime', 'eventEndTime', 'emailFromName', 'emailReplyTo',
+  'eventDate', 'eventStartTime', 'eventEndTime', 'emailFromName', 'emailReplyTo', 'themeTokens',
 ] as const;
 export type BrandAdminField = (typeof BRAND_ADMIN_FIELDS)[number];
 
@@ -83,10 +87,28 @@ function date(v: unknown, field: string): Date | null {
 }
 
 /**
+ * Theme tokens: null/empty clears them. Otherwise the full strict validation (hex colours, font
+ * keys, radius, mode, size, AA contrast). `overrides` is super-admin only, so a PATCH containing it
+ * is a 400; revert (trusted snapshot of this same series) passes allowOverrides.
+ */
+function themeTokensValue(v: unknown, allowOverrides: boolean, warnings?: string[]): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  if (v === null || v === undefined) return Prisma.DbNull;
+  const r = parseThemeTokens(v, { allowOverrides });
+  if (!r.ok) return bad(`themeTokens: ${r.errors.slice(0, 6).join('; ')}`);
+  if (warnings) warnings.push(...r.warnings);
+  return r.tokens as unknown as Prisma.InputJsonValue;
+}
+
+/** Super-admin write (admin-series PATCH): same validation, `overrides` allowed. */
+export function superAdminThemeTokens(v: unknown, warnings?: string[]) {
+  return themeTokensValue(v, true, warnings);
+}
+
+/**
  * Validate `input` against the allowlist and return the Prisma update fragment. With `strict` (the
  * PATCH route) any key outside the allowlist is rejected; revert passes pre-filtered values.
  */
-export function validateBrandSettings(input: Record<string, unknown>, opts: { strict?: boolean } = { strict: true }): Prisma.EventSeriesUpdateInput {
+export function validateBrandSettings(input: Record<string, unknown>, opts: { strict?: boolean; allowOverrides?: boolean; warnings?: string[] } = { strict: true }): Prisma.EventSeriesUpdateInput {
   const allowed = BRAND_ADMIN_FIELDS as readonly string[];
   if (opts.strict) {
     const extra = Object.keys(input).filter((k) => !allowed.includes(k));
@@ -122,13 +144,22 @@ export function validateBrandSettings(input: Record<string, unknown>, opts: { st
         break;
       }
       case 'emailReplyTo': data.emailReplyTo = emailOrNull(v, 'emailReplyTo'); break;
+      case 'themeTokens': data.themeTokens = themeTokensValue(v, !!opts.allowOverrides, opts.warnings); break;
       default: break;
     }
   }
   return data;
 }
 
-const plain = (v: unknown) => JSON.stringify(v === undefined ? null : v);
+/** JSON with object keys sorted at every depth, so jsonb key reordering is not a change. */
+function stable(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(stable);
+  if (v && typeof v === 'object') {
+    return Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, stable((v as Record<string, unknown>)[k])]));
+  }
+  return v;
+}
+const plain = (v: unknown) => JSON.stringify(stable(v === undefined || v === Prisma.DbNull ? null : v));
 
 /** Fields of `data` whose value really differs from the current row. */
 function changedFields(before: Record<string, unknown>, data: Record<string, unknown>): string[] {
@@ -151,12 +182,23 @@ export async function applyBrandSettings(opts: {
   actorEmail: string;
   actorKind: SeriesActorKind;
   action: 'settings.update' | 'revert';
+  /** Brand-admin routes keep the current super-admin theme `overrides` (default true). */
+  preserveOverrides?: boolean;
   extraChanges?: Record<string, { old: unknown; new: unknown }>;
 }) {
-  const { seriesId, data, actorEmail, actorKind, action, extraChanges } = opts;
+  let { data } = opts;
+  const { seriesId, actorEmail, actorKind, action, extraChanges } = opts;
+  const preserve = opts.preserveOverrides !== false;
   return prisma.$transaction(async (tx) => {
     const before = await tx.eventSeries.findFirst({ where: { id: seriesId } });
     if (!before) throw new AppError('Not found', 404, 'NOT_FOUND');
+    // Super-admin `overrides` survive every brand-admin write: they can't send, edit or remove them.
+    const kept = (before as any).themeTokens?.overrides;
+    if (preserve && kept && 'themeTokens' in data) {
+      const nt = (data as any).themeTokens;
+      if (nt === Prisma.DbNull) bad('themeTokens carry super-admin overrides and can only be cleared by a super-admin');
+      data = { ...data, themeTokens: { ...nt, overrides: kept } };
+    }
     const fields = changedFields(before as any, data as any);
     if (fields.length === 0) return { changed: [] as string[], settings: pickSettings(before as any) };
     const patch: Prisma.EventSeriesUpdateInput = Object.fromEntries(fields.map((k) => [k, (data as any)[k]]));
@@ -202,6 +244,17 @@ export async function revertToAudit(opts: { seriesId: string; auditId: string; a
   const todo: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(wanted)) {
     if (plain((current as any)[k]) !== plain(v)) todo[k] = v;
+  }
+  // Overrides are super-admin owned: a revert never adds, changes or removes them. Strip them from
+  // the snapshot value; applyBrandSettings keeps whatever the series has now.
+  if ('themeTokens' in todo) {
+    const t = todo.themeTokens as any;
+    const cur = (current as any).themeTokens;
+    if (t && typeof t === 'object' && 'overrides' in t) {
+      const { overrides: _o, ...rest } = t;
+      todo.themeTokens = rest;
+    }
+    if (todo.themeTokens == null && cur?.overrides) delete todo.themeTokens; // can't clear tokens that carry overrides
   }
   const data = validateBrandSettings(todo, { strict: false });
   return applyBrandSettings({

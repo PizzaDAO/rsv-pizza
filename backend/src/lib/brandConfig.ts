@@ -6,6 +6,7 @@
  * internals, admin data and pending-domain tokens are never read, so they cannot leak.
  */
 import type { SeriesBrandRow } from './siteBrand.js';
+import { normalizeThemeTokens, deriveThemeVars, type ThemeTokens } from './themeTokens.js';
 
 export interface BrandConfig {
   v: number;
@@ -23,7 +24,10 @@ export interface BrandConfig {
   hasCustomOgImage: boolean;
   supportEmail: string | null;
   themeClass: string | null;
-  tokens: Record<string, unknown> | null;
+  /** Validated, normalised theme tokens (null when unset or invalid). */
+  tokens: ThemeTokens | null;
+  /** deriveThemeVars(tokens), so the blocking /brand-config.js applier needs no theme code. */
+  themeVars: Record<string, string> | null;
   flyer: { templateKey: string | null; art: Record<string, unknown> | null };
 }
 
@@ -49,6 +53,7 @@ function classOrNull(v: unknown): string | null {
 }
 
 export function toBrandConfig(row: SeriesBrandRow): BrandConfig {
+  const tokens = normalizeThemeTokens(row.themeTokens);
   const url = (str(row.siteUrl) || '').replace(/\/+$/, '');
   const domain = url.replace(/^https?:\/\//i, '');
   const ogImageUrl = urlOrNull(row.ogImageUrl);
@@ -68,7 +73,8 @@ export function toBrandConfig(row: SeriesBrandRow): BrandConfig {
     hasCustomOgImage: !!ogImageUrl,
     supportEmail: str(row.supportEmail),
     themeClass: classOrNull(row.themeClass),
-    tokens: plainObject(row.themeTokens),
+    tokens,
+    themeVars: tokens ? deriveThemeVars(tokens) : null,
     flyer: { templateKey: str(row.flyerTemplateKey), art: plainObject(row.flyerArt) },
   };
 }

@@ -8,7 +8,14 @@ const mockPrisma = vi.hoisted(() => ({
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
 import router from './brandConfig.routes.js';
+import { deriveThemeVars } from '../lib/themeTokens.js';
+import { toBrandConfig } from '../lib/brandConfig.js';
 import { _resetSiteBrandCache } from '../lib/siteBrand.js';
+
+const TOKENS = {
+  mode: 'dark', bg: '#0b0b10', surface: '#17171f', text: '#f5f5f7', textMuted: '#a8a8b3',
+  accent: '#e6212f', onAccent: '#ffffff', border: '#2a2a35', radius: 'pill', fontHeading: 'kanit', fontBody: 'inter',
+};
 
 const ROW = {
   id: 'series-ex',
@@ -25,7 +32,7 @@ const ROW = {
   faviconUrl: 'https://cdn.example.org/fav.png',
   ogImageUrl: 'https://cdn.example.org/og.png',
   themeClass: 'example-theme',
-  themeTokens: { accent: '#E6212F' },
+  themeTokens: TOKENS,
   flyerTemplateKey: 'standard',
   flyerArt: { hero: 'a.png' },
   configVersion: 7,
@@ -73,7 +80,8 @@ describe('GET /api/brand-config', () => {
       hasCustomOgImage: true,
       supportEmail: 'help@example.org',
       themeClass: 'example-theme',
-      tokens: { accent: '#E6212F' },
+      tokens: TOKENS,
+      themeVars: deriveThemeVars(TOKENS as never),
       flyer: { templateKey: 'standard', art: { hero: 'a.png' } },
     });
   });
@@ -86,7 +94,7 @@ describe('GET /api/brand-config', () => {
     }
     expect(Object.keys(res.body).sort()).toEqual([
       'description', 'domain', 'faviconUrl', 'flyer', 'hasCustomOgImage', 'logoLightUrl', 'logoUrl', 'name',
-      'ogImageUrl', 'seriesId', 'slug', 'supportEmail', 'tagline', 'themeClass', 'tokens', 'url', 'v',
+      'ogImageUrl', 'seriesId', 'slug', 'supportEmail', 'tagline', 'themeClass', 'themeVars', 'tokens', 'url', 'v',
     ]);
   });
 
@@ -131,5 +139,19 @@ describe('GET /api/brand-config', () => {
     expect(res.body.ogImageUrl).toBeNull();
     expect(res.body.hasCustomOgImage).toBe(false);
     expect(res.body.themeClass).toBeNull();
+  });
+});
+
+describe('toBrandConfig theme tokens', () => {
+  it('serves null tokens/vars when the stored value is invalid or malicious', () => {
+    for (const bad of [{ accent: '#E6212F' }, { ...TOKENS, bg: 'url(//evil.example.org)' }, 'x', [], null]) {
+      const c = toBrandConfig({ ...ROW, themeTokens: bad } as never);
+      expect(c.tokens).toBeNull();
+      expect(c.themeVars).toBeNull();
+    }
+  });
+  it('normalises stored colours to lowercase', () => {
+    const c = toBrandConfig({ ...ROW, themeTokens: { ...TOKENS, accent: '#E6212F' } } as never);
+    expect(c.tokens?.accent).toBe('#e6212f');
   });
 });
