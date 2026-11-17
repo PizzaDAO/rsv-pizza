@@ -11,7 +11,8 @@
  */
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
-import { brandedSiteForParty } from '../lib/siteBrand.js';
+import { brandedSiteForParty, type SiteBrand } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
 function esc(s: string): string {
   return s.replace(/[<>&]/g, (c) => (c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'));
@@ -77,8 +78,14 @@ async function sendResend(
   subject: string,
   html: string,
   tag: string,
-  from: string = brand.fromEmail,
+  from: string | SiteBrand = brand.fromEmail,
 ) {
+  if (typeof from !== 'string') {
+    // Branded series: partner sender / reply-to / verified-domain fallback live in sendBrandedEmail.
+    await sendBrandedEmail({ site: from, apiKey, payload: { to, subject, html } })
+      .catch((err) => console.warn(`[${tag}] Resend send failed:`, err?.message || err));
+    return;
+  }
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -106,7 +113,7 @@ export async function emailHostOfStatusChange(
     if (!ctx) return;
     if (ctx.site) {
       const { subject, html } = buildBrandedStatusEmail(ctx.site, ctx, newStatus);
-      await sendResend(apiKey, ctx.toEmail, subject, html, 'emailHostOfStatusChange', ctx.site.fromEmail);
+      await sendResend(apiKey, ctx.toEmail, subject, html, 'emailHostOfStatusChange', ctx.site);
       return;
     }
     const eventUrl = `https://rsv.pizza/host/${ctx.slug}`;

@@ -31,6 +31,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { brand } from '../config/brand.js';
 import { siteForParty, type SiteBrand } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
 const router = Router();
 
@@ -273,14 +274,7 @@ async function sendReminderEmail(
     siteName: site.name,
   });
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: site.fromEmail,
+  const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [guest.email],
       subject: `Tonight at ${timeOnly}: ${ctx.partyName} 🍕`,
       html,
@@ -290,8 +284,7 @@ async function sendReminderEmail(
         'List-Unsubscribe': `<${unsubUrl}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       },
-    }),
-  });
+    } });
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => '');

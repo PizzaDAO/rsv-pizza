@@ -6,6 +6,8 @@
     "frontend/src/lib/supabase.ts",
     "frontend/src/i18n/",
     "backend/src/lib/siteBrand.test.ts",
+    "backend/src/lib/resendSend.test.ts",
+    "backend/src/routes/siteBrandPartnerSender.test.ts",
     "backend/src/routes/emailSnapshots.test.ts",
     "backend/src/routes/siteBrandCallSites.test.ts",
     "backend/src/routes/__snapshots__/emailSnapshots.test.ts.snap",

@@ -22,6 +22,7 @@ import {
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { brand } from '../config/brand.js';
 import { siteForParty } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
 const SURVEY_TAB = 'survey';
 
@@ -171,19 +172,11 @@ async function sendSurveyToParty(
             site.name !== brand.name
           );
 
-          const resp = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${resendApiKey}`,
-            },
-            body: JSON.stringify({
-              from: site.fromEmail,
+          const resp = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
               to: [g.email],
               subject,
               html,
-            }),
-          });
+            } });
 
           if (!resp.ok) {
             failed += 1;

@@ -12,8 +12,8 @@ import crypto from 'crypto';
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
 import { siteForParty } from '../lib/siteBrand.js';
+import { sendBrandedEmail } from '../lib/resendSend.js';
 
-const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
 function escapeHtml(s: string): string {
   return s
@@ -134,18 +134,10 @@ export async function sendHostSurveyEmail(partyId: string): Promise<boolean> {
       site.name !== brand.name ? site.name : undefined
     );
 
-    const resp = await fetch(RESEND_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: site.fromEmail,
-        to: [party.user.email],
-        subject,
-        html,
-      }),
+    const resp = await sendBrandedEmail({
+      site,
+      apiKey: process.env.RESEND_API_KEY as string,
+      payload: { to: [party.user.email], subject, html },
     });
 
     if (!resp.ok) {
