@@ -28,6 +28,7 @@ import { domainsCronRouter } from './brand-admin.domain.routes.js';
 import { errorHandler } from '../middleware/error.js';
 import { setInviteLimitStore } from '../lib/seriesInviteLimit.js';
 import { setDomainAdaptersForTest, DomainApiError, type VercelAdapter, type ResendAdapter, type DnsAdapter, type ResendDomain } from '../lib/domainAdapters.js';
+import { brand } from '../config/brand.js';
 import { normalizePartnerHost } from '../lib/domainHost.js';
 import { brandProjectFor } from '../lib/domainService.js';
 
@@ -151,7 +152,7 @@ const base = (p: string, id = A) => `/api/brand-admin/${id}${p}`;
 const request_ = (host = 'events.partner.example.org') => request(app).put(base('/domain')).send({ domain: host });
 
 describe('host validation', () => {
-  const bad = ['example.org', 'partner.example.org/path', 'https://events.partner.example.org', '*.partner.example.org', 'events.partner.example.org:8080', '192.168.1.1', '10.0.0.1', '0x7f.1', 'partner.com', 'partner.co.uk', 'events.rsv.pizza', 'rsv.pizza', 'x.vercel.app', 'foo.pizzadao.org', 'a b.example.org', 'localhost', '', 'user@events.example.org'];
+  const bad = ['example.org', 'partner.example.org/path', 'https://events.partner.example.org', '*.partner.example.org', 'events.partner.example.org:8080', '192.168.1.1', '10.0.0.1', '0x7f.1', 'partner.com', 'partner.co.uk', `events.${brand.domain}`, brand.domain, 'x.vercel.app', 'foo.pizzadao.org', 'a b.example.org', 'localhost', '', 'user@events.example.org'];
   it.each(bad)('rejects %j', (h) => {
     expect(() => normalizePartnerHost(h)).toThrow();
   });
@@ -189,7 +190,7 @@ describe('web domain: request', () => {
     expect(audits('domain.request')).toHaveLength(1);
     expect(ad.f.calls.filter((c) => c.startsWith('vercel'))).toEqual([]); // nothing attached yet
   });
-  it.each(['example.org', 'https://x.example.org', 'events.rsv.pizza', '1.2.3.4', '*.example.org'])('rejects %s with 400 and no write', async (h) => {
+  it.each(['example.org', 'https://x.example.org', `events.${brand.domain}`, '1.2.3.4', '*.example.org'])('rejects %s with 400 and no write', async (h) => {
     const res = await request_(h);
     expect(res.status).toBe(400);
     expect(S().pendingDomain).toBeNull();
@@ -432,7 +433,7 @@ describe('email domain', () => {
 
   it.each([
     [{ emailDomain: 'example.org', emailFromAddress: 'a@example.org' }, 'apex'],
-    [{ emailDomain: 'mail.rsv.pizza', emailFromAddress: 'a@mail.rsv.pizza' }, 'reserved'],
+    [{ emailDomain: `mail.${brand.domain}`, emailFromAddress: `a@mail.${brand.domain}` }, 'reserved'],
     [{ emailDomain: 'mail.partner.example.org', emailFromAddress: 'a@other.example.org' }, 'address off domain'],
     [{ emailDomain: 'mail.partner.example.org', emailFromAddress: 'Name <a@mail.partner.example.org>' }, 'display name'],
     [{ emailDomain: '*.partner.example.org', emailFromAddress: 'a@x.partner.example.org' }, 'wildcard'],
