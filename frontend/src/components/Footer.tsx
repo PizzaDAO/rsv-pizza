@@ -6,6 +6,10 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
+  // White-label builds carry no PizzaDAO/RSV.Pizza footer branding; nothing
+  // brand-relevant lives here, so render nothing (no empty bar or border).
+  if (BRAND.isBranded) return null;
+
   return (
     <footer className={`py-6 ${className}`}>
       <div className="flex flex-col items-center gap-1">
@@ -21,16 +25,6 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
             className="h-7"
           />
         </a>
-        {BRAND.isBranded && (
-          <a
-            href="https://rsv.pizza" // brand-check-ignore-line
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-white/40 hover:text-white/60 transition-colors"
-          >
-            powered by RSV.Pizza {/* brand-check-ignore-line */}
-          </a>
-        )}
       </div>
     </footer>
   );

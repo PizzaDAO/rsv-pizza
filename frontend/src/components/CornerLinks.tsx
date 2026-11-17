@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
 import { Pencil } from 'lucide-react';
+import { BRAND } from '../config/brand';
 import { SuggestionModal } from './SuggestionModal';
 
 export const CornerLinks: React.FC = () => {
   const [open, setOpen] = useState(false);
+
+  // The pencil is a "suggest an improvement" form for the RSV.Pizza product
+  // (not an edit-event shortcut), and the other link is the PizzaDAO GitHub
+  // repo: neither belongs on white-label sites.
+  if (BRAND.isBranded) return null;
 
   return (
     <>
