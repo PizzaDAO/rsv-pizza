@@ -8,6 +8,7 @@ export const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface StoredDraft {
   savedAt: number;
+  ownerEmail?: string;
   data: Record<string, unknown>;
 }
 
@@ -43,4 +44,30 @@ export function hasEventDraft(now = Date.now()): boolean {
 
 export function clearEventDraft(): void {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+}
+
+/** Bind the draft to the account that just signed in (so another user on this browser never sees it). */
+export function stampEventDraftOwner(email: string | null | undefined): void {
+  if (!email) return;
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as StoredDraft;
+    parsed.ownerEmail = email.trim().toLowerCase();
+    localStorage.setItem(KEY, JSON.stringify(parsed));
+  } catch { /* ignore */ }
+}
+
+/** The draft, but only if it is anonymous or belongs to `email`; a draft owned by someone else is cleared. */
+export function loadEventDraftFor(email: string | null | undefined, now = Date.now()): Record<string, unknown> | null {
+  const data = loadEventDraft(now);
+  if (!data) return null;
+  try {
+    const owner = (JSON.parse(localStorage.getItem(KEY) || '{}') as StoredDraft).ownerEmail;
+    if (owner && owner !== (email || '').trim().toLowerCase()) {
+      clearEventDraft();
+      return null;
+    }
+  } catch { /* ignore */ }
+  return data;
 }

@@ -7,7 +7,8 @@ import { IconInput } from '../components/IconInput';
 import { Layout } from '../components/Layout';
 import { sanitizeNextPath } from '../lib/wallet/handoff';
 import { authErrorKey } from '../lib/authErrors';
-import { hasEventDraft } from '../lib/eventDraft';
+import { hasEventDraft, stampEventDraftOwner } from '../lib/eventDraft';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { getAuthCodeEmail, clearAuthCodeEmail, postVerifyCode } from '../lib/authCodeEmail';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -46,7 +47,6 @@ export function AuthVerifyPage() {
   const signedInAsRef = useRef<string | null>(null);
 
   const pendingToken = useRef<string | null>(null);
-  const nextPath = () => sanitizeNextPath(initialParams.current.get('next'));
   const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
 
   // Single-use token in the URL (wallet hand-off or emailed magic link). It is NEVER redeemed
@@ -131,7 +131,7 @@ export function AuthVerifyPage() {
       setResendNote({ kind: 'ok', text: t('verifyPage.resent', { email: codeEmail }) });
       inputRefs.current[0]?.focus();
     } catch (err: any) {
-      setResendNote({ kind: 'err', text: t(authErrorKey(err?.message, 'send')) });
+      setResendNote({ kind: 'err', text: t(authErrorKey(err?.message, 'send', err?.code)) });
     } finally {
       setResending(false);
     }
@@ -140,11 +140,10 @@ export function AuthVerifyPage() {
   // Where to go once signed in: explicit ?next=, then a saved event draft, then the stored return URL.
   function postLoginPath(): string {
     const nextParam = sanitizeNextPath(initialParams.current.get('next'));
-    if (nextParam) return nextParam;
-    if (hasEventDraft()) return '/new';
     const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl'));
     sessionStorage.removeItem('authReturnUrl');
-    return returnUrl || '/';
+    // The draft is only a fallback; series builds may render a different /new, so skip it there.
+    return nextParam || returnUrl || (!IS_SERIES_SCOPED && hasEventDraft() ? '/new' : '/');
   }
 
   // Check if this is a new user on mount
@@ -167,7 +166,7 @@ export function AuthVerifyPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Invalid code');
+        throw Object.assign(new Error(errorData.error?.message || 'Invalid code'), { code: errorData.error?.code as string | undefined });
       }
 
       const data = await response.json();
@@ -186,7 +185,7 @@ export function AuthVerifyPage() {
       }
     } catch (err: any) {
       setStatus('error');
-      setError(t(authErrorKey(err?.message, 'verify')));
+      setError(t(authErrorKey(err?.message, 'verify', err?.code)));
     }
   }
 
@@ -216,6 +215,7 @@ export function AuthVerifyPage() {
     // Store token and user
     localStorage.setItem('authToken', data.accessToken);
     localStorage.setItem('user', JSON.stringify(data.user));
+    stampEventDraftOwner(data.user?.email);
     setUser(data.user);
 
     setStatus('success');
@@ -386,7 +386,7 @@ export function AuthVerifyPage() {
               <button onClick={confirmRedeem} className="btn-primary">
                 {t('verifyPage.continueToSignIn', { defaultValue: 'Continue to sign in' })}
               </button>
-              <button onClick={() => navigate(nextPath() || '/', { replace: true })} className="btn-secondary">
+              <button onClick={() => navigate(sanitizeNextPath(initialParams.current.get('next')) || '/', { replace: true })} className="btn-secondary">
                 {t('verifyPage.continueWithout', { defaultValue: 'Continue without signing in' })}
               </button>
             </div>
@@ -480,7 +480,7 @@ export function AuthVerifyPage() {
             <div className="flex flex-col gap-3">
               {initialParams.current.has('next') || initialParams.current.has('token') ? (
                 <button
-                  onClick={() => navigate(nextPath() || '/', { replace: true })}
+                  onClick={() => navigate(sanitizeNextPath(initialParams.current.get('next')) || '/', { replace: true })}
                   className="btn-primary"
                 >
                   {t('verifyPage.continueWithout', { defaultValue: 'Continue without signing in' })}

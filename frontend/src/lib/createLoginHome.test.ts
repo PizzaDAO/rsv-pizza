@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { saveEventDraft, loadEventDraft, clearEventDraft, hasEventDraft, DRAFT_TTL_MS } from './eventDraft';
+import { saveEventDraft, loadEventDraft, stampEventDraftOwner, loadEventDraftFor, clearEventDraft, hasEventDraft, DRAFT_TTL_MS } from './eventDraft';
 import { authErrorKey } from './authErrors';
 import { groupEvents, paginateGroups, formatPartyDate } from './homeEvents';
 import { shouldShowNextSteps, dismissNextSteps, isNextStepsDismissed } from './nextSteps';
@@ -32,11 +32,33 @@ describe('eventDraft', () => {
   });
 });
 
+describe('draft owner', () => {
+  it('restores only for the owner', () => {
+    saveEventDraft({ partyName: 'A' });
+    stampEventDraftOwner('A@x.org');
+    expect(loadEventDraftFor('b@x.org')).toBeNull();
+    expect(store['pendingEventDraft']).toBeUndefined();
+    saveEventDraft({ partyName: 'A' });
+    stampEventDraftOwner('a@x.org');
+    expect(loadEventDraftFor('A@x.org')).toEqual({ partyName: 'A' });
+  });
+  it('anonymous drafts restore for anyone', () => {
+    saveEventDraft({ partyName: 'A' });
+    expect(loadEventDraftFor('b@x.org')).toEqual({ partyName: 'A' });
+  });
+});
+
 describe('authErrorKey', () => {
   it('maps raw server strings', () => {
     expect(authErrorKey('Invalid code')).toBe('errors.invalidCode');
     expect(authErrorKey('Code has expired')).toBe('errors.codeExpired');
     expect(authErrorKey('Try again in a few minutes', 'send')).toBe('errors.tooManyAttempts');
+    expect(authErrorKey('x', 'send', 'CODE_SEND_LIMIT')).toBe('errors.tooManyAttempts');
+    expect(authErrorKey('x', 'verify', 'VERIFY_RATE_LIMITED')).toBe('errors.tooManyAttempts');
+    expect(authErrorKey('x', 'verify', 'TOKEN_EXPIRED')).toBe('errors.codeExpired');
+    expect(authErrorKey('Invalid email format', 'send')).toBe('errors.invalidEmail');
+    expect(authErrorKey('Invalid email format')).toBe('errors.invalidEmail');
+    expect(authErrorKey('generate failed')).toBe('errors.verifyFailed');
     expect(authErrorKey('boom')).toBe('errors.verifyFailed');
     expect(authErrorKey('boom', 'send')).toBe('errors.sendFailed');
   });

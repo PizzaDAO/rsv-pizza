@@ -16,13 +16,13 @@ import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries } from '../lib/api';
 import { IconInput } from './IconInput';
-import { saveEventDraft, loadEventDraft, clearEventDraft } from '../lib/eventDraft';
+import { saveEventDraft, loadEventDraftFor, clearEventDraft } from '../lib/eventDraft';
 import { prepareSquareImage, SquareImageError } from '../lib/squareImage';
 
 export function EventForm() {
   const { t } = useTranslation('account');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,9 +104,9 @@ export function EventForm() {
   // the code / magic link opening in another tab). Never auto-submits: the host reviews first.
   const draftChecked = useRef(false);
   useEffect(() => {
-    if (draftChecked.current) return;
+    if (draftChecked.current || authLoading) return;
     draftChecked.current = true;
-    const d = loadEventDraft() as Record<string, any> | null;
+    const d = loadEventDraftFor(user?.email) as Record<string, any> | null;
     if (!d) return;
     const str = (v: unknown) => (typeof v === 'string' ? v : '');
     setPartyName(str(d.partyName));
@@ -132,7 +132,8 @@ export function EventForm() {
     setHideGuests(!!d.hideGuests);
     if (d.partyPassword || d.limitGuests || d.requireApproval || d.hideGuests) setShowOptionalFields(true);
     setDraftRestored(true);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading]);
 
   // Surface errors: scroll the banner into view and focus the offending field.
   useEffect(() => {
@@ -155,7 +156,7 @@ export function EventForm() {
       URL.revokeObjectURL(imagePreview);
     }
 
-    setFormError(null);
+    setFormErrorState((cur) => (cur?.field === 'image' ? null : cur));
     const token = ++imageRequestRef.current;
     setProcessingImage(true);
 
@@ -191,7 +192,7 @@ export function EventForm() {
     }
     setEventImageFile(null);
     setImagePreview(null);
-    setFormError(null);
+    setFormErrorState((cur) => (cur?.field === 'image' ? null : cur));
     setEventImageUrl('');
   };
 
@@ -522,7 +523,7 @@ export function EventForm() {
                 if (e.target.value.trim()) {
                   setEventImageFile(null);
                   setImagePreview(null);
-                  setFormError(null);
+                  setFormErrorState((cur) => (cur?.field === 'image' ? null : cur));
                 }
               }}
               placeholder={t('eventForm.imageUrl')}
