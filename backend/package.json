@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.137.0",
-    "@aws-sdk/client-s3": "^3.1167.0",
+    "@aws-sdk/client-s3": "^3.1169.0",
     "@napi-rs/canvas": "^0.1.100",
     "@prisma/client": "^6.8.2",
     "@privy-io/node": "^0.39.0",
@@ -36,7 +36,7 @@
     "heic-decode": "^2.1.0",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^6.0.2",
-    "openai": "^7.55.0",
+    "openai": "^7.57.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.23.1",
@@ -45,7 +45,7 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "tldts": "^7.5.4",
-    "viem": "^2.57.18"
+    "viem": "^2.57.19"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
