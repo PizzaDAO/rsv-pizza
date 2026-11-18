@@ -11,6 +11,9 @@ import { randomUUID } from 'crypto';
 import { signGuestToken, verifyGuestToken, guestTokenFromRequest, callerOwnsGuest } from '../lib/guestToken.js';
 import { issueLoginCode, takeCodeSend } from '../lib/loginCode.js';
 import { sendBrandedEmail } from '../lib/resendSend.js';
+import { escapeHtml, oneLine } from '../lib/escapeHtml.js';
+import { runInBackground } from '../lib/background.js';
+import { withPartyLock } from '../lib/partyLock.js';
 
 /**
  * invite-verify: the RSVP endpoint's answer when the submitted email is already on the
@@ -493,48 +496,52 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     // under Postgres three-valued logic `NULL <> false` is NULL (falsy in
     // WHERE), so unreviewed RSVPs (approved=null by default) were silently
     // excluded from the capacity gate.
-    const confirmedGuestCount = await prisma.guest.count({
-      where: {
-        partyId: party.id,
-        status: { in: ['CONFIRMED', 'PENDING'] },
-        OR: [{ approved: true }, { approved: null }],
-      },
-    });
-
-    // Determine if guest should be waitlisted
-    const isAtCapacity = party.maxGuests ? confirmedGuestCount >= party.maxGuests : false;
+    // capacity-lock: "what would a new RSVP get right now". Computed once up front (decoy
+    // responses, duplicate checks) and AGAIN inside the per-party lock right before a row is
+    // created/completed, so concurrent RSVPs can't both take the last seat or the same waitlist
+    // position. Used for real creates, for completing a host invite, and for the decoy
+    // response below, so all three look the same.
+    const capPartyId = party.id;
+    const capMaxGuests = party.maxGuests;
+    const capRequireApproval = party.requireApproval;
+    let isAtCapacity = false;
+    let waitlistPosition: number | null = null;
+    let guestStatus: 'CONFIRMED' | 'PENDING' | 'WAITLISTED' = 'CONFIRMED';
+    let message = 'Your preferences have been saved!';
+    const computeSlot = async (db: Pick<typeof prisma, 'guest'>) => {
+      const confirmedGuestCount = await db.guest.count({
+        where: {
+          partyId: capPartyId,
+          status: { in: ['CONFIRMED', 'PENDING'] },
+          OR: [{ approved: true }, { approved: null }],
+        },
+      });
+      isAtCapacity = capMaxGuests ? confirmedGuestCount >= capMaxGuests : false;
+      waitlistPosition = null;
+      if (isAtCapacity) {
+        // Next waitlist position (excluding rejected — mushroom-31723)
+        const maxPosition = await db.guest.aggregate({
+          where: {
+            partyId: capPartyId,
+            status: 'WAITLISTED',
+            OR: [{ approved: true }, { approved: null }],
+          },
+          _max: { waitlistPosition: true },
+        });
+        waitlistPosition = (maxPosition._max.waitlistPosition || 0) + 1;
+      }
+      guestStatus = isAtCapacity ? 'WAITLISTED' : capRequireApproval ? 'PENDING' : 'CONFIRMED';
+      message = isAtCapacity
+        ? `You're #${waitlistPosition} on the waitlist! We'll notify you if a spot opens up.`
+        : capRequireApproval
+          ? 'Your RSVP has been submitted and is pending approval from the host.'
+          : 'Your preferences have been saved!';
+    };
+    await computeSlot(prisma);
 
     // rsvp-overwrite-fix: the walletShared heads-up (another guest's name for a shared
     // wallet) is gone. Even a boolean would tell an anonymous caller "wallet W is on event
     // E's guest list", so no wallet lookup happens here any more.
-
-    // What a brand-new RSVP would get right now. Used for real creates, for completing a
-    // host invite, and for the decoy response below, so all three look the same.
-    let waitlistPosition: number | null = null;
-    if (isAtCapacity) {
-      // Next waitlist position (excluding rejected — mushroom-31723)
-      const maxPosition = await prisma.guest.aggregate({
-        where: {
-          partyId: party.id,
-          status: 'WAITLISTED',
-          OR: [{ approved: true }, { approved: null }],
-        },
-        _max: { waitlistPosition: true },
-      });
-      waitlistPosition = (maxPosition._max.waitlistPosition || 0) + 1;
-    }
-    let guestStatus: 'CONFIRMED' | 'PENDING' | 'WAITLISTED' = 'CONFIRMED';
-    if (isAtCapacity) {
-      guestStatus = 'WAITLISTED';
-    } else if (party.requireApproval) {
-      guestStatus = 'PENDING';
-    }
-    let message = 'Your preferences have been saved!';
-    if (isAtCapacity) {
-      message = `You're #${waitlistPosition} on the waitlist! We'll notify you if a spot opens up.`;
-    } else if (party.requireApproval) {
-      message = 'Your RSVP has been submitted and is pending approval from the host.';
-    }
 
     // The one response shape every public "new RSVP" gets (201). The duplicate-email decoy
     // and an invite completion use it too, so the caller can't tell them apart.
@@ -689,16 +696,20 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
           if (existingGuest.status === 'INVITED') {
             let completed: Awaited<ReturnType<typeof prisma.guest.update>> | null = null;
             try {
-              completed = await prisma.guest.update({
-                where: { id: existingGuest.id, status: 'INVITED' },
-                data: updateData(existingGuest),
+              completed = await withPartyLock(capPartyId, async (tx) => {
+                await computeSlot(tx); // capacity-lock: re-check under the party lock
+                return tx.guest.update({
+                  where: { id: existingGuest.id, status: 'INVITED' },
+                  data: updateData(existingGuest),
+                });
               });
             } catch (e) {
               if ((e as { code?: string } | null)?.code !== 'P2025') throw e;
             }
             if (completed) {
               await provisionWalletIfNeeded(completed.id);
-              await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
+              const completedGuest = completed;
+              runInBackground(() => triggerWebhook('guest.updated', { guest: completedGuest, partyId: capPartyId }, party.userId!), 'webhook guest.updated');
               await sendNewRsvpEmail(completed.id);
               return res.status(201).json(newRsvpResponse(completed.id));
             }
@@ -714,7 +725,8 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
           });
 
           // Trigger webhook for guest update (using party owner's webhooks)
-          await triggerWebhook('guest.updated', { guest: updatedGuest, partyId: party.id }, party.userId!);
+          // (fire-and-forget: delivery retries must not hold the RSVP response)
+          runInBackground(() => triggerWebhook('guest.updated', { guest: updatedGuest, partyId: capPartyId }, party.userId!), 'webhook guest.updated');
 
           return res.status(200).json({
             success: true,
@@ -769,7 +781,10 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     }
 
     // Create guest
-    const guest = await prisma.guest.create({
+    // capacity-lock: count + position + create are atomic per party.
+    const guest = await withPartyLock(capPartyId, async (tx) => {
+      await computeSlot(tx);
+      return tx.guest.create({
       data: {
         name: name.trim(),
         email: email?.trim().toLowerCase() || null,
@@ -799,16 +814,19 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
         // romana-30802: cookie-based per-browser ID; null for legacy/blocked browsers
         visitorSessionId: safeVisitorSessionId,
       },
+      });
     });
 
     // Auto-provision Privy embedded wallet if no wallet address was provided and email exists
     await provisionWalletIfNeeded(guest.id);
 
     // Trigger webhook for guest registration or waitlist (using party owner's webhooks)
+    const hookOwnerId = party.userId!;
+    const hookPosition = waitlistPosition;
     if (isAtCapacity) {
-      await triggerWebhook('guest.waitlisted', { guest, partyId: party.id, waitlistPosition }, party.userId!);
+      runInBackground(() => triggerWebhook('guest.waitlisted', { guest, partyId: capPartyId, waitlistPosition: hookPosition }, hookOwnerId), 'webhook guest.waitlisted');
     } else {
-      await triggerWebhook('guest.registered', { guest, partyId: party.id }, party.userId!);
+      runInBackground(() => triggerWebhook('guest.registered', { guest, partyId: capPartyId }, hookOwnerId), 'webhook guest.registered');
     }
 
     // Send appropriate email if email provided
@@ -900,7 +918,7 @@ router.post('/:inviteCode/send-confirmation', optionalAuth, async (req: AuthRequ
     const guestRow = tokenOk || UUID_RE.test(guestId)
       ? await prisma.guest.findFirst({
           where: { id: guestId, partyId: party.id },
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, status: true, approved: true, waitlistPosition: true },
         })
       : null;
     const callerEmail = req.userEmail?.trim().toLowerCase();
@@ -911,20 +929,43 @@ router.post('/:inviteCode/send-confirmation', optionalAuth, async (req: AuthRequ
       throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
     }
 
-    // Send confirmation email (to the stored address only)
-    await sendRSVPConfirmationEmail({
-      guestEmail: guestRow.email,
-      guestName: guestRow.name,
-      guestId: guestRow.id,
-      partyName: party.name,
-      partyDate: party.date,
+    // resend-by-status: the "you're going" email (QR + address) is only for guests who are
+    // actually confirmed. Pending and waitlisted guests get their own email; rejected/invited
+    // rows get nothing.
+    const guestStatus = guestRow.status;
+    if (guestRow.approved === false || !['CONFIRMED', 'PENDING', 'WAITLISTED'].includes(guestStatus)) {
+      throw new AppError('No confirmation email is available for this RSVP', 409, 'RSVP_NOT_CONFIRMABLE');
+    }
+    // Send the status-appropriate email (to the stored address only)
+    if (guestStatus === 'WAITLISTED') {
+        await sendWaitlistConfirmationEmail({
+        guestEmail: guestRow.email,
+        guestName: guestRow.name,
+        guestId: guestRow.id,
+        partyName: party.name,
+        partyDate: party.date,
       partyTimezone: party.timezone,
-      partyAddress: party.address,
-      partyImageUrl: party.eventImageUrl,
-      inviteCode,
-      customUrl: party.customUrl,
-      eventSeriesId: party.eventSeriesId,
-    });
+        waitlistPosition: guestRow.waitlistPosition ?? 1,
+        inviteCode,
+        customUrl: party.customUrl,
+        eventSeriesId: party.eventSeriesId,
+      });
+    } else {
+        await sendRSVPConfirmationEmail({
+        guestEmail: guestRow.email,
+        guestName: guestRow.name,
+        guestId: guestRow.id,
+        partyName: party.name,
+        partyDate: party.date,
+      partyTimezone: party.timezone,
+        partyAddress: party.address,
+        partyImageUrl: party.eventImageUrl,
+        inviteCode,
+        customUrl: party.customUrl,
+        requireApproval: guestStatus === "PENDING",
+        eventSeriesId: party.eventSeriesId,
+      });
+    }
 
     res.json({ success: true, message: 'Confirmation email sent' });
   } catch (error) {
@@ -990,7 +1031,7 @@ async function sendRSVPConfirmationEmail(params: {
           <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
           <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
           <img src="${qrCodeUrl}" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
-          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${params.guestName}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${escapeHtml(params.guestName)}</p>
         </div>
   ` : `
         <div style="background: #fff3cd; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #ffc107;">
@@ -1002,16 +1043,16 @@ async function sendRSVPConfirmationEmail(params: {
   const headerTitle = isPendingApproval ? '🍕 RSVP Submitted!' : '🍕 You\'re Going!';
   const headerSubtitle = isPendingApproval ? 'Awaiting host approval' : 'Your RSVP is confirmed';
   const footerText = isPendingApproval
-    ? `We'll let you know once the host approves your RSVP, ${params.guestName}!`
-    : `See you there, ${params.guestName}!`;
+    ? `We'll let you know once the host approves your RSVP, ${escapeHtml(params.guestName)}!`
+    : `See you there, ${escapeHtml(params.guestName)}!`;
   const emailSubject = isPendingApproval
-    ? `RSVP Submitted for ${params.partyName} - Pending Approval`
-    : `You're going to ${params.partyName}! 🍕`;
+    ? `RSVP Submitted for ${oneLine(params.partyName)} - Pending Approval`
+    : `You're going to ${oneLine(params.partyName)}! 🍕`;
 
   const flyerBlock = params.partyImageUrl
     ? `
         <div style="text-align: center; margin-bottom: 20px;">
-          <img src="${params.partyImageUrl}" alt="${params.partyName}" style="max-width: 100%; border-radius: 12px;" />
+          <img src="${escapeHtml(params.partyImageUrl)}" alt="${escapeHtml(params.partyName)}" style="max-width: 100%; border-radius: 12px;" />
         </div>
   `
     : '';
@@ -1033,15 +1074,15 @@ async function sendRSVPConfirmationEmail(params: {
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
           <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
-          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${escapeHtml(params.partyName)}</p>
           <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
-          <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> ${escapeHtml(addressText)}</p>
         </div>
 
         ${qrCodeSection}
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+          <a href="${escapeHtml(eventUrl)}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
         </div>
 
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
@@ -1115,12 +1156,12 @@ export async function sendApprovalEmail(params: {
   const addressText = params.partyAddress || 'Location TBD';
 
   const flyerImg = params.partyImageUrl
-    ? `<img src="${params.partyImageUrl}" alt="${params.partyName}" style="width: 100%; max-width: 540px; height: auto; border-radius: 12px; display: block; margin: 0 auto 20px auto;" />`
+    ? `<img src="${escapeHtml(params.partyImageUrl)}" alt="${escapeHtml(params.partyName)}" style="width: 100%; max-width: 540px; height: auto; border-radius: 12px; display: block; margin: 0 auto 20px auto;" />`
     : '';
 
   const whereHtml = params.venueName
-    ? `<p style="margin: 10px 0;"><strong>Where:</strong> ${params.venueName}<br><span style="color: #666; font-size: 14px;">${addressText}</span></p>`
-    : `<p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>`;
+    ? `<p style="margin: 10px 0;"><strong>Where:</strong> ${escapeHtml(params.venueName)}<br><span style="color: #666; font-size: 14px;">${escapeHtml(addressText)}</span></p>`
+    : `<p style="margin: 10px 0;"><strong>Where:</strong> ${escapeHtml(addressText)}</p>`;
 
   const emailHtml = `
     <!DOCTYPE html>
@@ -1143,7 +1184,7 @@ export async function sendApprovalEmail(params: {
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
           ${flyerImg}
           <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
-          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${escapeHtml(params.partyName)}</p>
           <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
           ${whereHtml}
         </div>
@@ -1152,15 +1193,15 @@ export async function sendApprovalEmail(params: {
           <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
           <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
           <img src="${qrCodeUrl}" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
-          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${params.guestName}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${escapeHtml(params.guestName)}</p>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+          <a href="${escapeHtml(eventUrl)}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
         </div>
 
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
-          <p>See you there, ${params.guestName}!</p>
+          <p>See you there, ${escapeHtml(params.guestName)}!</p>
         </div>
       </body>
     </html>
@@ -1168,7 +1209,7 @@ export async function sendApprovalEmail(params: {
 
   const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
-      subject: `You're approved for ${params.partyName}! 🍕`,
+      subject: oneLine(`You're approved for ${params.partyName}! 🍕`),
       html: emailHtml,
       ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
     } });
@@ -1235,13 +1276,13 @@ async function sendWaitlistConfirmationEmail(params: {
 
         <div style="background: #fff3cd; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #ffc107;">
           <p style="color: #856404; font-size: 16px; margin: 0;">
-            ${params.partyName} is currently at capacity, but you're #${params.waitlistPosition} on the waitlist!
+            ${escapeHtml(params.partyName)} is currently at capacity, but you're #${params.waitlistPosition} on the waitlist!
           </p>
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
           <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
-          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${escapeHtml(params.partyName)}</p>
           <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
         </div>
 
@@ -1254,11 +1295,11 @@ async function sendWaitlistConfirmationEmail(params: {
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+          <a href="${escapeHtml(eventUrl)}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
         </div>
 
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
-          <p>Fingers crossed, ${params.guestName}!</p>
+          <p>Fingers crossed, ${escapeHtml(params.guestName)}!</p>
         </div>
       </body>
     </html>
@@ -1266,7 +1307,7 @@ async function sendWaitlistConfirmationEmail(params: {
 
   const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
-      subject: `You're #${params.waitlistPosition} on the waitlist for ${params.partyName}`,
+      subject: oneLine(`You're #${params.waitlistPosition} on the waitlist for ${params.partyName}`),
       html: emailHtml,
     } });
 
@@ -1328,7 +1369,7 @@ export async function sendPromotionEmail(params: {
   const flyerBlock = params.partyImageUrl
     ? `
         <div style="text-align: center; margin-bottom: 20px;">
-          <img src="${params.partyImageUrl}" alt="${params.partyName}" style="max-width: 100%; border-radius: 12px;" />
+          <img src="${escapeHtml(params.partyImageUrl)}" alt="${escapeHtml(params.partyName)}" style="max-width: 100%; border-radius: 12px;" />
         </div>
   `
     : '';
@@ -1356,24 +1397,24 @@ export async function sendPromotionEmail(params: {
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
           <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
-          <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
+          <p style="margin: 10px 0;"><strong>Event:</strong> ${escapeHtml(params.partyName)}</p>
           <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
-          <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> ${escapeHtml(addressText)}</p>
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
           <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
           <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
           <img src="${qrCodeUrl}" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
-          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${params.guestName}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: ${escapeHtml(params.guestName)}</p>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+          <a href="${escapeHtml(eventUrl)}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
         </div>
 
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
-          <p>See you there, ${params.guestName}!</p>
+          <p>See you there, ${escapeHtml(params.guestName)}!</p>
         </div>
       </body>
     </html>
@@ -1381,7 +1422,7 @@ export async function sendPromotionEmail(params: {
 
   const response = await sendBrandedEmail({ site, apiKey: resendApiKey, payload: {
       to: [params.guestEmail],
-      subject: `You're in! A spot opened up at ${params.partyName}`,
+      subject: oneLine(`You're in! A spot opened up at ${params.partyName}`),
       html: emailHtml,
       ...(qrAttachments.length ? { attachments: qrAttachments } : {}),
     } });

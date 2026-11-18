@@ -631,6 +631,7 @@ describe('Party Routes', () => {
         })
         .mockResolvedValueOnce({
           id: PARTY_ID,
+          userId: HOST_USER_ID, // co-host guard reads the owner from this select
           coHosts: existingCoHosts,
         });
 

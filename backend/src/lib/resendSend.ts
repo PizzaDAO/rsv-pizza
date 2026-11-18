@@ -33,6 +33,8 @@ export function isUnverifiedDomainError(status: number, body: string): boolean {
 
 function post(fetchImpl: typeof fetch, apiKey: string, from: string, payload: Record<string, unknown>, replyTo?: string, signal?: AbortSignal) {
   const body: Record<string, unknown> = { from, ...payload };
+  // Header-injection guard: a CR/LF in a user-influenced subject must never reach the mail provider.
+  if (typeof body.subject === 'string') body.subject = body.subject.replace(/[\r\n\u2028\u2029]+/g, ' ');
   if (replyTo) body.reply_to = replyTo;
   return fetchImpl(RESEND_URL, {
     method: 'POST',
