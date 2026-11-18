@@ -45,9 +45,9 @@ export function RSVPFormStep2({
     <form onSubmit={form.handleSubmit} className="space-y-3">
       {/* Dietary Restrictions */}
       <div>
-        <label className="block text-sm font-medium text-theme-text mb-3">
+        <p className="block text-sm font-medium text-theme-text mb-3">
           {t('step2.diet')}
-        </label>
+        </p>
         <div className="flex flex-wrap gap-2">
           {dietaryOptionsToShow.map((option) => (
             <button
@@ -69,9 +69,9 @@ export function RSVPFormStep2({
       {/* Topping Preferences (gorgonzola-41822: opt-in by host) */}
       {form.showToppingsOnRsvp && form.availableToppings.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-theme-text mb-3">
+          <p className="block text-sm font-medium text-theme-text mb-3">
             {t('step2.toppings', { defaultValue: 'Topping Preferences' })}
-          </label>
+          </p>
           <div className="flex flex-wrap gap-2">
             {ALL_TOPPINGS
               .filter(topping => form.availableToppings.includes(topping.id))
@@ -167,9 +167,9 @@ export function RSVPFormStep2({
       {/* Drinks */}
       {!form.isGppEvent && form.availableBeverages.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-theme-text mb-3">
+          <p className="block text-sm font-medium text-theme-text mb-3">
             {t('step2.drinkPreferences')}
-          </label>
+          </p>
           <div className="flex flex-wrap gap-2">
             {DRINKS.filter(d => form.availableBeverages.includes(d.id)).map((drink) => {
               const isLiked = form.likedBeverages.includes(drink.id);
@@ -298,9 +298,9 @@ export function RSVPFormStep2({
       {/* Pizzeria Rankings */}
       {form.nearbyPizzerias.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-theme-text mb-3">
+          <p className="block text-sm font-medium text-theme-text mb-3">
             {t('step2.favoritePizzerias')} <span className="text-theme-text-muted font-normal">{t('step2.clickToRank')}</span>
-          </label>
+          </p>
           {form.loadingPizzerias ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 size={20} className="animate-spin text-theme-text-muted" />

@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Modal } from './Modal';
 import { useTranslation } from 'react-i18next';
 import { Upload, X, FileSpreadsheet, AlertTriangle, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { IconInput } from './IconInput';
@@ -277,17 +278,10 @@ export const ImportGuestsModal: React.FC<Props> = ({ isOpen, onClose, existingEm
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={handleClose}
-    >
-      <div
-        className="bg-theme-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={handleClose} labelledBy="import-guests-title" panelClassName="bg-theme-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" backdropClassName="z-50 bg-black/60 backdrop-blur-sm" showClose={false}>
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-theme-stroke">
-          <h2 className="text-2xl font-bold text-theme-text">
+          <h2 id="import-guests-title" className="text-2xl font-bold text-theme-text">
             {t('guests.import.title', { defaultValue: 'Import guests' })}
           </h2>
           <button
@@ -644,7 +638,6 @@ export const ImportGuestsModal: React.FC<Props> = ({ isOpen, onClose, existingEm
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

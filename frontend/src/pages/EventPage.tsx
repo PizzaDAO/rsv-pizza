@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, getMyGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats, checkEventHost } from '../lib/api';
 import { IconInput } from '../components/IconInput';
+import { LoadingState } from '../components/StateViews';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
@@ -431,11 +432,7 @@ export function EventPage() {
   }, [event, eventYear, yearParam]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-      </div>
-    );
+    return <LoadingState fullScreen />;
   }
 
   if (error || !event) {
@@ -813,15 +810,13 @@ export function EventPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-theme-text mb-2">
-                  {t('editPassword.label')}
-                </label>
-                <input
+                <IconInput
+                  icon={Lock}
                   type="password"
                   value={editPasswordInput}
                   onChange={(e) => setEditPasswordInput(e.target.value)}
                   placeholder={t('editPassword.placeholder')}
-                  className="w-full"
+                  aria-label={t('editPassword.label')}
                   required
                   autoFocus
                 />

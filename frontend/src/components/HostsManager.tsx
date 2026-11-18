@@ -546,10 +546,10 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   return (
     <div>
       <div className="mb-3">
-        <label className="block text-sm font-medium text-white/80">
+        <p className="block text-sm font-medium text-white/80">
           <User size={16} className="inline mr-2" />
           Hosts
-        </label>
+        </p>
       </div>
 
       {/* Hosts List (Main Host + Co-Hosts) */}

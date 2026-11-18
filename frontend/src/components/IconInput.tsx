@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { LucideIcon } from 'lucide-react';
 
 interface IconInputBaseProps {
@@ -20,6 +20,15 @@ export type IconInputProps = SingleLineProps | MultilineProps;
 export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
   (allProps, ref) => {
     const { icon: Icon, customIcon, iconSize = 20, className = '', placeholder, required, multiline, ...props } = allProps;
+    const autoId = useId();
+    // Placeholders are our labels (project rule), but a placeholder is not an accessible name
+    // everywhere, so derive an aria-label from it unless the caller supplied a label.
+    const a11yProps = {
+      id: props.id ?? autoId,
+      ...(props['aria-label'] || props['aria-labelledby'] || !placeholder
+        ? {}
+        : { 'aria-label': placeholder.replace(/\s*\*$/, '') }),
+    };
     const displayPlaceholder = placeholder && required && !placeholder.endsWith('*')
       ? `${placeholder} *`
       : placeholder;
@@ -42,6 +51,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
             placeholder={displayPlaceholder}
             required={required}
             rows={rows}
+            {...a11yProps}
             {...textareaProps}
           />
         </div>
@@ -56,6 +66,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
           className={`w-full !pl-14 ${className}`}
           placeholder={displayPlaceholder}
           required={required}
+          {...a11yProps}
           {...(props as React.InputHTMLAttributes<HTMLInputElement>)}
         />
       </div>

@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2, ShieldCheck, Upload, Instagram, Youtube, Linkedin, Globe, LogOut, Trash2, AlertTriangle, Save, X, User, Mail, ThumbsUp, ThumbsDown, Pizza, Handshake, ExternalLink, Calendar } from 'lucide-react';
 import { IconInput } from '../components/IconInput';
+import { LoadingState } from '../components/StateViews';
 import { uploadProfilePicture, getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/supabase';
 import { getUserSponsorships, UserSponsorshipEntry } from '../lib/api';
 import { DIETARY_OPTIONS, TOPPINGS, DRINKS, getExcludedToppingIds } from '../constants/options';
@@ -337,9 +338,7 @@ export function AccountPage() {
   if (authLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 size={32} className="animate-spin text-theme-text-secondary" />
-        </div>
+        <LoadingState />
       </Layout>
     );
   }
@@ -431,11 +430,12 @@ export function AccountPage() {
             </div>
 
             {/* Bio */}
-            <textarea
+            <IconInput
+              multiline
+              icon={User}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               placeholder={t('profile.bioPlaceholder')}
-              className="w-full"
               rows={3}
             />
 
@@ -578,9 +578,9 @@ export function AccountPage() {
 
               {/* Dietary Restrictions */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-theme-text mb-3">
+                <p className="block text-sm font-medium text-theme-text mb-3">
                   {t('profile.diet')}
-                </label>
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {DIETARY_OPTIONS.map((option) => (
                     <button
@@ -600,9 +600,9 @@ export function AccountPage() {
 
               {/* Toppings */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-theme-text mb-3">
+                <p className="block text-sm font-medium text-theme-text mb-3">
                   {t('profile.toppings')}
-                </label>
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {TOPPINGS.map((topping) => {
                     const isLiked = likedToppings.includes(topping.id);
@@ -654,9 +654,9 @@ export function AccountPage() {
 
               {/* Drinks */}
               <div>
-                <label className="block text-sm font-medium text-theme-text mb-3">
+                <p className="block text-sm font-medium text-theme-text mb-3">
                   {t('profile.drinkPreferences')}
-                </label>
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {DRINKS.map((drink) => {
                     const isLiked = likedBeverages.includes(drink.id);

@@ -1,4 +1,5 @@
 import { X, MailQuestion } from 'lucide-react';
+import { Modal } from './Modal';
 import { Guest } from '../types';
 import { ClickableEmail } from './ClickableEmail';
 
@@ -12,17 +13,11 @@ export function InvitedGuestsModal({ isOpen, onClose, invitedGuests }: InvitedGu
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-theme-header rounded-2xl border border-theme-stroke w-full max-w-lg max-h-[80vh] flex flex-col">
+    <Modal onClose={onClose} labelledBy="invited-guests-title" panelClassName="bg-theme-header rounded-2xl border border-theme-stroke w-full max-w-lg max-h-[80vh] flex flex-col" backdropClassName="z-[100] bg-black/60 backdrop-blur-sm" showClose={false}>
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <div className="flex items-center gap-2">
             <MailQuestion size={18} className="text-amber-400" />
-            <h2 className="text-lg font-bold text-theme-text">Invited Guests</h2>
+            <h2 id="invited-guests-title" className="text-lg font-bold text-theme-text">Invited Guests</h2>
             <span className="text-xs text-theme-text-muted">({invitedGuests.length})</span>
           </div>
           <button
@@ -58,7 +53,6 @@ export function InvitedGuestsModal({ isOpen, onClose, invitedGuests }: InvitedGu
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

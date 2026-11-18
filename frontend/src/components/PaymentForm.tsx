@@ -133,10 +133,10 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-theme-text mb-2">
+        <p className="block text-sm font-medium text-theme-text mb-2">
           <CreditCard size={14} className="inline mr-1" />
           Card Information
-        </label>
+        </p>
         <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke-hover focus-within:border-[#ff393a]/50 transition-colors">
           <CardElement options={cardElementOptions} />
         </div>

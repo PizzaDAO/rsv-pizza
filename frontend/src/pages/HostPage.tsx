@@ -8,6 +8,7 @@ import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useGuestsRealtime } from '../hooks/useGuestsRealtime';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { LoadingState } from '../components/StateViews';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
@@ -292,9 +293,7 @@ function HostPageContent() {
   if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-        </div>
+        <LoadingState className="!min-h-[60vh]" />
       </Layout>
     );
   }
@@ -319,9 +318,7 @@ function HostPageContent() {
   if (!canEdit) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-        </div>
+        <LoadingState className="!min-h-[60vh]" />
       </Layout>
     );
   }
