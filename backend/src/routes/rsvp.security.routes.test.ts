@@ -69,7 +69,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   _resetSiteBrandCache();
   process.env.RESEND_API_KEY = 're_test';
-  process.env.FRONTEND_URL = 'https://rsv.pizza';
   mockFetch.mockResolvedValue({ ok: true, json: async () => ({ id: 'r1' }), text: async () => '', headers: new Headers() });
   mockPrisma.party.findUnique.mockResolvedValue(PARTY);
   mockPrisma.guest.findFirst.mockResolvedValue(null);
