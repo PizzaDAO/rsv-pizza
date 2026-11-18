@@ -77,7 +77,8 @@ function safePartyColumns() {
   const src = fs.readFileSync(path.join(__dirname, '../frontend/src/lib/supabase.ts'), 'utf8');
   const m = /export const SAFE_PARTY_COLUMNS\s*=\s*`([^`]*)`/.exec(src);
   if (!m) throw new Error('could not parse SAFE_PARTY_COLUMNS from frontend/src/lib/supabase.ts');
-  return m[1].split(',').map((c) => c.trim()).filter(Boolean);
+  // Entries may be PostgREST `alias:column` (e.g. event_tags:public_event_tags); the grant is on the column.
+  return m[1].split(',').map((c) => c.trim()).filter(Boolean).map((c) => c.split(':').pop().trim());
 }
 
 async function checkColumns(client) {

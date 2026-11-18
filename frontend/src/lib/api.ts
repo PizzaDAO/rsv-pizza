@@ -289,6 +289,8 @@ export interface UpdatePartyData {
   targetAttendance?: number | null;
   expectedAttendance?: number | null;
   eventTags?: string[];
+  // scam-flag-private: targeted toggle; the backend adds/removes only 'prepay' on the stored tags.
+  prepay?: boolean;
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
@@ -434,6 +436,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       targetAttendance: data.targetAttendance,
       expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
+      prepay: data.prepay,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
