@@ -236,3 +236,14 @@ describe('changesGoTag / changesPaymentAdminTags', () => {
     expect(changesPaymentAdminTags(['a'], ['a', 'swc', 'prepay'])).toBe(false);
   });
 });
+
+import { canonicalizeEventTags } from './eventTags.js';
+
+describe('canonicalizeEventTags', () => {
+  it('lowercases guarded variants, leaves others, dedupes', () => {
+    expect(canonicalizeEventTags(['GO', ' go ', 'Possible-Scam', 'K40', ' 200 ', 'SWC', 'SWC'])).toEqual([
+      'go', 'possible-scam', 'k40', '200', 'SWC',
+    ]);
+    expect(canonicalizeEventTags(null)).toEqual([]);
+  });
+});

@@ -119,4 +119,26 @@ describe('bulk-event-tags guard', () => {
     expect(log).toHaveBeenCalledWith(expect.stringMatching(/possible-scam-tag\] party=p1 action=flag actor=ub@example.com/));
     log.mockRestore();
   });
+
+  it("stored 'Go' + add 'go' yields a single canonical 'go' and is not a guarded change", async () => {
+    stored({ p1: ['Go', 'review'] });
+    const r = await request(app()).patch(URL).set(H).send({ partyIds: ['p1'], tags: ['go'], action: 'add' });
+    expect(r.status).toBe(200);
+    expect(m.prisma.party.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { eventTags: ['go', 'review'] } });
+  });
+
+  it("underboss cannot remove a stored 'Go' variant", async () => {
+    stored({ p1: [' GO '] });
+    const r = await request(app()).patch(URL).set(H).send({ partyIds: ['p1'], tags: ['go'], action: 'remove' });
+    expect(r.status).toBe(403);
+    expect(m.prisma.party.update).not.toHaveBeenCalled();
+  });
+
+  it('payment admin adding a variant stores the canonical form', async () => {
+    m.isPaymentAdmin.mockResolvedValue(true);
+    stored({ p1: [] });
+    const r = await request(app()).patch(URL).set(H).send({ partyIds: ['p1'], tags: ['GO'], action: 'add' });
+    expect(r.status).toBe(200);
+    expect(m.prisma.party.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { eventTags: ['go'] } });
+  });
 });

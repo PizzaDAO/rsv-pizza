@@ -255,6 +255,20 @@ describe('Party Routes', () => {
       expect(bad.status).toBe(403);
     });
 
+    it("underboss cannot disable the go gate via a case variant ('go' -> 'GO' is a canonical no-op)", async () => {
+      tagRoles[OTHER_EMAIL] = 'underboss';
+      const res = await patchTags(OTHER_EMAIL, OTHER_USER_ID, ['swc', 'GO'], ['swc', 'go']);
+      expect(res.status).toBe(200);
+      expect(written()).toEqual(['swc', 'go']);
+    });
+
+    it('payment_admin variant writes are stored canonically', async () => {
+      tagRoles[HOST_EMAIL] = 'payment_admin';
+      const res = await patchTags(HOST_EMAIL, HOST_USER_ID, ['swc', ' GO ', 'Possible-Scam']);
+      expect(res.status).toBe(200);
+      expect(written()).toEqual(['swc', 'go', 'possible-scam']);
+    });
+
     it('out-of-scope underboss who is only a co-host is treated as a host', async () => {
       tagRoles[OTHER_EMAIL] = 'underboss';
       const res = await patchTags(OTHER_EMAIL, OTHER_USER_ID, ['paid'], CURRENT, { region: 'EMEA' });

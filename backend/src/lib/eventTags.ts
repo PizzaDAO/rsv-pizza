@@ -91,6 +91,28 @@ export function changesGuardedTags(current: string[] | null | undefined, next: u
   return false;
 }
 
+/**
+ * Canonical form of a payment-admin-only tag ('go', 'possible-scam', numeric /
+ * k cap): trimmed + lowercased. Readers check these tags by exact lowercase, so
+ * variants like 'GO' or ' Go ' must never be stored. Other tags are untouched.
+ */
+export function canonicalizeGuardedTag<T>(tag: T): T | string {
+  if (typeof tag !== 'string') return tag;
+  const t = tag.trim().toLowerCase();
+  return t === 'go' || isGuardedTag(t) ? t : tag;
+}
+
+/** Canonicalize guarded-tag variants in a tag list, then dedupe (order preserved). */
+export function canonicalizeEventTags(tags: unknown[] | null | undefined): string[] {
+  const out: string[] = [];
+  for (const t of Array.isArray(tags) ? tags : []) {
+    if (typeof t !== 'string') continue;
+    const c = canonicalizeGuardedTag(t) as string;
+    if (!out.includes(c)) out.push(c);
+  }
+  return out;
+}
+
 /** True when `next` adds or removes the payout-gate 'go' tag relative to `current` (case/whitespace-insensitive). */
 export function changesGoTag(current: string[] | null | undefined, next: unknown[]): boolean {
   const has = (arr: unknown) =>

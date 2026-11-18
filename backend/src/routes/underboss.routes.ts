@@ -14,7 +14,7 @@ import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { loadHostQuestionSet } from '../lib/hostSurveyQuestions.js';
 import { runChecks, worstStatus, cityIdentity, RESERVED_SLUGS } from '../lib/gppVerification.js';
 import { GPP27_YEAR, GPP27_TAG } from '../helpers/gpp27.js';
-import { changesPaymentAdminTags } from '../lib/eventTags.js';
+import { changesPaymentAdminTags, canonicalizeEventTags } from '../lib/eventTags.js';
 import { isUploadedReceipt } from '../lib/receiptSource.js';
 
 // Re-export the request type under the local name used throughout this file
@@ -1436,7 +1436,9 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
     // guard can reject the whole batch before anything is written.
     const planned = parties.map((party) => {
       let newTags: string[];
-      const existing = party.eventTags || [];
+      // Canonicalize stored variants ('Go', ' GO ') so add/remove/set and the
+      // guard below all see one form; readers match exact lowercase 'go'.
+      const existing = canonicalizeEventTags(party.eventTags);
 
       if (action === 'add') {
         // Append tags, deduplicated
@@ -1448,7 +1450,7 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
         // 'set' — replace entirely
         newTags = cleanTags;
       }
-      return { party, existing, newTags };
+      return { party, existing, newTags: canonicalizeEventTags(newTags) };
     });
 
     // 'go', 'possible-scam' and numeric / party-kit cap tags are payment-admin
