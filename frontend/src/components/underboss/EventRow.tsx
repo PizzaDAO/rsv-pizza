@@ -6,7 +6,7 @@ import { ProgressIndicator } from './ProgressIndicator';
 import { ReimbursementCapCell } from './ReimbursementCapCell';
 import { IconInput } from '../IconInput';
 import { CopyEmailButton } from '../CopyEmailButton';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, notifyTagError, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import { calculateEventPrice } from '../../utils/sponsorshipPricing';
@@ -175,8 +175,9 @@ function HostTagsPills({
     try {
       await bulkUpdateEventTags([eventId], [cleaned], 'add');
       triggerFlyerRegenForEvents([event]);
-    } catch {
+    } catch (err) {
       onUpdate(tags);
+      notifyTagError(err);
     }
   }
 
@@ -186,8 +187,9 @@ function HostTagsPills({
     try {
       await bulkUpdateEventTags([eventId], [tag], 'remove');
       triggerFlyerRegenForEvents([event]);
-    } catch {
+    } catch (err) {
       onUpdate(tags);
+      notifyTagError(err);
     }
   }
 

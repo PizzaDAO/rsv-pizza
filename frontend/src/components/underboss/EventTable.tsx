@@ -7,7 +7,7 @@ import { Checkbox } from '../Checkbox';
 import { TriStateFilterDropdown } from '../TriStateFilterDropdown';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
-import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
+import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags, notifyTagError } from '../../lib/api';
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
@@ -787,7 +787,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                 // Trigger flyer regen for affected events
                                 const affected = events.filter(e => selectedIds.has(e.id));
                                 triggerFlyerRegenForEvents(affected);
-                              } catch (err) { console.error('Add tag failed', err); }
+                              } catch (err) { console.error('Add tag failed', err); notifyTagError(err); }
                               setBulkLoading(false);
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
@@ -821,7 +821,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                   // Trigger flyer regen for affected events
                                   const affected = events.filter(e2 => selectedIds.has(e2.id));
                                   triggerFlyerRegenForEvents(affected);
-                                } catch (err) { console.error('Add custom tag failed', err); }
+                                } catch (err) { console.error('Add custom tag failed', err); notifyTagError(err); }
                                 setBulkLoading(false);
                                 setCustomTag('');
                               }
@@ -870,7 +870,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                                   // Trigger flyer regen for affected events (partner logo may have been removed)
                                   const affected = events.filter(e => selectedIds.has(e.id));
                                   triggerFlyerRegenForEvents(affected);
-                                } catch (err) { console.error('Remove tag failed', err); }
+                                } catch (err) { console.error('Remove tag failed', err); notifyTagError(err); }
                                 setBulkLoading(false);
                               }}
                               className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-theme-surface transition-colors"

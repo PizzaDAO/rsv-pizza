@@ -14,6 +14,7 @@ import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { loadHostQuestionSet } from '../lib/hostSurveyQuestions.js';
 import { runChecks, worstStatus, cityIdentity, RESERVED_SLUGS } from '../lib/gppVerification.js';
 import { GPP27_YEAR, GPP27_TAG } from '../helpers/gpp27.js';
+import { changesPaymentAdminTags, canonicalizeEventTags } from '../lib/eventTags.js';
 import { isUploadedReceipt } from '../lib/receiptSource.js';
 
 // Re-export the request type under the local name used throughout this file
@@ -1431,10 +1432,13 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
       select: { id: true, eventTags: true },
     });
 
-    let updated = 0;
-    for (const party of parties) {
+    // Compute the resulting tag list per party up front so the payment-admin
+    // guard can reject the whole batch before anything is written.
+    const planned = parties.map((party) => {
       let newTags: string[];
-      const existing = party.eventTags || [];
+      // Canonicalize stored variants ('Go', ' GO ') so add/remove/set and the
+      // guard below all see one form; readers match exact lowercase 'go'.
+      const existing = canonicalizeEventTags(party.eventTags);
 
       if (action === 'add') {
         // Append tags, deduplicated
@@ -1446,6 +1450,34 @@ router.patch('/events/bulk-event-tags', requireAuth, requireUnderbossAuth, async
         // 'set' — replace entirely
         newTags = cleanTags;
       }
+      return { party, existing, newTags: canonicalizeEventTags(newTags) };
+    });
+
+    // 'go', 'possible-scam' and numeric / party-kit cap tags are payment-admin
+    // only (mirrors the party PATCH). A scoped underboss must not be able to
+    // open Payments, flag/unflag a host, or mint a reimbursement cap.
+    const guardedChange = planned.some((p) => changesPaymentAdminTags(p.existing, p.newTags));
+    if (guardedChange && !(await isPaymentAdmin(req.userEmail))) {
+      throw new AppError(
+        "Only admins and payment admins can add or remove the 'go' or 'possible-scam' tags or numeric cap tags.",
+        403,
+        'FORBIDDEN_TAG',
+      );
+    }
+    for (const { party, existing, newTags } of planned) {
+      const hadScam = existing.some((t: string) => t.trim().toLowerCase() === 'possible-scam');
+      const wantsScam = newTags.some((t: string) => t.trim().toLowerCase() === 'possible-scam');
+      if (hadScam !== wantsScam) {
+        console.log(
+          `[bottarga-92104][possible-scam-tag] party=${party.id} action=${
+            wantsScam ? 'flag' : 'unflag'
+          } actor=${req.userEmail ?? 'unknown'} at=${new Date().toISOString()} via=bulk-event-tags`,
+        );
+      }
+    }
+
+    let updated = 0;
+    for (const { party, existing, newTags } of planned) {
 
       await prisma.party.update({
         where: { id: party.id },

@@ -3852,6 +3852,13 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   });
 }
 
+// Surface a bulk-tag rejection (e.g. 403 FORBIDDEN_TAG for 'go' / 'possible-scam' /
+// cap tags, which only payment admins may change) instead of failing silently.
+export function notifyTagError(err: unknown): void {
+  const e = err as { code?: string; message?: string };
+  if (e?.code === 'FORBIDDEN_TAG') window.alert(e.message || 'You are not allowed to change this tag.');
+}
+
 // Bulk update event tags (underboss auth)
 export async function bulkUpdateEventTags(
   partyIds: string[],
