@@ -15,6 +15,7 @@ import { publicTags, isInternalTag } from '../lib/eventTags.js';
 import { brand } from '../config/brand.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { countryCodeToRegion, countryNameToRegion } from '../lib/countryRegion.js';
+import { isTestParty } from '../lib/testParty.js';
 
 const router = Router();
 
@@ -594,6 +595,8 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     id: event.id,
     name: event.name,
     city,
+    // Host/geocoded city only (no fallback to the event name); used by the /events city filter.
+    geoCity: event.city || null,
     customUrl: event.customUrl,
     inviteCode: event.inviteCode,
     url,
@@ -774,7 +777,10 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       callerIsModerator ? 'private, no-store' : 'public, max-age=300'
     );
     res.json({
-      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
+      // Public callers never see obvious test/probe parties (moderators see everything).
+      events: events
+        .filter((e) => callerIsModerator || !isTestParty(e.name))
+        .map((e) => formatGppEvent(e, callerIsModerator)),
       total,
       limit: parsedLimit,
       offset: parsedOffset,

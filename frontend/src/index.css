@@ -35,10 +35,19 @@
 .marquee-item {
   flex-shrink: 0;
 }
+/* WCAG 2.2.2: pause on hover/focus and via the pause button. */
+.marquee-banner:hover .marquee-track,
+.marquee-banner:focus-within .marquee-track,
+.marquee-banner.marquee-paused .marquee-track {
+  animation-play-state: paused;
+}
 @media (prefers-reduced-motion: reduce) {
   .marquee-track {
     animation: none;
     transform: translateX(0);
+  }
+  .marquee-pause-btn {
+    display: none;
   }
 }
 

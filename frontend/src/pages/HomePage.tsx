@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
+import { DismissibleGppBanner } from '../components/DismissibleGppBanner';
 import { EventForm } from '../components/EventForm';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Loader2, Users, Plus, MapPin, Crown } from 'lucide-react';
@@ -71,11 +72,7 @@ export function HomePage() {
   if (user && (userParties.length > 0 || partiesLoading)) {
     return (
       <Layout>
-        {!IS_SERIES_SCOPED && (
-          <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
-            {t('home.gppBanner')}
-          </Link>
-        )}
+        {!IS_SERIES_SCOPED && <DismissibleGppBanner message={t('home.gppBanner')} />}
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('home.yourEvents')}</h1>
@@ -221,9 +218,7 @@ export function HomePage() {
   // Default: Show event creation form (for non-signed-in users or users with no parties)
   return (
     <Layout>
-      <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
-        Planning a Global Pizza Party? Create it at {`${BRAND.domain}/gpp`}
-      </Link>
+      <DismissibleGppBanner message={`Planning a Global Pizza Party? Create it at ${BRAND.domain}/gpp`} />
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="card p-8">
           <EventForm />

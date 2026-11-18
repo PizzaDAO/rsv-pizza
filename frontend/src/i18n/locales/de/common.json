@@ -31,6 +31,21 @@
   "notFound": {
     "title": "Seite nicht gefunden",
     "description": "Diese Seite existiert nicht. Der Link ist möglicherweise falsch oder veraltet.",
-    "goHome": "Zur Startseite"
+    "goHome": "Zur Startseite",
+    "eventTitle": "Veranstaltung nicht gefunden",
+    "eventDescription": "Diese Veranstaltung wurde nicht gefunden. Der Link ist möglicherweise falsch oder die Veranstaltung wurde entfernt.",
+    "seriesTitle": "Serie nicht gefunden",
+    "seriesDescription": "Unter dieser Adresse existiert keine Veranstaltungsserie.",
+    "browseEvents": "Veranstaltungen durchsuchen",
+    "createYourOwn": "Eigene erstellen",
+    "searchPlaceholder": "Veranstaltungen suchen",
+    "search": "Suchen",
+    "activeSeries": "Aktive Serien"
+  },
+  "banner": {
+    "findCities": "Weitere Städte findest du auf",
+    "pause": "Laufband anhalten",
+    "play": "Laufband fortsetzen",
+    "dismiss": "Schließen"
   }
 }

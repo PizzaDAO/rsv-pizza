@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, MapPin, Search, Users, X } from 'lucide-react';
+import { Crosshair, Map as MapIcon, MapPin, Search, Users, X } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { BRAND } from '../config/brand';
 import { IconInput } from '../components/IconInput';
@@ -13,7 +13,10 @@ import {
   EMPTY_FILTERS,
   EventSearchFilters,
   SearchableEvent,
+  cityOptions,
   eventContinent,
+  eventDistanceKm,
+  regionDuplicatesCountry,
   filterEvents,
   filtersToSearchParams,
   searchParamsToFilters,
@@ -23,6 +26,25 @@ import {
 const SELECT_CLASS =
   'w-full px-3 py-3 bg-theme-surface border border-theme-stroke rounded-xl text-theme-text text-sm focus:outline-none focus:border-[#ff393a]';
 const PAGE_SIZE = 60;
+const WHEN_LABELS: Record<string, string> = { week: 'This week', month: 'This month', upcoming: 'Upcoming', past: 'Past' };
+
+function SkeletonGrid() {
+  return (
+    <ul
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+      aria-busy="true"
+      aria-label="Loading events"
+    >
+      {Array.from({ length: 9 }).map((_, i) => (
+        <li key={i} className="p-4 bg-theme-surface border border-theme-stroke rounded-xl animate-pulse">
+          <div className="h-4 w-3/4 rounded bg-theme-surface-hover" />
+          <div className="mt-3 h-3 w-1/2 rounded bg-theme-surface-hover" />
+          <div className="mt-4 h-3 w-1/3 rounded bg-theme-surface-hover" />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function EventsSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -33,6 +55,30 @@ export function EventsSearchPage() {
   const [visible, setVisible] = useState(PAGE_SIZE);
   // Keyword is local state (debounced into the URL) so typing stays responsive.
   const [qInput, setQInput] = useState(filters.q);
+  // "Near me": browser geolocation on click, client-side distance sort.
+  const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoState, setGeoState] = useState<'idle' | 'loading' | 'denied'>('idle');
+
+  const toggleNearMe = () => {
+    if (origin) {
+      setOrigin(null);
+      return;
+    }
+    if (!navigator.geolocation) {
+      setGeoState('denied');
+      return;
+    }
+    setGeoState('loading');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoState('idle');
+        setVisible(PAGE_SIZE);
+      },
+      () => setGeoState('denied'),
+      { maximumAge: 600000, timeout: 10000 }
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -74,28 +120,44 @@ export function EventsSearchPage() {
     const present = new Set(scoped.map((e) => (e.region || '').toLowerCase()));
     return GPP_REGIONS.filter((r) => present.has(r.id));
   }, [events, filters.continent, filters.country]);
+  // City options come from the clean city field only (normalized, deduped); event names and
+  // test data never show up here.
   const cities = useMemo(
     () =>
-      uniqueSorted(
+      cityOptions(
         filterEvents(events, {
           ...EMPTY_FILTERS,
           continent: filters.continent,
           country: filters.country,
           region: filters.region,
-        }).map((e) => e.city)
+        })
       ),
     [events, filters.continent, filters.country, filters.region]
   );
+  const showRegion = useMemo(() => {
+    const scoped = filterEvents(events, { ...EMPTY_FILTERS, continent: filters.continent, country: filters.country });
+    return regions.length > 1 && !regionDuplicatesCountry(scoped);
+  }, [events, regions, filters.continent, filters.country]);
 
   const results = useMemo(
     () =>
       filterEvents(events, filters).sort((a, b) => {
-        if (a.date && b.date) return new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (origin) {
+          const da = eventDistanceKm(a, origin);
+          const db = eventDistanceKm(b, origin);
+          if (da !== null && db !== null) return da - db;
+          if (da !== null) return -1;
+          if (db !== null) return 1;
+        }
+        if (a.date && b.date) {
+          const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
+          return filters.when === 'past' ? -diff : diff;
+        }
         if (a.date) return -1;
         if (b.date) return 1;
         return a.city.localeCompare(b.city);
       }),
-    [events, filters]
+    [events, filters, origin]
   );
 
   const hasFilters = Object.values(filters).some(Boolean);
@@ -118,7 +180,7 @@ export function EventsSearchPage() {
             onChange={(e) => setQInput(e.target.value)}
             placeholder="Search by event name, city, venue, or country"
           />
-          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${IS_SERIES_SCOPED ? '' : 'lg:grid-cols-4'}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {!IS_SERIES_SCOPED && (
             <select
               aria-label="Continent"
@@ -143,7 +205,7 @@ export function EventsSearchPage() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            {!IS_SERIES_SCOPED && (
+            {!IS_SERIES_SCOPED && showRegion && (
             <select
               aria-label="Region"
               className={SELECT_CLASS}
@@ -168,6 +230,44 @@ export function EventsSearchPage() {
               ))}
             </select>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Date"
+              className={`${SELECT_CLASS} sm:w-auto`}
+              value={filters.when}
+              onChange={(e) => update({ when: e.target.value as EventSearchFilters['when'] })}
+            >
+              <option value="">Any date</option>
+              {Object.entries(WHEN_LABELS).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={toggleNearMe}
+              aria-pressed={!!origin}
+              disabled={geoState === 'loading'}
+              className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl border text-sm ${
+                origin ? 'border-[#ff393a] text-theme-text' : 'border-theme-stroke text-theme-text-secondary hover:text-theme-text'
+              }`}
+            >
+              <Crosshair size={16} />
+              {geoState === 'loading' ? 'Locating…' : origin ? 'Sorted by distance' : 'Near me'}
+            </button>
+            {!IS_SERIES_SCOPED && (
+              <Link
+                to="/map"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-theme-stroke text-sm text-theme-text-secondary hover:text-theme-text"
+              >
+                <MapIcon size={16} /> View map
+              </Link>
+            )}
+            {geoState === 'denied' && (
+              <span role="status" className="text-xs text-theme-text-muted">
+                Couldn't get your location. Allow location access to sort by distance.
+              </span>
+            )}
+          </div>
           <div className="flex items-center justify-between text-sm text-theme-text-muted">
             <span>{loading ? 'Loading…' : `${results.length} event${results.length === 1 ? '' : 's'}`}</span>
             {hasFilters && (
@@ -187,9 +287,7 @@ export function EventsSearchPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="animate-spin text-theme-text-muted" size={28} />
-          </div>
+          <SkeletonGrid />
         ) : error ? (
           <p className="text-center text-red-400 py-16">{error}</p>
         ) : results.length === 0 ? (
@@ -211,7 +309,12 @@ export function EventsSearchPage() {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs text-theme-text-muted">
-                      <span>{e.date ? formatShortDate(e.date) : 'Date TBD'}</span>
+                      <span>
+                        {e.date ? formatShortDate(e.date) : 'Date TBD'}
+                        {origin && eventDistanceKm(e, origin) !== null && (
+                          <> · {Math.round(eventDistanceKm(e, origin)!).toLocaleString()} km away</>
+                        )}
+                      </span>
                       {e.rsvpCount > 0 && (
                         <span className="inline-flex items-center gap-1">
                           <Users size={12} /> {e.rsvpCount}
