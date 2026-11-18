@@ -1013,5 +1013,14 @@
       "rsvpBody": "扫描二维码查看活动页面并报名。",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "下一步",
+    "subtitle": "你的活动已上线，快去邀请大家吧。",
+    "copyLink": "复制邀请链接",
+    "copied": "链接已复制",
+    "inviteGuests": "邀请嘉宾",
+    "orderPizza": "订购披萨",
+    "dismiss": "关闭下一步提示"
   }
 }

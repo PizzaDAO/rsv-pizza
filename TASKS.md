@@ -14,8 +14,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
 | neapolitan-48814 | Create Invoice, Receipt, and Media tabs on RSV.Pizza Profiles (could make specific host ones or make this available for the general public) | todo | P2 |  |  |  |  |  |  |
 | basil-48766 | Create template for gpp hosts | todo | P2 |  |  |  |  |  |  |
-| neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | todo | P2 |  |  |  |  |  | print/stickers app shipped in #228; nametag/table-tent widgets not built |
-| blackolive-70521 | add event tags | todo | P2 |  |  |  |  |  |  |
+| neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | todo | P2 |  |  |  | plans/neapolitan-93690.md | #1346 | print/stickers app shipped in #228; 2026-11-17: phase 1 (badge + table tent builders in Print app) shipped in #1346; phase 2 left: badge QR, 4x3 inserts, guest picker, tent sponsor logos, wifi QR |
+| blackolive-70521 | add event tags | todo | P2 |  |  |  | plans/blackolive-70521.md |  | 2026-11-17: plan written (host-visible `labels` column, separate from admin event_tags); waiting on Snax: public host tags vs admin tags. Phase 0 security done: #1349 (hosts can only write prepay), #1368 (bulk-edit guard + canonical guarded tags); scam-flag anon read fix in progress |
 | pepperoni-26709 | Real-Time Dashboard:<br>Task: Implement Supabase Realtime subscriptions on the Host Dashboard.<br>Why: So hosts can see RSVPs pop in live without refreshing the page. | todo | P2 |  |  |  |  |  |  |
 | truffle-59761 | Merch Implementation on RSVP pages | todo | P2 |  |  |  |  |  |  |
 | crust-55886 | natural language event creation and edits | todo | P2 |  |  |  |  |  |  |

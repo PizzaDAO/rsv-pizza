@@ -38,7 +38,9 @@
     "submit": "确认参加",
     "editSubmit": "编辑 RSVP",
     "submitting": "提交中...",
-    "saving": "保存中..."
+    "saving": "保存中...",
+    "skip": "跳过：我什么都吃",
+    "optionalHint": "可选：添加偏好，或跳过以完成报名。"
   },
   "success": {
     "seeYou": "{{eventName}} 见！",
@@ -50,7 +52,13 @@
     "preferenceSaved": "您的偏好已保存。",
     "waitlisted": "您已加入候补名单！",
     "waitlistedDesc": "此活动已满员，但您排在候补名单第 {{position}} 位！如有空位，我们会通知您。",
-    "backToEvent": "返回活动"
+    "backToEvent": "返回活动",
+    "alreadyOnList": "你已在名单中",
+    "alreadyOnListDesc": "此邮箱已报名该活动，因此未做任何更改。",
+    "confirmationSent": "确认邮件已发送至 {{email}}",
+    "addToCalendar": "添加到日历",
+    "calendar": "日历",
+    "changeRsvpHint": "需要修改？你可以在活动页面编辑你的报名。"
   },
   "password": {
     "title": "需要密码",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "为 {{recipient}} 购买披萨",
     "buyPizzaForEvent": "为此活动购买披萨",
     "buyPizzaForEventName": "为 {{eventName}} 购买披萨",
-    "thanksForSupport": "感谢您的支持！"
+    "thanksForSupport": "感谢您的支持！",
+    "buyPizzaForPrefix": "为以下对象买披萨："
   },
   "nft": {
     "minting": "正在铸造您的 NFT...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFT 已领取！",
     "viewOnOpenSea": "在 OpenSea 查看",
     "viewTransaction": "查看交易",
-    "mintFailed": "NFT 铸造失败"
+    "mintFailed": "NFT 铸造失败",
+    "afterApproval": "主办方批准后你将获得 NFT。"
   },
   "share": {
     "tellFriends": "告诉朋友们这个派对！",
@@ -137,5 +147,6 @@
     "Plain": "原味",
     "Gluten-Free": "无麸质",
     "Dairy-Free": "无乳制品"
-  }
+  },
+  "close": "关闭"
 }

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos, getImageAuthenticityCheck, ImageAuthenticityCheck } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, notifyTagError, updateUnderbossNotes, getPartyPhotos, getImageAuthenticityCheck, ImageAuthenticityCheck } from '../../lib/api';
 import { AuthenticityPanel } from '../payments-shared';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';
@@ -151,13 +151,13 @@ function HostTagsPills({
     onUpdate(newTags);
     setNewTag('');
     setIsAdding(false);
-    try { await bulkUpdateEventTags([eventId], [cleaned], 'add'); } catch { onUpdate(tags); }
+    try { await bulkUpdateEventTags([eventId], [cleaned], 'add'); } catch (err) { onUpdate(tags); notifyTagError(err); }
   }
 
   async function removeTag(tag: string) {
     const newTags = tags.filter((t) => t !== tag);
     onUpdate(newTags);
-    try { await bulkUpdateEventTags([eventId], [tag], 'remove'); } catch { onUpdate(tags); }
+    try { await bulkUpdateEventTags([eventId], [tag], 'remove'); } catch (err) { onUpdate(tags); notifyTagError(err); }
   }
 
   const tagColors: Record<string, string> = {

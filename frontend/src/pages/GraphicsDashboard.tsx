@@ -7,7 +7,7 @@ import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchUnderbossMe, fetchUnderbossDashboard, bulkUpdateEventTags, getSponsors } from '../lib/api';
+import { fetchUnderbossMe, fetchUnderbossDashboard, bulkUpdateEventTags, notifyTagError, getSponsors } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
 import {
   Loader2, Shield, Image, Pencil, Search, AlertTriangle, RefreshCw, Plus, X,
@@ -52,8 +52,9 @@ function TagPills({
     try {
       await bulkUpdateEventTags([eventId], [cleaned], 'add');
       triggerFlyerRegenForEvents([event]);
-    } catch {
+    } catch (err) {
       onUpdate(tags);
+      notifyTagError(err);
     }
   }
 
@@ -63,8 +64,9 @@ function TagPills({
     try {
       await bulkUpdateEventTags([eventId], [tag], 'remove');
       triggerFlyerRegenForEvents([event]);
-    } catch {
+    } catch (err) {
       onUpdate(tags);
+      notifyTagError(err);
     }
   }
 

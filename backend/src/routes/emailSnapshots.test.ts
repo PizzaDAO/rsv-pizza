@@ -11,6 +11,9 @@ import express from 'express';
 import request from 'supertest';
 
 const mockPrisma = vi.hoisted(() => ({
+  // capacity-lock: withPartyLock runs the create inside prisma.$transaction (advisory lock via $executeRaw)
+  $executeRaw: () => Promise.resolve(1),
+  $transaction(fn: any) { return fn(this); },
   user: { findUnique: vi.fn() },
   magicLink: { findUnique: vi.fn(), create: vi.fn(), count: vi.fn(() => Promise.resolve(0)) },
   party: { findUnique: vi.fn() },
@@ -109,7 +112,7 @@ describe('no-series emails are byte-identical to pre-change output', () => {
 
   it('RSVP confirmation (send-confirmation)', async () => {
     mockPrisma.party.findUnique.mockResolvedValue(PARTY);
-    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1', name: 'Gus', email: 'guest@example.com' });
+    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1', name: 'Gus', email: 'guest@example.com', status: 'CONFIRMED', approved: true, waitlistPosition: null });
     const res = await request(app())
       .post('/api/rsvp/abc123/send-confirmation')
       // rsvp-overwrite-fix: needs the guest token; the email goes to the stored address.

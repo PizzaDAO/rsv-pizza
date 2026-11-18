@@ -13,7 +13,11 @@
     "guest_other": "{{count}} invitados",
     "alreadyCreated": "¿Ya creaste un evento?",
     "viewAllTest": "Ver todos los eventos de prueba",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "hosting": "Organizo",
+    "attending": "Asisto",
+    "searchPlaceholder": "Buscar tus eventos",
+    "showMore": "Mostrar más ({{count}} más)"
   },
   "profile": {
     "title": "Tu Perfil",
@@ -74,6 +78,12 @@
     "endTime": "Hora de Fin",
     "done": "Listo",
     "datePlaceholder": "Jueves, 15 de Enero",
-    "timePlaceholder": "2:00 PM – 3:00 PM EST"
+    "timePlaceholder": "2:00 PM – 3:00 PM EST",
+    "heading": "Crea un evento",
+    "starts": "Inicio",
+    "ends": "Fin",
+    "confirmEmailNote": "Confirmarás tu correo para publicar.",
+    "draftRestored": "Borrador restaurado. Revisa y crea.",
+    "invalidCustomUrl": "Esa URL personalizada no es válida. Prueba con otra."
   }
 }

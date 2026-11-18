@@ -1016,5 +1016,14 @@
       "rsvpBody": "Escanea el código para ver la página del evento y confirmar asistencia.",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "Próximos pasos",
+    "subtitle": "Tu evento está publicado. Haz que la gente se apunte.",
+    "copyLink": "Copiar enlace de invitación",
+    "copied": "Enlace copiado",
+    "inviteGuests": "Invitar invitados",
+    "orderPizza": "Pedir pizza",
+    "dismiss": "Ocultar próximos pasos"
   }
 }

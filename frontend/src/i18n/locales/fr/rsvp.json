@@ -38,7 +38,9 @@
     "submit": "RSVP",
     "editSubmit": "Modifier le RSVP",
     "submitting": "Envoi en cours...",
-    "saving": "Enregistrement..."
+    "saving": "Enregistrement...",
+    "skip": "Passer : je mange de tout",
+    "optionalHint": "Facultatif : ajoutez vos préférences ou passez pour terminer votre RSVP."
   },
   "success": {
     "seeYou": "À bientôt à {{eventName}} !",
@@ -50,7 +52,13 @@
     "preferenceSaved": "Vos préférences ont été enregistrées.",
     "waitlisted": "Vous êtes sur la liste d'attente !",
     "waitlistedDesc": "Cet événement est complet, mais vous êtes #{{position}} sur la liste d'attente ! Nous vous notifierons si une place se libère.",
-    "backToEvent": "Retour à l'événement"
+    "backToEvent": "Retour à l'événement",
+    "alreadyOnList": "Vous êtes déjà sur la liste",
+    "alreadyOnListDesc": "Cet e-mail est déjà inscrit à cet événement, rien n'a donc été modifié.",
+    "confirmationSent": "Confirmation envoyée à {{email}}",
+    "addToCalendar": "Ajouter au calendrier",
+    "calendar": "Calendrier",
+    "changeRsvpHint": "Un changement à faire ? Vous pouvez modifier votre RSVP depuis la page de l'événement."
   },
   "password": {
     "title": "Mot de passe requis",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "Offrir une pizza à {{recipient}}",
     "buyPizzaForEvent": "Offrir une pizza pour cet événement",
     "buyPizzaForEventName": "Offrir une pizza pour {{eventName}}",
-    "thanksForSupport": "Merci pour votre soutien !"
+    "thanksForSupport": "Merci pour votre soutien !",
+    "buyPizzaForPrefix": "Offrir une pizza à"
   },
   "nft": {
     "minting": "Création de votre NFT...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFT déjà réclamé !",
     "viewOnOpenSea": "Voir sur OpenSea",
     "viewTransaction": "Voir la transaction",
-    "mintFailed": "Échec de la création du NFT"
+    "mintFailed": "Échec de la création du NFT",
+    "afterApproval": "Vous recevrez votre NFT une fois que l'hôte vous aura approuvé."
   },
   "share": {
     "tellFriends": "Parlez de la fête à vos amis !",
@@ -137,5 +147,6 @@
     "Plain": "Nature",
     "Gluten-Free": "Sans gluten",
     "Dairy-Free": "Sans produits laitiers"
-  }
+  },
+  "close": "Fermer"
 }

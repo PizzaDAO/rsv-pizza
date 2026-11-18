@@ -3855,6 +3855,13 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   });
 }
 
+// Surface a bulk-tag rejection (e.g. 403 FORBIDDEN_TAG for 'go' / 'possible-scam' /
+// cap tags, which only payment admins may change) instead of failing silently.
+export function notifyTagError(err: unknown): void {
+  const e = err as { code?: string; message?: string };
+  if (e?.code === 'FORBIDDEN_TAG') window.alert(e.message || 'You are not allowed to change this tag.');
+}
+
 // Bulk update event tags (underboss auth)
 export async function bulkUpdateEventTags(
   partyIds: string[],
@@ -4852,6 +4859,7 @@ interface GPPEventApiResponse {
   id: string;
   name: string;
   city: string;
+  geoCity?: string | null;
   customUrl: string | null;
   inviteCode: string;
   date: string | null;
@@ -4938,6 +4946,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
       region: e.region ?? null,
       rsvpCount: e.guestCount ?? 0,
       eventImageUrl: e.eventImageUrl ?? null,
+      latitude: e.latitude ?? null,
+      longitude: e.longitude ?? null,
     }));
   }
   const data = await apiRequest<GPPEventsApiPayload>(
@@ -4947,7 +4957,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
   return (data.events || []).map((e) => ({
     id: e.id,
     name: e.name,
-    city: e.city,
+    // geoCity = host/geocoded city only; `city` falls back to the event name server-side.
+    city: e.geoCity !== undefined ? e.geoCity ?? '' : e.city,
     slug: e.customUrl || e.inviteCode,
     date: e.date,
     venueName: e.venueName,
@@ -4956,6 +4967,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
     region: e.region ?? null,
     rsvpCount: e.guestCount ?? 0,
     eventImageUrl: e.eventImageUrl ?? null,
+    latitude: e.latitude ?? null,
+    longitude: e.longitude ?? null,
   }));
 }
 

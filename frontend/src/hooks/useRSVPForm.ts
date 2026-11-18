@@ -164,6 +164,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [dislikedBeverages, setDislikedBeverages] = useState<string[]>([]);
   const [saveToProfile, setSaveToProfile] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [prefsFetched, setPrefsFetched] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -329,7 +331,12 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       const emailToCheck = user?.email;
       if (!emailToCheck || preferencesLoaded) return;
 
-      const prefs = await getUserPreferences(emailToCheck);
+      let prefs;
+      try {
+        prefs = await getUserPreferences(emailToCheck);
+      } finally {
+        setPrefsFetched(true);
+      }
       if (prefs) {
         if (prefs.dietary_restrictions.length > 0) setDietaryRestrictions(prefs.dietary_restrictions);
         if (prefs.liked_toppings.length > 0) setLikedToppings(prefs.liked_toppings);
@@ -504,7 +511,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setStep(2);
   }, [name, email, eventData.customUrl, eventData.inviteCode]);
 
-  const submitRsvp = useCallback(async (verifiedEmail?: string) => {
+  const submitRsvp = useCallback(async (verifiedEmail?: string, opts?: { skipProfileSave?: boolean }) => {
     const inviteCode = eventData.customUrl || eventData.inviteCode;
     if (!inviteCode) {
       setError('Invalid invite code');
@@ -562,7 +569,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         if (
           ownerEmail &&
           email.trim().toLowerCase() === ownerEmail.trim().toLowerCase() &&
-          !result.alreadyRegistered
+          !result.alreadyRegistered &&
+          !opts?.skipProfileSave
         ) {
           await saveUserPreferences(email.trim(), {
             dietary_restrictions: dietaryRestrictions,
@@ -572,6 +580,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
             disliked_beverages: dislikedBeverages,
           });
         }
+        setEmailSent(result.emailSent);
         setAlreadyRegistered(result.alreadyRegistered);
         setPendingApproval(result.requireApproval);
         setWasUpdated(isEditing || result.updated);
@@ -792,6 +801,10 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     // Handlers
     handleStep1Continue,
     handleSubmit,
+    submitRsvp,
+    emailSent,
+    // true while a logged-in user's saved preferences are still being fetched
+    prefsPending: !!user?.email && !preferencesLoaded && !prefsFetched,
 
     // Computed
     isSwcEvent,

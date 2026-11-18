@@ -13,6 +13,9 @@ const savedSecret = process.env.JWT_SECRET;
 process.env.JWT_SECRET = JWT_SECRET;
 
 const mockPrisma = vi.hoisted(() => ({
+  // capacity-lock: withPartyLock runs the create inside prisma.$transaction (advisory lock via $executeRaw)
+  $executeRaw: () => Promise.resolve(1),
+  $transaction(fn: any) { return fn(this); },
   party: { findUnique: vi.fn() },
   slugAlias: { findUnique: vi.fn(() => Promise.resolve(null)) },
   guest: { findFirst: vi.fn() },

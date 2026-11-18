@@ -5,6 +5,9 @@ import jwt from 'jsonwebtoken';
 
 // Use vi.hoisted to create mocks
 const mockPrisma = vi.hoisted(() => ({
+  // capacity-lock: withPartyLock runs the create inside prisma.$transaction (advisory lock via $executeRaw)
+  $executeRaw: () => Promise.resolve(1),
+  $transaction(fn: any) { return fn(this); },
   party: {
     findUnique: vi.fn(),
   },
