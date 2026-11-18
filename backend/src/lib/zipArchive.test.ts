@@ -31,7 +31,7 @@ function readZip(buf: Buffer): Map<string, Buffer> {
 
 describe('createZipArchive', () => {
   it('builds a real zip streamed to a writable, with the expected entries', async () => {
-    const archive = createZipArchive();
+    const archive = await createZipArchive();
     const sink = new PassThrough();
     const chunks: Buffer[] = [];
     sink.on('data', (c: Buffer) => chunks.push(c));

@@ -70,9 +70,33 @@ export default function MapLibreMap({
   const markerObjsRef = useRef<MlMarker[]>([]);
   const mlRef = useRef<Awaited<ReturnType<typeof loadMapLibre>> | null>(null);
   const [ready, setReady] = useState(false);
+  // Defer loading maplibre + tiles until the container is near the viewport (below-the-fold maps
+  // on the event page otherwise cost ~300KB of JS plus tiles on every load).
+  const [visible, setVisible] = useState(false);
 
-  // ── Init map once ──────────────────────────────────────────────────────────
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el || visible) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisible(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible]);
+
+  // ── Init map once (when first visible) ─────────────────────────────────────
+  useEffect(() => {
+    if (!visible) return;
     let cancelled = false;
 
     loadMapLibre()
@@ -117,7 +141,7 @@ export default function MapLibreMap({
     };
     // Intentionally init-once; content is synced by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [visible]);
 
   // ── Sync markers + fit bounds ───────────────────────────────────────────────
   useEffect(() => {

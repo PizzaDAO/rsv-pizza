@@ -35,7 +35,7 @@ export const LiveRSVPTicker: React.FC<LiveRSVPTickerProps> = ({ guests }) => {
   // Tick every 30s to refresh relative timestamps between live events.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setTick(n => n + 1), REFRESH_INTERVAL_MS);
+    const id = setInterval(() => { if (!document.hidden) setTick(n => n + 1); }, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 

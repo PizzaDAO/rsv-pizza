@@ -30,7 +30,7 @@ const Countdown: React.FC<{ deadline: string }> = ({ deadline }) => {
   const { t } = useTranslation('host');
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    const id = window.setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 1000);
     return () => window.clearInterval(id);
   }, []);
   const left = Math.max(0, Date.parse(deadline) - now);

@@ -1,4 +1,4 @@
-import { ZipArchive } from 'archiver';
+import type { ZipArchive } from 'archiver';
 
 /**
  * Create a streaming ZIP archive for the partner photo download.
@@ -10,6 +10,8 @@ import { ZipArchive } from 'archiver';
  * zlib level 1: images are already compressed (JPEG/WebP/PNG); spending CPU on
  * level 6+ rarely shrinks the archive but adds significant latency.
  */
-export function createZipArchive(): ZipArchive {
-  return new ZipArchive({ zlib: { level: 1 } });
+export async function createZipArchive(): Promise<ZipArchive> {
+  // Imported on first use so archiver stays out of server boot.
+  const { ZipArchive: Zip } = await import('archiver');
+  return new Zip({ zlib: { level: 1 } });
 }

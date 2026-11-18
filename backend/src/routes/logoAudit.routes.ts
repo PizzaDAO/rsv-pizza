@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
+import { loadSharp } from '../lib/lazySharp.js';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
@@ -452,6 +452,7 @@ router.post('/apply-upload', requireAuth, requireGraphicsAdminAuth, async (req: 
 
     // Sanity-check the image actually parses
     try {
+      const sharp = await loadSharp();
       await sharp(buffer).metadata();
     } catch {
       throw new AppError('Invalid image', 400, 'INVALID_IMAGE');

@@ -50,6 +50,7 @@ export function CheckInButton({
     if (pollRef.current) return;
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
     pollRef.current = setInterval(async () => {
+      if (document.hidden) return; // pause while the tab is in the background
       try {
         const token = localStorage.getItem('authToken');
         if (!token) return;
