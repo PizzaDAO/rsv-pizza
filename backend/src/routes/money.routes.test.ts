@@ -232,7 +232,7 @@ describe('POST /api/webhooks/stripe', () => {
     const r = await post(evt('payment_intent.succeeded'));
     expect(r.status).toBe(200);
     expect(m.prisma.donation.create.mock.calls[0][0].data).toMatchObject({ status: 'succeeded', amount: 25, paymentIntentId: 'pi_w1', partyId: PARTY, isAnonymous: true });
-    expect(m.prisma.$executeRawUnsafe.mock.calls[0][0]).toContain('SET LOCAL lock_timeout');
+    expect((m.prisma.$executeRawUnsafe.mock.calls as unknown[][])[0][0]).toContain('SET LOCAL lock_timeout');
     expect(m.prisma.$executeRaw).toHaveBeenCalled();
   });
 
