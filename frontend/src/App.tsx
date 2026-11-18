@@ -1,3 +1,4 @@
+import { lazyWithReload } from './lib/chunkReload';
 import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router';
 import { HelmetProvider } from 'react-helmet-async';
@@ -8,70 +9,70 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
-const HostPage = React.lazy(() => import('./pages/HostPage').then(m => ({ default: m.HostPage })));
-const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
-const DayOfRunPage = React.lazy(() => import('./pages/DayOfRunPage').then(m => ({ default: m.DayOfRunPage })));
-const ArtDisplayPage = React.lazy(() => import('./pages/ArtDisplayPage').then(m => ({ default: m.ArtDisplayPage })));
+const HostPage = lazyWithReload(() => import('./pages/HostPage').then(m => ({ default: m.HostPage })));
+const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const DayOfRunPage = lazyWithReload(() => import('./pages/DayOfRunPage').then(m => ({ default: m.DayOfRunPage })));
+const ArtDisplayPage = lazyWithReload(() => import('./pages/ArtDisplayPage').then(m => ({ default: m.ArtDisplayPage })));
 import { EventPage } from './pages/EventPage';
-const AuthVerifyPage = React.lazy(() => import('./pages/AuthVerifyPage').then(m => ({ default: m.AuthVerifyPage })));
-const PizzadaoLinkPage = React.lazy(() => import('./pages/PizzadaoLinkPage').then(m => ({ default: m.PizzadaoLinkPage })));
-const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
-const NewEventPage = React.lazy(() => import('./pages/NewEventPage').then(m => ({ default: m.NewEventPage })));
-const AccountPage = React.lazy(() => import('./pages/AccountPage').then(m => ({ default: m.AccountPage })));
-const GPPLandingPage = React.lazy(() => import('./pages/GPPLandingPage').then(m => ({ default: m.GPPLandingPage })));
-const GPP27CreatePage = React.lazy(() => import('./pages/GPP27CreatePage').then(m => ({ default: m.GPP27CreatePage })));
-const SideCreatePage = React.lazy(() => import('./pages/SideCreatePage').then(m => ({ default: m.SideCreatePage })));
-const CheckInPage = React.lazy(() => import('./pages/CheckInPage').then(m => ({ default: m.CheckInPage })));
-const DJPage = React.lazy(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
-const JudgePage = React.lazy(() => import('./pages/JudgePage').then(m => ({ default: m.JudgePage })));
-const HackathonGalleryPage = React.lazy(() => import('./pages/HackathonGalleryPage').then(m => ({ default: m.HackathonGalleryPage })));
-const BoothPage = React.lazy(() => import('./pages/BoothPage').then(m => ({ default: m.BoothPage })));
-const HackathonProjectPage = React.lazy(() => import('./pages/HackathonProjectPage').then(m => ({ default: m.HackathonProjectPage })));
-const PublicReportPage = React.lazy(() => import('./pages/PublicReportPage').then(m => ({ default: m.PublicReportPage })));
-const PublicVenueReportPage = React.lazy(() => import('./pages/PublicVenueReportPage').then(m => ({ default: m.PublicVenueReportPage })));
-const DisplayPage = React.lazy(() => import('./pages/DisplayPage').then(m => ({ default: m.DisplayPage })));
-const UnderbossDashboard = React.lazy(() => import('./pages/UnderbossDashboard').then(m => ({ default: m.UnderbossDashboard })));
-const ShippingDashboard = React.lazy(() => import('./pages/ShippingDashboard').then(m => ({ default: m.ShippingDashboard })));
-const AdminPage = React.lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
+const AuthVerifyPage = lazyWithReload(() => import('./pages/AuthVerifyPage').then(m => ({ default: m.AuthVerifyPage })));
+const PizzadaoLinkPage = lazyWithReload(() => import('./pages/PizzadaoLinkPage').then(m => ({ default: m.PizzadaoLinkPage })));
+const LoginPage = lazyWithReload(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const NewEventPage = lazyWithReload(() => import('./pages/NewEventPage').then(m => ({ default: m.NewEventPage })));
+const AccountPage = lazyWithReload(() => import('./pages/AccountPage').then(m => ({ default: m.AccountPage })));
+const GPPLandingPage = lazyWithReload(() => import('./pages/GPPLandingPage').then(m => ({ default: m.GPPLandingPage })));
+const GPP27CreatePage = lazyWithReload(() => import('./pages/GPP27CreatePage').then(m => ({ default: m.GPP27CreatePage })));
+const SideCreatePage = lazyWithReload(() => import('./pages/SideCreatePage').then(m => ({ default: m.SideCreatePage })));
+const CheckInPage = lazyWithReload(() => import('./pages/CheckInPage').then(m => ({ default: m.CheckInPage })));
+const DJPage = lazyWithReload(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
+const JudgePage = lazyWithReload(() => import('./pages/JudgePage').then(m => ({ default: m.JudgePage })));
+const HackathonGalleryPage = lazyWithReload(() => import('./pages/HackathonGalleryPage').then(m => ({ default: m.HackathonGalleryPage })));
+const BoothPage = lazyWithReload(() => import('./pages/BoothPage').then(m => ({ default: m.BoothPage })));
+const HackathonProjectPage = lazyWithReload(() => import('./pages/HackathonProjectPage').then(m => ({ default: m.HackathonProjectPage })));
+const PublicReportPage = lazyWithReload(() => import('./pages/PublicReportPage').then(m => ({ default: m.PublicReportPage })));
+const PublicVenueReportPage = lazyWithReload(() => import('./pages/PublicVenueReportPage').then(m => ({ default: m.PublicVenueReportPage })));
+const DisplayPage = lazyWithReload(() => import('./pages/DisplayPage').then(m => ({ default: m.DisplayPage })));
+const UnderbossDashboard = lazyWithReload(() => import('./pages/UnderbossDashboard').then(m => ({ default: m.UnderbossDashboard })));
+const ShippingDashboard = lazyWithReload(() => import('./pages/ShippingDashboard').then(m => ({ default: m.ShippingDashboard })));
+const AdminPage = lazyWithReload(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
 // Brand-admin invite acceptance (works on brand sites: not in GPP_ONLY_PATHS).
-const BrandAdminAcceptPage = React.lazy(() => import('./pages/BrandAdminAcceptPage').then(m => ({ default: m.BrandAdminAcceptPage })));
+const BrandAdminAcceptPage = lazyWithReload(() => import('./pages/BrandAdminAcceptPage').then(m => ({ default: m.BrandAdminAcceptPage })));
 // Brand settings for brand admins (and super-admins): /brand-admin[/look|images|checklist|events|history]. Lazy, not in GPP_ONLY_PATHS.
-const BrandAdminPage = React.lazy(() => import('./pages/BrandAdminPage').then(m => ({ default: m.BrandAdminPage })));
-const AdminSeriesPage = React.lazy(() => import('./pages/AdminSeriesPage').then(m => ({ default: m.AdminSeriesPage })));
-const SeriesLandingPage = React.lazy(() => import('./pages/SeriesLandingPage').then(m => ({ default: m.SeriesLandingPage })));
-const SuggestionsPage = React.lazy(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
-const TaxFormRequestPage = React.lazy(() => import('./pages/TaxFormRequestPage').then(m => ({ default: m.TaxFormRequestPage })));
-const PaymentsAdminPage = React.lazy(() => import('./pages/PaymentsAdminPage').then(m => ({ default: m.PaymentsAdminPage })));
-const PaymentsHostsPage = React.lazy(() => import('./pages/PaymentsHostsPage').then(m => ({ default: m.PaymentsHostsPage })));
-const LatamPaymentsPage = React.lazy(() => import('./pages/LatamPaymentsPage').then(m => ({ default: m.LatamPaymentsPage })));
-const SouthAfricaPaymentsPage = React.lazy(() => import('./pages/SouthAfricaPaymentsPage').then(m => ({ default: m.SouthAfricaPaymentsPage })));
-const AfricaPaymentsPage = React.lazy(() => import('./pages/AfricaPaymentsPage').then(m => ({ default: m.AfricaPaymentsPage })));
-const WestAfricaPaymentsPage = React.lazy(() => import('./pages/WestAfricaPaymentsPage').then(m => ({ default: m.WestAfricaPaymentsPage })));
-const EastAfricaPaymentsPage = React.lazy(() => import('./pages/EastAfricaPaymentsPage').then(m => ({ default: m.EastAfricaPaymentsPage })));
-const NaPaymentsPage = React.lazy(() => import('./pages/NaPaymentsPage').then(m => ({ default: m.NaPaymentsPage })));
-const EuropePaymentsPage = React.lazy(() => import('./pages/EuropePaymentsPage').then(m => ({ default: m.EuropePaymentsPage })));
-const IndiaPaymentsPage = React.lazy(() => import('./pages/IndiaPaymentsPage').then(m => ({ default: m.IndiaPaymentsPage })));
-const AsiaPaymentsPage = React.lazy(() => import('./pages/AsiaPaymentsPage').then(m => ({ default: m.AsiaPaymentsPage })));
-const PartnerIntakePage = React.lazy(() => import('./pages/PartnerIntakePage').then(m => ({ default: m.PartnerIntakePage })));
-const PartnerDashboardPage = React.lazy(() => import('./pages/PartnerDashboardPage').then(m => ({ default: m.PartnerDashboardPage })));
-const InvoicePage = React.lazy(() => import('./pages/InvoicePage').then(m => ({ default: m.InvoicePage })));
-const MouPage = React.lazy(() => import('./pages/MouPage').then(m => ({ default: m.MouPage })));
-const ConsolidatedReportPage = React.lazy(() => import('./pages/ConsolidatedReportPage').then(m => ({ default: m.ConsolidatedReportPage })));
-const PartnerBizdevPage = React.lazy(() => import('./pages/PartnerBizdevPage').then(m => ({ default: m.PartnerBizdevPage })));
-const PostComposerPage = React.lazy(() => import('./pages/PostComposerPage').then(m => ({ default: m.PostComposerPage })));
-const OneSheetPage = React.lazy(() => import('./pages/OneSheetPage').then(m => ({ default: m.OneSheetPage })));
-const GPPPizzeriasPage = React.lazy(() => import('./pages/GPPPizzeriasPage').then(m => ({ default: m.GPPPizzeriasPage })));
-const PizzaIndexPage = React.lazy(() => import('./pages/PizzaIndexPage').then(m => ({ default: m.PizzaIndexPage })));
-const EventsMapPage = React.lazy(() => import('./pages/EventsMapPage').then(m => ({ default: m.EventsMapPage })));
-const EventsSearchPage = React.lazy(() => import('./pages/EventsSearchPage').then(m => ({ default: m.EventsSearchPage })));
-const AdminLogoCleanup = React.lazy(() => import('./pages/AdminLogoCleanup').then(m => ({ default: m.AdminLogoCleanup })));
-const PartnersPage = React.lazy(() => import('./pages/PartnersPage').then(m => ({ default: m.PartnersPage })));
-const LeaderboardPage = React.lazy(() => import('./pages/LeaderboardPage').then(m => ({ default: m.LeaderboardPage })));
-const PhotosFeedPage = React.lazy(() => import('./pages/PhotosFeedPage').then(m => ({ default: m.PhotosFeedPage })));
-const PhotosSlideshowPage = React.lazy(() => import('./pages/PhotosSlideshowPage').then(m => ({ default: m.PhotosSlideshowPage })));
-const SurveyPage = React.lazy(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
-const NftClaimPage = React.lazy(() => import('./pages/NftClaimPage').then(m => ({ default: m.NftClaimPage })));
-const HostSurveyPage = React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
+const BrandAdminPage = lazyWithReload(() => import('./pages/BrandAdminPage').then(m => ({ default: m.BrandAdminPage })));
+const AdminSeriesPage = lazyWithReload(() => import('./pages/AdminSeriesPage').then(m => ({ default: m.AdminSeriesPage })));
+const SeriesLandingPage = lazyWithReload(() => import('./pages/SeriesLandingPage').then(m => ({ default: m.SeriesLandingPage })));
+const SuggestionsPage = lazyWithReload(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
+const TaxFormRequestPage = lazyWithReload(() => import('./pages/TaxFormRequestPage').then(m => ({ default: m.TaxFormRequestPage })));
+const PaymentsAdminPage = lazyWithReload(() => import('./pages/PaymentsAdminPage').then(m => ({ default: m.PaymentsAdminPage })));
+const PaymentsHostsPage = lazyWithReload(() => import('./pages/PaymentsHostsPage').then(m => ({ default: m.PaymentsHostsPage })));
+const LatamPaymentsPage = lazyWithReload(() => import('./pages/LatamPaymentsPage').then(m => ({ default: m.LatamPaymentsPage })));
+const SouthAfricaPaymentsPage = lazyWithReload(() => import('./pages/SouthAfricaPaymentsPage').then(m => ({ default: m.SouthAfricaPaymentsPage })));
+const AfricaPaymentsPage = lazyWithReload(() => import('./pages/AfricaPaymentsPage').then(m => ({ default: m.AfricaPaymentsPage })));
+const WestAfricaPaymentsPage = lazyWithReload(() => import('./pages/WestAfricaPaymentsPage').then(m => ({ default: m.WestAfricaPaymentsPage })));
+const EastAfricaPaymentsPage = lazyWithReload(() => import('./pages/EastAfricaPaymentsPage').then(m => ({ default: m.EastAfricaPaymentsPage })));
+const NaPaymentsPage = lazyWithReload(() => import('./pages/NaPaymentsPage').then(m => ({ default: m.NaPaymentsPage })));
+const EuropePaymentsPage = lazyWithReload(() => import('./pages/EuropePaymentsPage').then(m => ({ default: m.EuropePaymentsPage })));
+const IndiaPaymentsPage = lazyWithReload(() => import('./pages/IndiaPaymentsPage').then(m => ({ default: m.IndiaPaymentsPage })));
+const AsiaPaymentsPage = lazyWithReload(() => import('./pages/AsiaPaymentsPage').then(m => ({ default: m.AsiaPaymentsPage })));
+const PartnerIntakePage = lazyWithReload(() => import('./pages/PartnerIntakePage').then(m => ({ default: m.PartnerIntakePage })));
+const PartnerDashboardPage = lazyWithReload(() => import('./pages/PartnerDashboardPage').then(m => ({ default: m.PartnerDashboardPage })));
+const InvoicePage = lazyWithReload(() => import('./pages/InvoicePage').then(m => ({ default: m.InvoicePage })));
+const MouPage = lazyWithReload(() => import('./pages/MouPage').then(m => ({ default: m.MouPage })));
+const ConsolidatedReportPage = lazyWithReload(() => import('./pages/ConsolidatedReportPage').then(m => ({ default: m.ConsolidatedReportPage })));
+const PartnerBizdevPage = lazyWithReload(() => import('./pages/PartnerBizdevPage').then(m => ({ default: m.PartnerBizdevPage })));
+const PostComposerPage = lazyWithReload(() => import('./pages/PostComposerPage').then(m => ({ default: m.PostComposerPage })));
+const OneSheetPage = lazyWithReload(() => import('./pages/OneSheetPage').then(m => ({ default: m.OneSheetPage })));
+const GPPPizzeriasPage = lazyWithReload(() => import('./pages/GPPPizzeriasPage').then(m => ({ default: m.GPPPizzeriasPage })));
+const PizzaIndexPage = lazyWithReload(() => import('./pages/PizzaIndexPage').then(m => ({ default: m.PizzaIndexPage })));
+const EventsMapPage = lazyWithReload(() => import('./pages/EventsMapPage').then(m => ({ default: m.EventsMapPage })));
+const EventsSearchPage = lazyWithReload(() => import('./pages/EventsSearchPage').then(m => ({ default: m.EventsSearchPage })));
+const AdminLogoCleanup = lazyWithReload(() => import('./pages/AdminLogoCleanup').then(m => ({ default: m.AdminLogoCleanup })));
+const PartnersPage = lazyWithReload(() => import('./pages/PartnersPage').then(m => ({ default: m.PartnersPage })));
+const LeaderboardPage = lazyWithReload(() => import('./pages/LeaderboardPage').then(m => ({ default: m.LeaderboardPage })));
+const PhotosFeedPage = lazyWithReload(() => import('./pages/PhotosFeedPage').then(m => ({ default: m.PhotosFeedPage })));
+const PhotosSlideshowPage = lazyWithReload(() => import('./pages/PhotosSlideshowPage').then(m => ({ default: m.PhotosSlideshowPage })));
+const SurveyPage = lazyWithReload(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
+const NftClaimPage = lazyWithReload(() => import('./pages/NftClaimPage').then(m => ({ default: m.NftClaimPage })));
+const HostSurveyPage = lazyWithReload(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
 
 // Shown while a lazily loaded route chunk downloads (same look as the app-level
 // fallback in main.tsx so the transition doesn't flash).
@@ -94,13 +95,13 @@ function SponsorIntakeRedirect() {
   return <Navigate to={`/partner-intake/${token}`} replace />;
 }
 
-const GraphicsDashboard = React.lazy(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
-const GraphicsFlyerEdit = React.lazy(() => import('./pages/GraphicsFlyerEdit').then(m => ({ default: m.GraphicsFlyerEdit })));
+const GraphicsDashboard = lazyWithReload(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
+const GraphicsFlyerEdit = lazyWithReload(() => import('./pages/GraphicsFlyerEdit').then(m => ({ default: m.GraphicsFlyerEdit })));
 // cacciatore-72814: super-admin-only SWC variant of /map (lazy because the
 // page is admin-only and rarely visited).
-const EventsMapSwcPage = React.lazy(() => import('./pages/EventsMapSwcPage').then(m => ({ default: m.EventsMapSwcPage })));
+const EventsMapSwcPage = lazyWithReload(() => import('./pages/EventsMapSwcPage').then(m => ({ default: m.EventsMapSwcPage })));
 // focaccia-58293: public no-clustering variant of /map (lazy to keep main bundle small).
-const EventsMapAllPage = React.lazy(() => import('./pages/EventsMapAllPage').then(m => ({ default: m.EventsMapAllPage })));
+const EventsMapAllPage = lazyWithReload(() => import('./pages/EventsMapAllPage').then(m => ({ default: m.EventsMapAllPage })));
 
 // White-label: on a series-scoped build, every route in GPP_ONLY_PATHS renders a
 // redirect to `/` instead of its page. Unset (default brand) => element untouched.

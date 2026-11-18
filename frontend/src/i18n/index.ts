@@ -41,31 +41,32 @@ const lazyBackend: BackendModule = {
   },
 };
 
+const enResources = {
+  common: enCommon,
+  rsvp: enRsvp,
+  event: enEvent,
+  auth: enAuth,
+  donation: enDonation,
+  gpp: enGpp,
+  account: enAccount,
+  checkin: enCheckin,
+  host: enHost,
+  admin: enAdmin,
+  partner: enPartner,
+  nft: enNft,
+};
+
 i18n
   .use(LanguageDetector)
   .use(lazyBackend)
   .use(initReactI18next)
   .init({
-    resources: {
-      en: {
-        common: enCommon,
-        rsvp: enRsvp,
-        event: enEvent,
-        auth: enAuth,
-        donation: enDonation,
-        gpp: enGpp,
-        account: enAccount,
-        checkin: enCheckin,
-        host: enHost,
-        admin: enAdmin,
-        partner: enPartner,
-        nft: enNft,
-      },
-    },
+    resources: { en: enResources },
     // en is bundled; every other language comes from the lazy backend.
     partialBundledLanguages: true,
     fallbackLng: 'en',
-    ns: ['common'],
+    // Load every namespace together so switching language never suspends on a later namespace fetch.
+    ns: Object.keys(enResources),
     defaultNS: 'common',
     detection: {
       order: ['querystring', 'localStorage', 'navigator'],

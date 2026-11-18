@@ -1,5 +1,17 @@
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { WalletInsideContext } from './walletContext';
+import { reloadOnceForChunkError } from '../lib/chunkReload';
+
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="text-sm text-white/70 p-3">
+      Couldn&apos;t load the wallet.{' '}
+      <button type="button" className="underline" onClick={onRetry}>
+        Retry
+      </button>
+    </div>
+  );
+}
 
 // Lazy loading for the wallet stack (wagmi/ConnectKit/viem, ~900KB).
 //
@@ -31,22 +43,26 @@ export function preloadWalletProviders(): Promise<ProvidersModule> {
 export function WalletGate({ children, fallback = null }: { children: ReactNode; fallback?: ReactNode }) {
   const inside = useContext(WalletInsideContext);
   const [, setTick] = useState(0);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (inside || loaded) return;
+    if (inside || loaded || failed) return;
     let cancelled = false;
     preloadWalletProviders().then(
       () => {
         if (!cancelled) setTick((n) => n + 1);
       },
-      () => undefined,
+      () => {
+        if (!cancelled && !reloadOnceForChunkError()) setFailed(true);
+      },
     );
     return () => {
       cancelled = true;
     };
-  }, [inside]);
+  }, [inside, failed]);
 
   if (inside) return <>{children}</>;
+  if (failed) return <LoadError onRetry={() => setFailed(false)} />;
   if (!loaded) return <>{fallback}</>;
   const Providers = loaded.default;
   return (
@@ -86,19 +102,24 @@ export function walletComponent<P extends object>(
 
   const Wrapped = (props: P) => {
     const [, setTick] = useState(0);
+    const [failed, setFailed] = useState(false);
     useEffect(() => {
-      if (Impl && loaded) return;
+      if ((Impl && loaded) || failed) return;
       let cancelled = false;
       preload().then(
         () => {
           if (!cancelled) setTick((n) => n + 1);
         },
-        () => undefined,
+        () => {
+          if (!cancelled && !reloadOnceForChunkError()) setFailed(true);
+        },
       );
       return () => {
         cancelled = true;
       };
-    }, []);
+    }, [failed]);
+
+    if (failed) return <LoadError onRetry={() => setFailed(false)} />;
 
     const fb = typeof fallback === 'function' ? (fallback as (p: P) => ReactNode)(props) : fallback;
     if (!Impl || !loaded) return <>{fb}</>;
