@@ -1,4 +1,5 @@
-import sharp, { Sharp, Metadata, OutputInfo } from 'sharp';
+import type { Sharp, Metadata, OutputInfo } from 'sharp';
+import { loadSharp } from './lazySharp.js';
 
 /**
  * Classifies and strips white backgrounds from logo images.
@@ -78,6 +79,7 @@ export async function classifyLogo(buffer: Buffer, contentType: string): Promise
   let raw: { data: Buffer; info: OutputInfo };
 
   try {
+    const sharp = await loadSharp();
     image = sharp(buffer);
     metadata = await image.metadata();
     raw = await image.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -126,6 +128,7 @@ export async function classifyLogo(buffer: Buffer, contentType: string): Promise
  * Returns PNG bytes.
  */
 export async function stripWhiteBackground(buffer: Buffer): Promise<Buffer> {
+  const sharp = await loadSharp();
   const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
   if (!width || !height) {

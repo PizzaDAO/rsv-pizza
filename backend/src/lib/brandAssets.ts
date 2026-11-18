@@ -16,7 +16,7 @@
  * Old asset objects are kept so history still resolves.
  */
 import crypto from 'node:crypto';
-import sharp from 'sharp';
+import { loadSharp } from './lazySharp.js';
 import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
@@ -128,6 +128,7 @@ export async function processBrandImage(buf: Buffer, slot: AssetSlot): Promise<{
   if (!sniffBrandImage(buf)) throw badImage();
   const spec = SLOT_SPECS[slot];
   try {
+    const sharp = await loadSharp();
     const meta = await sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).metadata();
     if ((meta.pages ?? 1) > 1) throw badImage('Animated images are not accepted');
     if (!meta.width || !meta.height) throw badImage();

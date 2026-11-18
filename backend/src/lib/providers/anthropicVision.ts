@@ -10,7 +10,7 @@
  * present), so a missing key never throws at import / startup time.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { getLlmModels } from '../privateConfig.js';
 import {
   VisionProvider,
@@ -23,13 +23,15 @@ import {
 
 let client: Anthropic | null = null;
 
-function getAnthropic(): Anthropic {
+// The SDK is imported on first use so it stays out of server boot.
+async function getAnthropic(): Promise<Anthropic> {
   if (!client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY is not set — anthropic vision provider is dormant.');
     }
-    client = new Anthropic({ apiKey });
+    const { default: AnthropicSdk } = await import('@anthropic-ai/sdk');
+    client = new AnthropicSdk({ apiKey });
   }
   return client;
 }
@@ -54,7 +56,7 @@ export const anthropicVisionProvider: VisionProvider = {
     const { mediaType, data } = parseDataUrl(imageDataUrl);
     const secondOpinionModel = (await getLlmModels()).visionSecondOpinion;
 
-    const response = await getAnthropic().messages.create({
+    const response = await (await getAnthropic()).messages.create({
       model: secondOpinionModel,
       max_tokens: 800,
       system: VISION_SYSTEM_PROMPT,

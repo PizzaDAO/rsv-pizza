@@ -116,8 +116,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     }
   }, [partyId, filter, activeTag, photos.length, isHost]);
 
-  const loadStats = useCallback(async () => {
-    const result = await getPhotoStats(partyId);
+  const loadStats = useCallback(async (fresh = true) => {
+    const result = await getPhotoStats(partyId, { fresh });
     if (result) {
       setStats(result);
     }
@@ -137,7 +137,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   // Initial load
   useEffect(() => {
     loadPhotos(true);
-    loadStats();
+    loadStats(false); // may reuse the event page's just-fetched stats
   }, [partyId, filter, activeTag]);
 
   const handleUploadComplete = (photo: Photo) => {

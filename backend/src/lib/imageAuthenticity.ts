@@ -25,7 +25,7 @@
  *      tie-breaker on `suspicious` verdicts. Off unless their key is set.
  */
 
-import sharp from 'sharp';
+import { loadSharp } from './lazySharp.js';
 import { createClient } from '@supabase/supabase-js';
 import {
   resolveFetchableUrl,
@@ -166,6 +166,7 @@ export async function scanImageMetadata(buffer: Buffer): Promise<MetadataScan> {
   let hasExif = false;
   let software: string | null = null;
   try {
+    const sharp = await loadSharp();
     const meta = await sharp(buffer).metadata();
     hasExif = !!meta.exif && meta.exif.length > 0;
     // sharp exposes the raw EXIF buffer; decode it as latin1 so we can substring
@@ -358,6 +359,7 @@ export async function generateElaArtifact(
   try {
     // Normalise both sides to a common pixel grid so the diff lines up even if
     // the original is a PNG / odd dimensions.
+    const sharp = await loadSharp();
     const base = sharp(buffer).removeAlpha();
     const meta = await base.metadata();
     const width = Math.min(meta.width ?? 1024, 1600);
