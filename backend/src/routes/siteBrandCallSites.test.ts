@@ -231,8 +231,8 @@ describe('branded call sites', () => {
       ]);
       const res = await request(app()).get('/api/series/gpp2026/events');
       const select = mockPrisma.party.findMany.mock.calls[0][0].select;
-      expect(Object.keys(select).sort()).toEqual(['city','country','customUrl','date','eventImageUrl','id','inviteCode','latitude','longitude','name','region','underbossStatus']);
-      expect(Object.keys(res.body.events[0]).sort()).toEqual(['city','community','country','date','eventImageUrl','id','latitude','longitude','name','region','slug']);
+      expect(Object.keys(select).sort()).toEqual(['city','country','customUrl','date','eventImageUrl','id','inviteCode','labels','latitude','longitude','name','region','underbossStatus']);
+      expect(Object.keys(res.body.events[0]).sort()).toEqual(['city','community','country','date','eventImageUrl','id','labels','latitude','longitude','name','region','slug']);
     });
   });
 });
