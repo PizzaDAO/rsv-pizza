@@ -91,6 +91,22 @@ export function changesGuardedTags(current: string[] | null | undefined, next: u
   return false;
 }
 
+/** True when `next` adds or removes the payout-gate 'go' tag relative to `current` (case/whitespace-insensitive). */
+export function changesGoTag(current: string[] | null | undefined, next: unknown[]): boolean {
+  const has = (arr: unknown) =>
+    Array.isArray(arr) && arr.some((t) => typeof t === 'string' && t.trim().toLowerCase() === 'go');
+  return has(current) !== has(next);
+}
+
+/**
+ * True when `next` adds or removes any tag only payment admins may change:
+ * 'go', 'possible-scam', or numeric / party-kit cap tags. Shared by the party
+ * PATCH and the underboss bulk-event-tags endpoint.
+ */
+export function changesPaymentAdminTags(current: string[] | null | undefined, next: unknown[]): boolean {
+  return changesGoTag(current, next) || changesGuardedTags(current, next);
+}
+
 /**
  * blackolive-70521: `parties.event_tags` is an admin/system switchboard (payout
  * state, partner co-host sync, launch gates, RSVP opt-ins). A host or co-host

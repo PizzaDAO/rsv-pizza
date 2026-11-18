@@ -26,7 +26,7 @@ import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { siteForParty, brandedSeriesBySlug, brandedSiteForParty, seriesSlugForOrigin } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
-import { changesGuardedTags, mergeHostEventTags } from '../lib/eventTags.js';
+import { changesGuardedTags, changesGoTag, mergeHostEventTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
 import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
@@ -814,9 +814,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         eventTagsToWrite = merged.changed ? merged.tags : undefined;
       } else {
         eventTagsToWrite = eventTags;
-        const hadGo = currentTags.includes('go');
-        const wantsGo = eventTags.includes('go');
-        if (hadGo !== wantsGo) {
+        if (changesGoTag(currentTags, eventTags)) {
           const canToggleGo = await isPaymentAdmin(req.userEmail);
           if (!canToggleGo) {
             throw new AppError(

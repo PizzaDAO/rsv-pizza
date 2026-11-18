@@ -220,3 +220,19 @@ describe('blackolive-70521: mergeHostEventTags', () => {
     expect(mergeHostEventTags(['swc', 'refund', 'prepay'], ['swc']).tags).toEqual(['swc', 'refund']);
   });
 });
+
+import { changesGoTag, changesPaymentAdminTags } from './eventTags.js';
+
+describe('changesGoTag / changesPaymentAdminTags', () => {
+  it('detects go add/remove case-insensitively', () => {
+    expect(changesGoTag([], ['GO'])).toBe(true);
+    expect(changesGoTag(['go'], [])).toBe(true);
+    expect(changesGoTag(['go'], ['go', 'x'])).toBe(false);
+  });
+  it('covers go, scam and caps but not normal tags', () => {
+    expect(changesPaymentAdminTags([], ['go'])).toBe(true);
+    expect(changesPaymentAdminTags([], ['possible-scam'])).toBe(true);
+    expect(changesPaymentAdminTags([], ['k40'])).toBe(true);
+    expect(changesPaymentAdminTags(['a'], ['a', 'swc', 'prepay'])).toBe(false);
+  });
+});
