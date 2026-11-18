@@ -8,7 +8,7 @@ import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { claimStateForGuest } from '../lib/nftClaim.js';
 import { signGuestToken } from '../lib/guestToken.js';
 import { triggerWebhook } from '../services/webhook.service.js';
-import { coHostListChanged, underbossMayWriteCap } from '../lib/coHostGuard.js';
+import { coHostEscalation, underbossMayWriteCap } from '../lib/coHostGuard.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
@@ -890,25 +890,23 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // Protect underboss and partner co-host entries: preserve them on co-hosts update
     // Respects client-specified ordering so hosts can reorder protected entries
     let mergedCoHosts = coHosts;
-    let coHostsReadOnly = false;
     if (coHosts !== undefined) {
       const existingParty = await prisma.party.findUnique({
         where: { id },
-        select: { coHosts: true, userId: true },
+        select: { coHosts: true, userId: true, region: true, city: true },
       });
       const existingCoHosts = (existingParty?.coHosts as any[]) || [];
-      // cohost-escalation: only the owner or an admin may change the co-host list. Anyone else
-      // (a co-host, a scoped underboss) gets a 403 for a real change; an unchanged echo of the
-      // list is ignored so ordinary saves keep working.
-      const mayEditCoHosts =
+      // cohost-escalation: the owner, admins and in-scope underbosses may change the list freely.
+      // Other editors (co-hosts) may save it but not escalate permissions (canEdit/allowedTabs).
+      let mayEditCoHosts =
         (!!req.userId && existingParty?.userId === req.userId) ||
         (await isSuperAdmin(req.userEmail)) ||
         (await isAdmin(req.userEmail));
-      if (!mayEditCoHosts) {
-        if (!Array.isArray(coHosts) || coHostListChanged(existingCoHosts, coHosts)) {
-          throw new AppError('Only the event owner or an admin can change co-hosts', 403, 'FORBIDDEN_COHOSTS');
-        }
-        coHostsReadOnly = true;
+      if (!mayEditCoHosts && existingParty && (await isUnderboss(req.userEmail))) {
+        mayEditCoHosts = partyMatchesScope(existingParty as any, await getUnderbossScope(req.userEmail));
+      }
+      if (!mayEditCoHosts && (!Array.isArray(coHosts) || coHostEscalation(existingCoHosts, coHosts))) {
+        throw new AppError('Only the event owner or an admin can change co-host permissions', 403, 'FORBIDDEN_COHOSTS');
       }
       // Extract protected entries (underboss + partner) from existing data
       const protectedEntries = existingCoHosts.filter(
@@ -944,7 +942,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
           ordered.push(entry);
         }
       }
-      mergedCoHosts = coHostsReadOnly ? undefined : ordered;
+      mergedCoHosts = ordered;
     }
 
     // reimbursementCapUsd is settable by underbosses + admins only (arugula-38633 v2).

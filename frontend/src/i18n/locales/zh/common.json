@@ -30,6 +30,21 @@
   "notFound": {
     "title": "未找到页面",
     "description": "此页面不存在。链接可能有误或已过期。",
-    "goHome": "返回首页"
+    "goHome": "返回首页",
+    "eventTitle": "未找到活动",
+    "eventDescription": "找不到该活动。链接可能有误，或活动已被移除。",
+    "seriesTitle": "未找到系列",
+    "seriesDescription": "此地址下没有活动系列。",
+    "browseEvents": "浏览活动",
+    "createYourOwn": "创建你自己的活动",
+    "searchPlaceholder": "搜索活动",
+    "search": "搜索",
+    "activeSeries": "进行中的系列"
+  },
+  "banner": {
+    "findCities": "在此查找其他城市：",
+    "pause": "暂停滚动横幅",
+    "play": "继续滚动横幅",
+    "dismiss": "关闭"
   }
 }

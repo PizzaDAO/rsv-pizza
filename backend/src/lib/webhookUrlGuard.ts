@@ -73,6 +73,8 @@ export function isBlockedIp(ip: string): boolean {
       return isBlockedIp(`${g[6] >> 8}.${g[6] & 255}.${g[7] >> 8}.${g[7] & 255}`);
     }
     if (g[0] === 0x64 && g[1] === 0xff9b) return true; // NAT64
+    if (g[0] === 0x2002) return true; // 6to4 (embeds an IPv4; block the whole prefix)
+    if (g[0] === 0x2001 && g[1] === 0) return true; // Teredo 2001::/32
     if ((g[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
     if ((g[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
     if ((g[0] & 0xffc0) === 0xfec0) return true; // fec0::/10 site-local

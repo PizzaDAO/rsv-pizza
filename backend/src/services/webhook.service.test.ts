@@ -38,7 +38,7 @@ describe('webhook delivery SSRF guard', () => {
     expect(mockFetch).not.toHaveBeenCalled();
     // recorded as a failed delivery, without burning the retry schedule
     expect(mockPrisma.webhookDelivery.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'failed' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ status: 'failed', attempts: 1 }) }),
     );
   });
 
@@ -57,6 +57,16 @@ describe('webhook delivery SSRF guard', () => {
     const data = (mockPrisma.webhookDelivery.update.mock.calls as any[][])[0][0].data;
     expect(data.status).toBe('success');
     expect(data.responseBody.length).toBeLessThanOrEqual(500);
+  });
+
+  it('singleAttempt makes exactly one fetch and records one attempt on failure', async () => {
+    hookTo('https://93.184.216.34/hook');
+    mockFetch.mockResolvedValue(new Response('no', { status: 500 }));
+    await triggerWebhook('guest.registered', { guest: { id: 'g' } }, 'owner-1', { singleAttempt: true });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.webhookDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'failed', attempts: 1 }) }),
+    );
   });
 
   it('the test-webhook endpoint is guarded too', async () => {

@@ -3,32 +3,47 @@ import { runInBackground } from './background.js';
 
 afterEach(() => {
   delete (globalThis as any)[Symbol.for('@vercel/request-context')];
+  vi.useRealTimers();
 });
 
 describe('runInBackground', () => {
-  it('returns immediately without awaiting the work', () => {
+  it('with waitUntil: returns without waiting and registers the work', async () => {
+    const waitUntil = vi.fn();
+    (globalThis as any)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil }) };
     let done = false;
-    runInBackground(async () => {
-      await new Promise((r) => setTimeout(r, 50));
+    await runInBackground(async (m) => {
+      expect(m.inline).toBe(false);
+      await new Promise((r) => setTimeout(r, 30));
       done = true;
     });
     expect(done).toBe(false);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
   });
 
-  it('swallows and logs errors (no unhandled rejection)', async () => {
+  it('without waitUntil: awaits the work inline in inline mode', async () => {
+    let done = false;
+    await runInBackground(async (m) => {
+      expect(m.inline).toBe(true);
+      await new Promise((r) => setTimeout(r, 10));
+      done = true;
+    });
+    expect(done).toBe(true);
+  });
+
+  it('inline mode is capped so a hung job cannot block the response', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const p = runInBackground(() => new Promise(() => {}), 'hung');
+    await vi.advanceTimersByTimeAsync(12_001);
+    await p;
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('swallows and logs errors in both modes', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    runInBackground(async () => {
-      throw new Error('boom');
-    }, 'test');
-    await new Promise((r) => setTimeout(r, 5));
+    await runInBackground(async () => { throw new Error('boom'); }, 'test');
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
-  });
-
-  it('registers with the platform waitUntil when present', () => {
-    const waitUntil = vi.fn();
-    (globalThis as any)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil }) };
-    runInBackground(async () => {});
-    expect(waitUntil).toHaveBeenCalledTimes(1);
   });
 });

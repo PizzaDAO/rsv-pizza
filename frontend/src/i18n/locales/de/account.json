@@ -13,7 +13,11 @@
     "guest_other": "{{count}} Gäste",
     "alreadyCreated": "Bereits eine Party erstellt?",
     "viewAllTest": "Alle Test-Events anzeigen",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "hosting": "Ich veranstalte",
+    "attending": "Ich nehme teil",
+    "searchPlaceholder": "Events durchsuchen",
+    "showMore": "Mehr anzeigen ({{count}} weitere)"
   },
   "profile": {
     "title": "Ihr Profil",
@@ -74,6 +78,12 @@
     "endTime": "Endzeit",
     "done": "Fertig",
     "datePlaceholder": "Donnerstag, 15. Januar",
-    "timePlaceholder": "14:00 – 15:00 MEZ"
+    "timePlaceholder": "14:00 – 15:00 MEZ",
+    "heading": "Event erstellen",
+    "starts": "Beginn",
+    "ends": "Ende",
+    "confirmEmailNote": "Zum Veröffentlichen bestätigst du deine E-Mail-Adresse.",
+    "draftRestored": "Entwurf wiederhergestellt. Prüfen und erstellen.",
+    "invalidCustomUrl": "Diese eigene URL ist ungültig. Versuche eine andere."
   }
 }

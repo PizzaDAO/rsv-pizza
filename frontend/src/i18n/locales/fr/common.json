@@ -30,6 +30,21 @@
   "notFound": {
     "title": "Page introuvable",
     "description": "Cette page n'existe pas. Le lien est peut-être erroné ou obsolète.",
-    "goHome": "Retour à l'accueil"
+    "goHome": "Retour à l'accueil",
+    "eventTitle": "Événement introuvable",
+    "eventDescription": "Cet événement est introuvable. Le lien est peut-être erroné ou l'événement a été supprimé.",
+    "seriesTitle": "Série introuvable",
+    "seriesDescription": "Aucune série d'événements n'existe à cette adresse.",
+    "browseEvents": "Parcourir les événements",
+    "createYourOwn": "Créez le vôtre",
+    "searchPlaceholder": "Rechercher des événements",
+    "search": "Rechercher",
+    "activeSeries": "Séries actives"
+  },
+  "banner": {
+    "findCities": "Trouvez d'autres villes sur",
+    "pause": "Mettre en pause la bannière défilante",
+    "play": "Reprendre la bannière défilante",
+    "dismiss": "Fermer"
   }
 }

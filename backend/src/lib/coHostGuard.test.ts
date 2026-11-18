@@ -1,21 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { coHostListChanged, underbossMayWriteCap } from './coHostGuard.js';
+import { coHostEscalation, underbossMayWriteCap } from './coHostGuard.js';
 
 const A = { id: 'a', email: 'a@example.org', canEdit: true, allowedTabs: ['guests'] };
 const B = { id: 'b', email: 'b@example.org', canEdit: true };
 
-describe('coHostListChanged', () => {
-  it('treats an identical echo (any order, cosmetic fields) as unchanged', () => {
-    expect(coHostListChanged([A, B], [{ ...B, name: 'Bee' }, { ...A, avatar: 'x.png' }])).toBe(false);
+describe('coHostEscalation', () => {
+  const PARTNER = { id: 'p', email: 'p@example.org', isPartner: true };
+  it('allows cosmetic edits, reorder and an unchanged echo', () => {
+    expect(coHostEscalation([A, B], [{ ...B, name: 'Bee' }, { ...A, avatar: 'x.png' }])).toBe(false);
   });
-  it('detects dropped allowedTabs (tab escalation)', () => {
-    expect(coHostListChanged([A, B], [{ ...A, allowedTabs: undefined }, B])).toBe(true);
+  it('allows adding/removing non-editor partner entries', () => {
+    expect(coHostEscalation([A, PARTNER], [A])).toBe(false);
+    expect(coHostEscalation([A], [A, { id: 'n', email: 'n@example.org', name: 'N' }])).toBe(false);
   });
-  it('detects added tabs, removed co-hosts, granted canEdit and added entries', () => {
-    expect(coHostListChanged([A, B], [{ ...A, allowedTabs: ['guests', 'pizza'] }, B])).toBe(true);
-    expect(coHostListChanged([A, B], [A])).toBe(true);
-    expect(coHostListChanged([A, { ...B, canEdit: false }], [A, B])).toBe(true);
-    expect(coHostListChanged([A], [A, { id: 'c', email: 'c@example.org', canEdit: true }])).toBe(true);
+  it('detects dropped or widened allowedTabs and canEdit changes', () => {
+    expect(coHostEscalation([A, B], [{ ...A, allowedTabs: undefined }, B])).toBe(true);
+    expect(coHostEscalation([A, B], [{ ...A, allowedTabs: ['guests', 'pizza'] }, B])).toBe(true);
+    expect(coHostEscalation([A, { ...B, canEdit: false }], [A, B])).toBe(true);
+  });
+  it('detects removing an editor, adding an editor, and swapping an editor email', () => {
+    expect(coHostEscalation([A, B], [A])).toBe(true);
+    expect(coHostEscalation([A], [A, { id: 'c', email: 'c@example.org', canEdit: true }])).toBe(true);
+    expect(coHostEscalation([A], [{ id: 'z', email: 'c@example.org', allowedTabs: ['guests'] }])).toBe(true);
+    expect(coHostEscalation([A, B], [A, { ...B, email: 'evil@example.org' }])).toBe(true);
   });
 });
 

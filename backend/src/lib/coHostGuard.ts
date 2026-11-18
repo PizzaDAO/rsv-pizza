@@ -1,31 +1,43 @@
 /**
  * Co-host escalation guard (PATCH /api/parties/:id).
  *
- * A co-host may edit the event but must not be able to rewrite the co-host list: that would let a
- * tab-restricted co-host drop their own `allowedTabs`, grant themselves/others `canEdit`, or
- * remove other co-hosts. Only the owner or an admin may change it.
- *
- * To keep ordinary co-host saves working (the edit form re-sends the list it loaded), a payload
- * whose security-relevant projection is unchanged is silently ignored; any real difference is
- * rejected by the caller with 403.
+ * Owners, admins and in-scope underbosses may change the co-host list freely. Every other editor
+ * (a co-host) may still save it (HostsManager / FlyerGenerator edit cosmetic fields, partner and
+ * non-editor entries), but must not ESCALATE permissions: change canEdit / allowedTabs of an
+ * existing entry, add an entry that can edit or carries allowedTabs, remove an entry that can
+ * edit, or change the id/email of an editor entry (which reads as remove + add).
  */
-export function coHostSecurityProjection(list: unknown): string {
-  const entries = Array.isArray(list) ? list : [];
-  const rows = entries.map((h: any) => ({
-    id: h?.id ?? null,
-    email: typeof h?.email === 'string' ? h.email.trim().toLowerCase() : null,
-    canEdit: h?.canEdit === true,
-    // null = unrestricted; [] = restricted to nothing. Order is irrelevant.
-    allowedTabs: Array.isArray(h?.allowedTabs) ? [...h.allowedTabs].map(String).sort() : null,
-    isUnderboss: h?.isUnderboss === true,
-    isPartner: h?.isPartner === true,
-  }));
-  rows.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-  return JSON.stringify(rows);
+function tabsKey(h: any): string | null {
+  return Array.isArray(h?.allowedTabs) ? JSON.stringify([...h.allowedTabs].map(String).sort()) : null;
 }
 
-export function coHostListChanged(existing: unknown, incoming: unknown): boolean {
-  return coHostSecurityProjection(existing) !== coHostSecurityProjection(incoming);
+function keyOf(h: any): string {
+  return h?.id != null ? `id:${h.id}` : `email:${String(h?.email ?? '').trim().toLowerCase()}`;
+}
+
+export function coHostEscalation(existing: unknown, incoming: unknown): boolean {
+  const oldList: any[] = Array.isArray(existing) ? existing : [];
+  const newList: any[] = Array.isArray(incoming) ? incoming : [];
+  const oldBy = new Map(oldList.map((h) => [keyOf(h), h]));
+  const newBy = new Map(newList.map((h) => [keyOf(h), h]));
+
+  for (const [k, i] of newBy) {
+    const e = oldBy.get(k);
+    if (!e) {
+      if (i?.canEdit === true || Array.isArray(i?.allowedTabs)) return true;
+      continue;
+    }
+    if ((e.canEdit === true) !== (i?.canEdit === true)) return true;
+    if (tabsKey(e) !== tabsKey(i)) return true;
+    if (e.canEdit === true) {
+      const em = (x: any) => String(x?.email ?? '').trim().toLowerCase();
+      if (em(e) !== em(i)) return true;
+    }
+  }
+  for (const [k, e] of oldBy) {
+    if (!newBy.has(k) && e?.canEdit === true) return true;
+  }
+  return false;
 }
 
 /**

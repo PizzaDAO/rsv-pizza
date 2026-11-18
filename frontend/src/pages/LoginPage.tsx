@@ -6,6 +6,9 @@ import { Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
 import { sanitizeNextPath } from '../lib/wallet/handoff';
+import { authErrorKey } from '../lib/authErrors';
+import { hasEventDraft } from '../lib/eventDraft';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
 
 export function LoginPage() {
   const { signIn, user } = useAuth();
@@ -28,7 +31,7 @@ export function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl')) || '/';
+      const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl')) || (!IS_SERIES_SCOPED && hasEventDraft() ? '/new' : '/');
       sessionStorage.removeItem('authReturnUrl');
       navigate(returnUrl);
     }
@@ -50,7 +53,7 @@ export function LoginPage() {
       // Navigate directly to code entry
       navigate('/auth/verify');
     } catch (err: any) {
-      setError(err.message || t('loginModal.failedToSend'));
+      setError(t(authErrorKey(err?.message, 'send', err?.code)));
       setLoading(false);
     }
   };

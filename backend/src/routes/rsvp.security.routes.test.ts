@@ -5,7 +5,7 @@
  *  - "send-confirmation" sends the status-appropriate email (or refuses)
  *  - webhooks never block the RSVP response
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
@@ -125,9 +125,8 @@ describe('capacity lock', () => {
     mockPrisma.party.findUnique.mockResolvedValue({ ...PARTY, maxGuests: 10 });
     const res = await request(app()).post('/api/rsvp/abc123/guest').send({ name: 'A', email: 'a@example.org' });
     expect(res.status).toBe(201);
-    expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
-    const lockOrder = mockPrisma.$executeRaw.mock.invocationCallOrder[0];
-    expect(lockOrder).toBeLessThan(mockPrisma.guest.create.mock.invocationCallOrder[0]);
+    expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(2); // SET LOCAL lock_timeout + advisory lock
+    const lockOrder = mockPrisma.$executeRaw.mock.invocationCallOrder[1];    expect(lockOrder).toBeLessThan(mockPrisma.guest.create.mock.invocationCallOrder[0]);
     // the in-lock count is the one that decides the status
     const countOrders = mockPrisma.guest.count.mock.invocationCallOrder;
     expect(countOrders.some((o) => o > lockOrder)).toBe(true);
@@ -196,19 +195,32 @@ describe('send-confirmation is status-aware', () => {
 });
 
 describe('webhooks do not block the RSVP response', () => {
-  it('responds 201 even if webhook delivery never settles, and sends it to the party owner', async () => {
+  afterEach(() => {
+    delete (globalThis as any)[Symbol.for('@vercel/request-context')];
+  });
+
+  it('with waitUntil present: responds 201 even if delivery never settles, to the party owner, retries allowed', async () => {
+    const waitUntil = vi.fn();
+    (globalThis as any)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil }) };
     vi.mocked(triggerWebhook).mockReturnValue(new Promise<void>(() => {}));
     const res = await request(app()).post('/api/rsvp/abc123/guest').send({ name: 'A', email: 'a@example.org' });
     expect(res.status).toBe(201);
-    expect(triggerWebhook).toHaveBeenCalledWith('guest.registered', expect.anything(), 'owner-1');
+    expect(waitUntil).toHaveBeenCalled();
+    expect(triggerWebhook).toHaveBeenCalledWith('guest.registered', expect.anything(), 'owner-1', { singleAttempt: false });
   });
 
-  it('a rejecting webhook does not fail the RSVP or leak an unhandled rejection', async () => {
+  it('without waitUntil: delivers inline with a single attempt (no retries)', async () => {
+    vi.mocked(triggerWebhook).mockResolvedValue(undefined);
+    const res = await request(app()).post('/api/rsvp/abc123/guest').send({ name: 'A', email: 'a@example.org' });
+    expect(res.status).toBe(201);
+    expect(triggerWebhook).toHaveBeenCalledWith('guest.registered', expect.anything(), 'owner-1', { singleAttempt: true });
+  });
+
+  it('a rejecting webhook does not fail the RSVP', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(triggerWebhook).mockRejectedValue(new Error('hook down'));
     const res = await request(app()).post('/api/rsvp/abc123/guest').send({ name: 'A', email: 'a@example.org' });
     expect(res.status).toBe(201);
-    await new Promise((r) => setTimeout(r, 5));
     spy.mockRestore();
   });
 });

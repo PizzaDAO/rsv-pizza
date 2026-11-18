@@ -13,7 +13,11 @@
     "guest_one": "{{count}} guest",
     "guest_other": "{{count}} guests",
     "alreadyCreated": "Already created a party?",
-    "viewAllTest": "View all test events"
+    "viewAllTest": "View all test events",
+    "hosting": "Hosting",
+    "attending": "Attending",
+    "searchPlaceholder": "Search your events",
+    "showMore": "Show more ({{count}} more)"
   },
   "profile": {
     "title": "Your Profile",
@@ -74,6 +78,12 @@
     "endTime": "End Time",
     "done": "Done",
     "datePlaceholder": "Thursday, January 15",
-    "timePlaceholder": "2:00 PM – 3:00 PM EST"
+    "timePlaceholder": "2:00 PM – 3:00 PM EST",
+    "heading": "Create an event",
+    "starts": "Starts",
+    "ends": "Ends",
+    "confirmEmailNote": "You'll confirm your email to publish.",
+    "draftRestored": "Draft restored. Review and create.",
+    "invalidCustomUrl": "That custom URL is not valid. Try a different one."
   }
 }

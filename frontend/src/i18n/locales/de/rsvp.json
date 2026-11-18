@@ -38,7 +38,9 @@
     "submit": "RSVP",
     "editSubmit": "RSVP bearbeiten",
     "submitting": "Wird gesendet...",
-    "saving": "Wird gespeichert..."
+    "saving": "Wird gespeichert...",
+    "skip": "Überspringen – ich esse alles",
+    "optionalHint": "Optional: Vorlieben angeben oder überspringen, um die Zusage abzuschließen."
   },
   "success": {
     "seeYou": "Wir sehen uns bei {{eventName}}!",
@@ -50,7 +52,13 @@
     "preferenceSaved": "Ihre Vorlieben wurden gespeichert.",
     "waitlisted": "Sie stehen auf der Warteliste!",
     "waitlistedDesc": "Dieses Event ist derzeit ausgebucht, aber Sie sind Nr. {{position}} auf der Warteliste! Wir benachrichtigen Sie, wenn ein Platz frei wird.",
-    "backToEvent": "Zurück zum Event"
+    "backToEvent": "Zurück zum Event",
+    "alreadyOnList": "Du stehst bereits auf der Liste",
+    "alreadyOnListDesc": "Diese E-Mail ist bereits für dieses Event registriert, daher wurde nichts geändert.",
+    "confirmationSent": "Bestätigung an {{email}} gesendet",
+    "addToCalendar": "Zum Kalender hinzufügen",
+    "calendar": "Kalender",
+    "changeRsvpHint": "Etwas ändern? Du kannst deine Zusage auf der Event-Seite bearbeiten."
   },
   "password": {
     "title": "Passwort erforderlich",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "Pizza kaufen für {{recipient}}",
     "buyPizzaForEvent": "Pizza für dieses Event kaufen",
     "buyPizzaForEventName": "Pizza kaufen für {{eventName}}",
-    "thanksForSupport": "Vielen Dank für Ihre Unterstützung!"
+    "thanksForSupport": "Vielen Dank für Ihre Unterstützung!",
+    "buyPizzaForPrefix": "Pizza kaufen für"
   },
   "nft": {
     "minting": "Ihr NFT wird geprägt...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFT bereits beansprucht!",
     "viewOnOpenSea": "Auf OpenSea ansehen",
     "viewTransaction": "Transaktion ansehen",
-    "mintFailed": "NFT-Prägung fehlgeschlagen"
+    "mintFailed": "NFT-Prägung fehlgeschlagen",
+    "afterApproval": "Du erhältst dein NFT, sobald der Gastgeber dich genehmigt."
   },
   "share": {
     "tellFriends": "Erzählen Sie Ihren Freunden von der Party!",
@@ -137,5 +147,6 @@
     "Plain": "Klassisch",
     "Gluten-Free": "Glutenfrei",
     "Dairy-Free": "Laktosefrei"
-  }
+  },
+  "close": "Schließen"
 }

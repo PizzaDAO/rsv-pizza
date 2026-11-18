@@ -13,7 +13,11 @@
     "guest_other": "게스트 {{count}}명",
     "alreadyCreated": "이미 파티를 만드셨나요?",
     "viewAllTest": "모든 테스트 이벤트 보기",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "hosting": "호스팅",
+    "attending": "참석",
+    "searchPlaceholder": "이벤트 검색",
+    "showMore": "더 보기 ({{count}}개 더)"
   },
   "profile": {
     "title": "내 프로필",
@@ -74,6 +78,12 @@
     "endTime": "종료 시간",
     "done": "완료",
     "datePlaceholder": "1월 15일 목요일",
-    "timePlaceholder": "오후 2:00 – 오후 3:00 EST"
+    "timePlaceholder": "오후 2:00 – 오후 3:00 EST",
+    "heading": "이벤트 만들기",
+    "starts": "시작",
+    "ends": "종료",
+    "confirmEmailNote": "게시하려면 이메일을 확인해야 합니다.",
+    "draftRestored": "임시 저장본을 복원했습니다. 확인 후 만드세요.",
+    "invalidCustomUrl": "이 사용자 지정 URL은 올바르지 않습니다. 다른 URL을 시도하세요."
   }
 }

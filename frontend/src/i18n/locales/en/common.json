@@ -30,6 +30,21 @@
   "notFound": {
     "title": "Page Not Found",
     "description": "This page doesn't exist. The link may be wrong or out of date.",
-    "goHome": "Go to Home"
+    "goHome": "Go to Home",
+    "eventTitle": "Event Not Found",
+    "eventDescription": "We couldn't find that event. The link may be wrong, or the event may have been removed.",
+    "seriesTitle": "Series Not Found",
+    "seriesDescription": "No event series exists at this address.",
+    "browseEvents": "Browse events",
+    "createYourOwn": "Create your own",
+    "searchPlaceholder": "Search events",
+    "search": "Search",
+    "activeSeries": "Active series"
+  },
+  "banner": {
+    "findCities": "Find other cities at",
+    "pause": "Pause scrolling banner",
+    "play": "Resume scrolling banner",
+    "dismiss": "Dismiss"
   }
 }

@@ -124,12 +124,27 @@ describe('PATCH co-hosts: owner/admin only', () => {
     expect(mockPrisma.party.update).not.toHaveBeenCalled();
   });
 
-  it('lets a co-host re-send the unchanged list without rewriting it (ordinary saves keep working)', async () => {
+  it('writes a co-host cosmetic edit (never 200 without writing)', async () => {
     setParty();
     const res = await patch(COHOST, { name: 'Renamed', coHosts: [OTHER_CH, { ...RESTRICTED, avatar: 'a.png' }] });
     expect(res.status).toBe(200);
     expect(written().name).toBe('Renamed');
-    expect(written()).not.toHaveProperty('coHosts');
+    expect(written().coHosts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'ch-1', avatar: 'a.png' })]));
+  });
+
+  it('lets a co-host add/remove non-editor entries', async () => {
+    setParty({ coHosts: [RESTRICTED, OTHER_CH, { id: 'p1', email: 'p@example.org', name: 'P' }] });
+    const res = await patch(COHOST, { coHosts: [RESTRICTED, OTHER_CH, { id: 'n1', name: 'New partner' }] });
+    expect(res.status).toBe(200);
+    expect(written().coHosts).toHaveLength(3);
+  });
+
+  it('lets an in-scope underboss change the list', async () => {
+    setParty();
+    roles['ub@example.org'] = 'underboss';
+    const res = await patch({ id: 'ub-1', email: 'ub@example.org' }, { coHosts: [RESTRICTED] });
+    expect(res.status).toBe(200);
+    expect(written().coHosts).toEqual([expect.objectContaining({ id: 'ch-1' })]);
   });
 
   it('lets the owner change the list', async () => {

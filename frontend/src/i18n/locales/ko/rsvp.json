@@ -38,7 +38,9 @@
     "submit": "RSVP",
     "editSubmit": "RSVP 수정",
     "submitting": "제출 중...",
-    "saving": "저장 중..."
+    "saving": "저장 중...",
+    "skip": "건너뛰기 — 아무거나 잘 먹어요",
+    "optionalHint": "선택 사항: 취향을 추가하거나 건너뛰어 RSVP를 완료하세요."
   },
   "success": {
     "seeYou": "{{eventName}}에서 만나요!",
@@ -50,7 +52,13 @@
     "preferenceSaved": "취향이 저장되었습니다.",
     "waitlisted": "대기자 명단에 등록되었습니다!",
     "waitlistedDesc": "이 이벤트는 현재 정원이 찼지만, 대기자 명단에서 #{{position}}번입니다! 자리가 생기면 알려드립니다.",
-    "backToEvent": "이벤트로 돌아가기"
+    "backToEvent": "이벤트로 돌아가기",
+    "alreadyOnList": "이미 명단에 있습니다",
+    "alreadyOnListDesc": "이 이메일은 이미 이 이벤트에 등록되어 있어 변경된 내용이 없습니다.",
+    "confirmationSent": "{{email}}(으)로 확인 메일을 보냈습니다",
+    "addToCalendar": "캘린더에 추가",
+    "calendar": "캘린더",
+    "changeRsvpHint": "변경이 필요하신가요? 이벤트 페이지에서 RSVP를 수정할 수 있습니다."
   },
   "password": {
     "title": "비밀번호 필요",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "{{recipient}}을(를) 위해 피자 사기",
     "buyPizzaForEvent": "이 이벤트를 위해 피자 사기",
     "buyPizzaForEventName": "{{eventName}}을(를) 위해 피자 사기",
-    "thanksForSupport": "후원해 주셔서 감사합니다!"
+    "thanksForSupport": "후원해 주셔서 감사합니다!",
+    "buyPizzaForPrefix": "피자 사주기:"
   },
   "nft": {
     "minting": "NFT 발행 중...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFT가 이미 청구되었습니다!",
     "viewOnOpenSea": "OpenSea에서 보기",
     "viewTransaction": "거래 보기",
-    "mintFailed": "NFT 발행에 실패했습니다"
+    "mintFailed": "NFT 발행에 실패했습니다",
+    "afterApproval": "호스트가 승인하면 NFT를 받게 됩니다."
   },
   "share": {
     "tellFriends": "친구들에게 파티를 알리세요!",
@@ -137,5 +147,6 @@
     "Plain": "플레인",
     "Gluten-Free": "글루텐 프리",
     "Dairy-Free": "유제품 프리"
-  }
+  },
+  "close": "닫기"
 }

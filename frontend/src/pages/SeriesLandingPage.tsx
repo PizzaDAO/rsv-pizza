@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Loader2, MapPin, CalendarDays } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { NotFoundView } from '../components/NotFoundView';
 import { useTheme } from '../contexts/ThemeContext';
 import { BRAND, HIDE_HERO_LOGO, brandUrl } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
@@ -141,16 +142,7 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
   }
 
   if (notFound || !series) {
-    return (
-      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
-        <Header />
-        <div className="flex flex-col items-center justify-center px-4 py-32">
-          <h1 className="text-2xl font-bold mb-2 text-theme-text">Series not found</h1>
-          <p className="text-theme-text-muted">No event series exists at this address.</p>
-        </div>
-        <Footer />
-      </div>
-    );
+    return <NotFoundView kind="series" />;
   }
 
   const title = series.displayName || series.name;
