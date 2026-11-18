@@ -21,7 +21,7 @@ vi.mock('../middleware/auth.js', () => ({
   },
 }));
 
-import router from './stripe-payments.routes.js';
+import router, { emailHash } from './stripe-payments.routes.js';
 import { errorHandler } from '../middleware/error.js';
 import { setStripeClientForTests } from '../lib/stripeClient.js';
 
@@ -147,8 +147,11 @@ describe('POST /setup-intent', () => {
     expect(res.body).toMatchObject({ customerId: 'cus_new', clientSecret: 'seti_secret' });
     expect(stripe.customers.create).toHaveBeenCalledWith(
       { email: 'u1@example.org', metadata: { source: 'rsvpizza', rsvpizzaUserId: 'u1' } },
-      { idempotencyKey: 'rsvpizza-customer-u1' }
+      { idempotencyKey: `rsvpizza-customer-u1-${emailHash('u1@example.org')}` }
     );
+    expect(emailHash('u1@example.org')).toMatch(/^[0-9a-f]{12}$/);
+    expect(emailHash('U1@example.org ')).toBe(emailHash('u1@example.org'));
+    expect(emailHash('other@example.org')).not.toBe(emailHash('u1@example.org'));
     expect(stripe.setupIntents.create.mock.calls[0][0].customer).toBe('cus_new');
   });
 

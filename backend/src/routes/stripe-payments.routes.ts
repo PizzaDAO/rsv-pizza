@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
@@ -26,6 +27,11 @@ export function donationMaxCents(): number {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+
+/** Short email hash for the customer idempotency key, so an email change within 24 h gets a new key instead of a 400. */
+export function emailHash(email: string | undefined): string {
+  return crypto.createHash('sha256').update((email || '').trim().toLowerCase()).digest('hex').slice(0, 12);
+}
 
 function cleanEmail(v: unknown): string | undefined {
   return typeof v === 'string' && v.length <= 254 && EMAIL_RE.test(v.trim()) ? v.trim() : undefined;
@@ -166,7 +172,7 @@ router.post('/setup-intent', requireAuth, async (req: AuthRequest, res: Response
       // (per user; Stripe keeps keys for 24 h) makes them return the same customer.
       const customer = await stripe.customers.create(
         { email: req.userEmail, metadata: { source: 'rsvpizza', rsvpizzaUserId: userId } },
-        { idempotencyKey: `rsvpizza-customer-${userId}` }
+        { idempotencyKey: `rsvpizza-customer-${userId}-${emailHash(req.userEmail)}` }
       );
       customerId = customer.id;
     }

@@ -85,16 +85,6 @@ export interface PaymentIntentLike {
   client_secret: string | null;
   status: string;
 }
-export interface IssuingCardLike {
-  id: string;
-  last4: string;
-  exp_month: number;
-  exp_year: number;
-  number?: string;
-  cvc?: string;
-  metadata?: Record<string, string>;
-}
-
 /** The subset of Stripe this backend uses; tests inject a fake with the same shape. */
 export interface StripeLike {
   paymentIntents: { create(p: Params): Promise<PaymentIntentLike> };
@@ -103,17 +93,7 @@ export interface StripeLike {
     search(p: { query: string; limit?: number }): Promise<StripeList<{ id: string }>>;
     create(p: Params, opts?: RequestOpts): Promise<{ id: string }>;
   };
-  issuing: {
-    cards: {
-      list(p: Params): Promise<StripeList<IssuingCardLike>>;
-      create(p: Params): Promise<IssuingCardLike>;
-      retrieve(id: string, p?: { expand?: string[] }): Promise<IssuingCardLike>;
-      update(id: string, p: Params): Promise<IssuingCardLike>;
-    };
-  };
 }
-
-const seg = (id: string) => encodeURIComponent(id);
 
 const fetchClient: StripeLike = {
   paymentIntents: { create: (p) => call('POST', '/payment_intents', p) },
@@ -121,14 +101,6 @@ const fetchClient: StripeLike = {
   customers: {
     search: (p) => call('GET', '/customers/search', p),
     create: (p, opts) => call('POST', '/customers', p, opts),
-  },
-  issuing: {
-    cards: {
-      list: (p) => call('GET', '/issuing/cards', p),
-      create: (p) => call('POST', '/issuing/cards', p),
-      retrieve: (id, p = {}) => call('GET', `/issuing/cards/${seg(id)}`, p),
-      update: (id, p) => call('POST', `/issuing/cards/${seg(id)}`, p),
-    },
   },
 };
 
