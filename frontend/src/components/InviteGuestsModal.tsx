@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { usePizza } from '../contexts/PizzaContext';
-import { X, Send } from 'lucide-react';
+import { X, Send, MessageSquare } from 'lucide-react';
+import { IconInput } from './IconInput';
 
 interface InviteGuestsModalProps {
   isOpen: boolean;
@@ -68,11 +70,10 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
   const eventName = party?.name || 'the event';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-theme-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <Modal onClose={handleClose} labelledBy="invite-guests-title" panelClassName="bg-theme-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" backdropClassName="z-50 bg-black/50" showClose={false}>
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-theme-stroke">
-          <h2 className="text-2xl font-bold text-theme-text">
+          <h2 id="invite-guests-title" className="text-2xl font-bold text-theme-text">
             {step === 1 ? 'Add Emails' : 'Invite Guests'}
           </h2>
           <button
@@ -165,11 +166,14 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
                     Hi, {hostName} invites you to join {eventName}.
                   </p>
 
-                  <textarea
+                  <IconInput
+                    multiline
+                    icon={MessageSquare}
                     value={customMessage}
                     onChange={(e) => setCustomMessage(e.target.value)}
                     placeholder="Add a custom message here..."
-                    className="w-full min-h-[120px] resize-none"
+                    className="min-h-[120px]"
+                    rows={5}
                   />
 
                   <div className="bg-theme-surface-hover border border-theme-stroke-hover rounded-lg p-4">
@@ -237,7 +241,6 @@ export const InviteGuestsModal: React.FC<InviteGuestsModalProps> = ({ isOpen, on
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

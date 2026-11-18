@@ -187,8 +187,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={normalizeUrl(hostProfile.website)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(hostProfile.website!, `${displayHostName}_website`)}
+                    aria-label="Website"
                   >
                     <Globe size={config.socialIcon} />
                   </a>
@@ -198,8 +199,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://twitter.com/${hostProfile.twitter}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://twitter.com/${hostProfile.twitter}`, `${displayHostName}_twitter`)}
+                    aria-label="X (Twitter)"
                   >
                     <XIcon size={config.socialIcon} />
                   </a>
@@ -209,8 +211,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://instagram.com/${hostProfile.instagram}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://instagram.com/${hostProfile.instagram}`, `${displayHostName}_instagram`)}
+                    aria-label="Instagram"
                   >
                     <Instagram size={config.socialIcon} />
                   </a>
@@ -220,8 +223,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://youtube.com/@${hostProfile.youtube}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://youtube.com/@${hostProfile.youtube}`, `${displayHostName}_youtube`)}
+                    aria-label="YouTube"
                   >
                     <Youtube size={config.socialIcon} />
                   </a>
@@ -231,8 +235,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://tiktok.com/@${hostProfile.tiktok}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://tiktok.com/@${hostProfile.tiktok}`, `${displayHostName}_tiktok`)}
+                    aria-label="TikTok"
                   >
                     <TikTokIcon size={config.socialIcon} />
                   </a>
@@ -242,8 +247,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://linkedin.com/in/${hostProfile.linkedin}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://linkedin.com/in/${hostProfile.linkedin}`, `${displayHostName}_linkedin`)}
+                    aria-label="LinkedIn"
                   >
                     <Linkedin size={config.socialIcon} />
                   </a>
@@ -277,8 +283,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={normalizeUrl(coHost.website)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(coHost.website!, `${coHost.name}_website`)}
+                    aria-label="Website"
                   >
                     <Globe size={config.socialIcon} />
                   </a>
@@ -288,8 +295,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://twitter.com/${coHost.twitter}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://twitter.com/${coHost.twitter}`, `${coHost.name}_twitter`)}
+                    aria-label="X (Twitter)"
                   >
                     <XIcon size={config.socialIcon} />
                   </a>
@@ -299,8 +307,9 @@ export const HostsList: React.FC<HostsListProps> = ({
                     href={`https://instagram.com/${coHost.instagram}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-theme-text-muted hover:text-theme-text transition-colors"
+                    className="tap-target text-theme-text-muted hover:text-theme-text transition-colors"
                     onClick={() => onLinkClick?.(`https://instagram.com/${coHost.instagram}`, `${coHost.name}_instagram`)}
+                    aria-label="Instagram"
                   >
                     <Instagram size={config.socialIcon} />
                   </a>

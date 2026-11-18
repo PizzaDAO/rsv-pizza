@@ -211,9 +211,9 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-3">
               <MapPin size={16} className="text-theme-text-secondary" />
-              <label className="text-sm font-medium text-theme-text">
+              <p className="text-sm font-medium text-theme-text">
                 {t('kit.shippingAddress')}
-              </label>
+              </p>
             </div>
 
             <div className="space-y-3">

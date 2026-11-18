@@ -84,7 +84,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative" ref={langRef}>
             <button
               onClick={() => setLangMenuOpen(prev => !prev)}
-              className="flex items-center gap-1.5 px-2 py-1.5 min-h-[40px] rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
+              aria-haspopup="menu"
+              aria-expanded={langMenuOpen}
+              className="flex items-center gap-1.5 px-2 py-1.5 min-h-[44px] rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
             >
               <Globe size={14} />
               <span className="font-bold">{currentLang.label}</span>
@@ -116,7 +118,8 @@ export const Header: React.FC<HeaderProps> = ({
             user ? (
               <Link
                 to="/account"
-                className="flex items-center gap-2 text-theme-text-secondary hover:text-theme-text transition-colors"
+                aria-label={user.name || user.email}
+                className="flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] text-theme-text-secondary hover:text-theme-text transition-colors"
               >
                 <User size={18} />
                 <span className="text-sm hidden sm:inline">{user.name || user.email}</span>
@@ -124,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-theme-surface-hover hover:bg-theme-surface-hover border border-theme-stroke-hover rounded-lg text-theme-text hover:text-theme-text text-sm transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 min-h-[44px] bg-theme-surface-hover hover:bg-theme-surface-hover border border-theme-stroke-hover rounded-lg text-theme-text hover:text-theme-text text-sm transition-all"
               >
                 <LogIn size={16} />
                 <span>{t('header.logIn')}</span>

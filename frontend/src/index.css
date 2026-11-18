@@ -66,7 +66,7 @@
   /* Text */
   --text-primary: rgba(255, 255, 255, 0.92);
   --text-secondary: rgba(255, 255, 255, 0.68);
-  --text-muted: rgba(255, 255, 255, 0.45);
+  --text-muted: rgba(255, 255, 255, 0.6); /* >= 4.5:1 on the dark base */
   --text-faint: rgba(255, 255, 255, 0.20);
   --text-inverted: #1a1a1a;
 
@@ -170,6 +170,57 @@ body.gpp-theme-active .ai-order {
 /* White on the brand red is 3.6:1; inside the flow the primary button uses a deeper red (5:1+). */
 .ai-order .btn-primary { background-color: #c8262a; }
 .ai-order .btn-primary:hover:not(:disabled) { background-color: #b01f23; }
+
+
+/* Keyboard focus (a11y): visible ring on every interactive element. Uses --accent, which every
+   theme (.wl-theme / brand-* / gpp / team1 / monad / doge / swc) defines. Inputs keep their
+   border-colour focus style above. */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[role="checkbox"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Beat Tailwind's blanket `focus:outline-none` on non-input interactive elements. */
+:is(a, button, [role="button"], [role="checkbox"], [role="tab"], summary).focus\:outline-none:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -64px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  transition: top 0.15s ease;
+}
+.skip-link:focus { top: 8px; }
+
+/* Helper text: raise the faint white utilities to >= 4.5:1 on the dark default theme.
+   Light/brand themes override these with higher-specificity rules and keep their own values. */
+html .text-white\/40, html .text-white\/50 { color: rgba(255, 255, 255, 0.6); }
+
+/* Expand tap targets of small icon-only links/buttons to 44px without changing visuals */
+.tap-target { position: relative; }
+.tap-target::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
 
 /* Input styling */
 input[type="text"],

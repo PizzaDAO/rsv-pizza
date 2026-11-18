@@ -454,16 +454,16 @@ export function EventForm() {
           </div>
         </div>
 
-        <div className="relative">
-          <FileText size={18} className="absolute left-4 top-[14px] text-theme-text-muted pointer-events-none" />
-          <textarea
-            value={eventDescription}
-            onChange={(e) => setEventDescription(e.target.value)}
-            placeholder={t('eventForm.description')}
-            className="w-full !pl-11 text-left"
-            rows={3}
-          />
-        </div>
+        <IconInput
+          multiline
+          icon={FileText}
+          iconSize={18}
+          value={eventDescription}
+          onChange={(e) => setEventDescription(e.target.value)}
+          placeholder={t('eventForm.description')}
+          className="text-left"
+          rows={3}
+        />
 
 
         <div ref={imageSectionRef}>

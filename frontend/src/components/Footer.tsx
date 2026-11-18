@@ -17,7 +17,8 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
           href="https://pizzadao.org"
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:opacity-80 transition-opacity"
+          aria-label="PizzaDAO (opens in a new tab)"
+          className="tap-target inline-block hover:opacity-80 transition-opacity"
         >
           <img
             src="/pizzadao-logo.svg"

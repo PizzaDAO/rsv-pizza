@@ -9,6 +9,7 @@ import { TimePickerInput } from '../TimePickerInput';
 import { TimezonePickerInput } from '../TimezonePickerInput';
 import { LoginModal } from '../LoginModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { saveEventDraft, loadEventDraftFor, clearEventDraft, seriesDraftKey } from '../../lib/eventDraft';
 import { createPartyApi, updatePartyApi, fetchPublicSeriesEvents } from '../../lib/api';
 import type { PublicSeries } from '../../lib/seriesApi';
 import { renderNameTemplate, type CreatePreset } from '../../config/createPresets';
@@ -26,7 +27,6 @@ interface SeriesCreateFlowProps {
   preset: CreatePreset;
 }
 
-const pendingKey = (slug: string) => `pendingSeriesCreate:${slug}`;
 
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T12:00:00Z`);
@@ -74,20 +74,23 @@ function normalizeCity(s: string | null | undefined): string {
 
 export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  const [form, setForm] = useState<CreateFormState>(() => {
-    // Resume after the login round trip.
-    try {
-      const saved = sessionStorage.getItem(pendingKey(series.slug));
-      if (saved) return { ...initialForm(preset, series), ...JSON.parse(saved) };
-    } catch { /* fall through to a fresh form */ }
-    return initialForm(preset, series);
-  });
+  const draftKey = seriesDraftKey(series.slug);
+  const [form, setForm] = useState<CreateFormState>(() => initialForm(preset, series));
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState(false);
-  const resumed = useRef(false);
+  // Restore a draft saved before the email-code login (localStorage, so it survives the code /
+  // magic link opening in another tab). Only for the same account; never auto-submits.
+  const draftChecked = useRef(false);
+  useEffect(() => {
+    if (draftChecked.current || authLoading) return;
+    draftChecked.current = true;
+    const d = loadEventDraftFor(user?.email, Date.now(), draftKey);
+    if (d) setForm({ ...initialForm(preset, series), ...(d as Partial<CreateFormState>) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading]);
 
   // Soft dedupe hint: is there already an event in this city? Degrades to nothing on failure.
   const { data: seriesEvents } = useQuery({
@@ -118,7 +121,7 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
       const { party } = await createPartyApi(buildCreatePayload(preset, series, f, user?.name || undefined));
       const code: string | undefined = party?.inviteCode;
       if (!code) throw new Error('No invite code returned');
-      sessionStorage.removeItem(pendingKey(series.slug));
+      clearEventDraft(draftKey);
       // Safe against merge order: if the backend did not pin the preset apps, pin them here.
       if (!(party.pinnedApps ?? []).includes('checklist') && party.id) {
         try { await updatePartyApi(party.id, { pinnedApps: preset.pinnedApps }); } catch { /* best effort */ }
@@ -131,16 +134,6 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
     }
   };
 
-  // After login the form is restored from sessionStorage; submit once.
-  useEffect(() => {
-    if (!user || resumed.current) return;
-    let saved: string | null = null;
-    try { saved = sessionStorage.getItem(pendingKey(series.slug)); } catch { /* ignore */ }
-    if (!saved) return;
-    resumed.current = true;
-    void submit({ ...initialForm(preset, series), ...JSON.parse(saved) });
-  }, [user]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (creating) return;
@@ -152,7 +145,7 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
       }
       setError(null);
       try {
-        sessionStorage.setItem(pendingKey(series.slug), JSON.stringify(form));
+        saveEventDraft(form as unknown as Record<string, unknown>, Date.now(), draftKey);
         sessionStorage.setItem('authReturnUrl', window.location.pathname);
       } catch { /* storage blocked: the form just won't resume */ }
       setShowLogin(true);

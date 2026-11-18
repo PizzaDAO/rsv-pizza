@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Modal } from './Modal';
 import { X, RotateCcw, Loader2, Ban } from 'lucide-react';
 import { Guest, Party } from '../types';
 import { ClickableEmail } from './ClickableEmail';
@@ -39,18 +40,12 @@ export function RejectedGuestsModal({ isOpen, onClose, rejectedGuests, onRestore
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-theme-header rounded-2xl border border-theme-stroke w-full max-w-lg max-h-[80vh] flex flex-col">
+    <Modal onClose={onClose} labelledBy="rejected-guests-title" panelClassName="bg-theme-header rounded-2xl border border-theme-stroke w-full max-w-lg max-h-[80vh] flex flex-col" backdropClassName="z-[100] bg-black/60 backdrop-blur-sm" showClose={false}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-theme-stroke">
           <div className="flex items-center gap-2">
             <Ban size={18} className="text-red-400" />
-            <h2 className="text-lg font-bold text-theme-text">Rejected Guests</h2>
+            <h2 id="rejected-guests-title" className="text-lg font-bold text-theme-text">Rejected Guests</h2>
             <span className="text-xs text-theme-text-muted">({rejectedGuests.length})</span>
           </div>
           <button
@@ -106,7 +101,6 @@ export function RejectedGuestsModal({ isOpen, onClose, rejectedGuests, onRestore
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
