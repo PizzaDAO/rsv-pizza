@@ -13,7 +13,11 @@
     "guest_other": "{{count}}名のゲスト",
     "alreadyCreated": "すでにパーティーを作成しましたか？",
     "viewAllTest": "すべてのテストイベントを表示",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "hosting": "主催",
+    "attending": "参加",
+    "searchPlaceholder": "イベントを検索",
+    "showMore": "もっと見る（残り{{count}}件）"
   },
   "profile": {
     "title": "あなたのプロフィール",
@@ -74,6 +78,12 @@
     "endTime": "終了時間",
     "done": "完了",
     "datePlaceholder": "2025年1月15日（木）",
-    "timePlaceholder": "14:00 – 15:00 JST"
+    "timePlaceholder": "14:00 – 15:00 JST",
+    "heading": "イベントを作成",
+    "starts": "開始",
+    "ends": "終了",
+    "confirmEmailNote": "公開するにはメールアドレスの確認が必要です。",
+    "draftRestored": "下書きを復元しました。確認して作成してください。",
+    "invalidCustomUrl": "このカスタムURLは無効です。別のものをお試しください。"
   }
 }
