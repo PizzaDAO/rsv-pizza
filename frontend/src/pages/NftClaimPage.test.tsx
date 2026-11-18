@@ -1,5 +1,5 @@
 import '../i18n';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
@@ -9,6 +9,11 @@ vi.mock('wagmi', () => ({ useAccount: () => ({ address: wallet.address, isConnec
 vi.mock('connectkit', () => ({
   ConnectKitButton: { Custom: ({ children }: { children: (p: { show: () => void }) => React.ReactNode }) => <>{children({ show: () => {} })}</> },
 }));
+// The real wallet providers are lazy-loaded; use a passthrough and preload it so renders stay synchronous.
+vi.mock('../components/WalletProviders', () => ({
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
+beforeAll(() => NftClaimForm.preload());
 vi.mock('../components/OpenInWallet', () => ({ OpenInWallet: () => null }));
 vi.mock('../components/Layout', () => ({ Layout: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('react-helmet-async', () => ({ Helmet: () => null }));
@@ -20,6 +25,7 @@ const api = vi.hoisted(() => ({ getNftClaim: vi.fn(), submitNftClaim: vi.fn() })
 vi.mock('../lib/api', async () => ({ ...(await vi.importActual<typeof import('../lib/api')>('../lib/api')), ...api }));
 
 import { NftClaimPage } from './NftClaimPage';
+import { NftClaimForm } from '../components/NftClaimForm';
 import { NftClaimError } from '../lib/api';
 
 const TOKEN = 'T'.repeat(43);

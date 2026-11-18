@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import '../i18n';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -25,6 +25,12 @@ vi.mock('../lib/ordering', () => ({
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: undefined, isConnected: false }),
 }));
+
+// The real wallet providers are lazy-loaded; use a passthrough and preload it so renders stay synchronous.
+vi.mock('./WalletProviders', () => ({
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
+beforeAll(() => RSVPModal.preload());
 
 vi.mock('connectkit', () => ({
   ConnectKitButton: { Custom: () => null },

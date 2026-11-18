@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router';
 import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, getMyGuest, findApprovedGppPartyInCity, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DonationForm } from '../components/DonationForm';
+import { lazyComponent } from '../lib/lazyComponent';
+
+// Stripe.js + payment UI load only once the donation form is shown.
+const DonationForm = lazyComponent(() => import('../components/DonationForm').then((m) => ({ default: m.DonationForm })));
 import { PublicEvent, getDonationStats, trackRsvpFunnel, checkEventHost } from '../lib/api';
 import { BRAND_FEATURES } from '../config/brandScope';
 import { DonationPublicStats } from '../types';

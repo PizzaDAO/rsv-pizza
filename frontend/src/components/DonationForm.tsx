@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
+import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { DollarSign, Loader2, Check, AlertCircle, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -9,10 +9,13 @@ import { DonationPublicStats } from '../types';
 import { IconInput } from './IconInput';
 import { CryptoDonationWidget } from './CryptoDonationWidget';
 
-// Initialize Stripe (lazy-load only when key exists to avoid empty key error)
-const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-  : null;
+// Stripe.js is only fetched when a payment form actually renders (memoized), never at module load.
+let stripePromiseCache: Promise<Stripe | null> | null = null;
+const getStripePromise = (): Promise<Stripe | null> | null => {
+  if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) return null;
+  if (!stripePromiseCache) stripePromiseCache = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+  return stripePromiseCache;
+};
 
 // Default crypto donation address (fallback if host hasn't set one)
 const DEFAULT_CRYPTO_ADDRESS = 'dreadpizzaroberts.eth';
@@ -425,7 +428,7 @@ export const DonationForm: React.FC<DonationFormProps> = ({
 
   // Payment form step
   return (
-    <Elements stripe={stripePromise} options={elementsOptions}>
+    <Elements stripe={getStripePromise()} options={elementsOptions}>
       <DonationFormInner
         partyId={partyId}
         amount={finalAmount}
