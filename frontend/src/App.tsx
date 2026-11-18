@@ -8,20 +8,20 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
-import { HostPage } from './pages/HostPage';
-import { NotFoundPage } from './pages/NotFoundPage';
+const HostPage = React.lazy(() => import('./pages/HostPage').then(m => ({ default: m.HostPage })));
+const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const DayOfRunPage = React.lazy(() => import('./pages/DayOfRunPage').then(m => ({ default: m.DayOfRunPage })));
 const ArtDisplayPage = React.lazy(() => import('./pages/ArtDisplayPage').then(m => ({ default: m.ArtDisplayPage })));
 import { EventPage } from './pages/EventPage';
-import { AuthVerifyPage } from './pages/AuthVerifyPage';
-import { PizzadaoLinkPage } from './pages/PizzadaoLinkPage';
-import { LoginPage } from './pages/LoginPage';
-import { NewEventPage } from './pages/NewEventPage';
-import { AccountPage } from './pages/AccountPage';
-import { GPPLandingPage } from './pages/GPPLandingPage';
-import { GPP27CreatePage } from './pages/GPP27CreatePage';
-import { SideCreatePage } from './pages/SideCreatePage';
-import { CheckInPage } from './pages/CheckInPage';
+const AuthVerifyPage = React.lazy(() => import('./pages/AuthVerifyPage').then(m => ({ default: m.AuthVerifyPage })));
+const PizzadaoLinkPage = React.lazy(() => import('./pages/PizzadaoLinkPage').then(m => ({ default: m.PizzadaoLinkPage })));
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const NewEventPage = React.lazy(() => import('./pages/NewEventPage').then(m => ({ default: m.NewEventPage })));
+const AccountPage = React.lazy(() => import('./pages/AccountPage').then(m => ({ default: m.AccountPage })));
+const GPPLandingPage = React.lazy(() => import('./pages/GPPLandingPage').then(m => ({ default: m.GPPLandingPage })));
+const GPP27CreatePage = React.lazy(() => import('./pages/GPP27CreatePage').then(m => ({ default: m.GPP27CreatePage })));
+const SideCreatePage = React.lazy(() => import('./pages/SideCreatePage').then(m => ({ default: m.SideCreatePage })));
+const CheckInPage = React.lazy(() => import('./pages/CheckInPage').then(m => ({ default: m.CheckInPage })));
 const DJPage = React.lazy(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
 const JudgePage = React.lazy(() => import('./pages/JudgePage').then(m => ({ default: m.JudgePage })));
 const HackathonGalleryPage = React.lazy(() => import('./pages/HackathonGalleryPage').then(m => ({ default: m.HackathonGalleryPage })));
@@ -38,7 +38,7 @@ const BrandAdminAcceptPage = React.lazy(() => import('./pages/BrandAdminAcceptPa
 // Brand settings for brand admins (and super-admins): /brand-admin[/look|images|checklist|events|history]. Lazy, not in GPP_ONLY_PATHS.
 const BrandAdminPage = React.lazy(() => import('./pages/BrandAdminPage').then(m => ({ default: m.BrandAdminPage })));
 const AdminSeriesPage = React.lazy(() => import('./pages/AdminSeriesPage').then(m => ({ default: m.AdminSeriesPage })));
-import { SeriesLandingPage } from './pages/SeriesLandingPage';
+const SeriesLandingPage = React.lazy(() => import('./pages/SeriesLandingPage').then(m => ({ default: m.SeriesLandingPage })));
 const SuggestionsPage = React.lazy(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
 const TaxFormRequestPage = React.lazy(() => import('./pages/TaxFormRequestPage').then(m => ({ default: m.TaxFormRequestPage })));
 const PaymentsAdminPage = React.lazy(() => import('./pages/PaymentsAdminPage').then(m => ({ default: m.PaymentsAdminPage })));
@@ -60,18 +60,32 @@ const ConsolidatedReportPage = React.lazy(() => import('./pages/ConsolidatedRepo
 const PartnerBizdevPage = React.lazy(() => import('./pages/PartnerBizdevPage').then(m => ({ default: m.PartnerBizdevPage })));
 const PostComposerPage = React.lazy(() => import('./pages/PostComposerPage').then(m => ({ default: m.PostComposerPage })));
 const OneSheetPage = React.lazy(() => import('./pages/OneSheetPage').then(m => ({ default: m.OneSheetPage })));
-import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
+const GPPPizzeriasPage = React.lazy(() => import('./pages/GPPPizzeriasPage').then(m => ({ default: m.GPPPizzeriasPage })));
 const PizzaIndexPage = React.lazy(() => import('./pages/PizzaIndexPage').then(m => ({ default: m.PizzaIndexPage })));
-import { EventsMapPage } from './pages/EventsMapPage';
+const EventsMapPage = React.lazy(() => import('./pages/EventsMapPage').then(m => ({ default: m.EventsMapPage })));
 const EventsSearchPage = React.lazy(() => import('./pages/EventsSearchPage').then(m => ({ default: m.EventsSearchPage })));
 const AdminLogoCleanup = React.lazy(() => import('./pages/AdminLogoCleanup').then(m => ({ default: m.AdminLogoCleanup })));
-import { PartnersPage } from './pages/PartnersPage';
-import { LeaderboardPage } from './pages/LeaderboardPage';
+const PartnersPage = React.lazy(() => import('./pages/PartnersPage').then(m => ({ default: m.PartnersPage })));
+const LeaderboardPage = React.lazy(() => import('./pages/LeaderboardPage').then(m => ({ default: m.LeaderboardPage })));
 const PhotosFeedPage = React.lazy(() => import('./pages/PhotosFeedPage').then(m => ({ default: m.PhotosFeedPage })));
 const PhotosSlideshowPage = React.lazy(() => import('./pages/PhotosSlideshowPage').then(m => ({ default: m.PhotosSlideshowPage })));
 const SurveyPage = React.lazy(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
 const NftClaimPage = React.lazy(() => import('./pages/NftClaimPage').then(m => ({ default: m.NftClaimPage })));
 const HostSurveyPage = React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
+
+// Shown while a lazily loaded route chunk downloads (same look as the app-level
+// fallback in main.tsx so the transition doesn't flash).
+function PageFallback() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading"
+      style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', color: '#fff', fontFamily: 'system-ui, sans-serif' }}
+    >
+      Loading…
+    </div>
+  );
+}
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -141,7 +155,7 @@ function App() {
       <AuthProvider>
         <ThemeProvider theme="dark">
         <BrowserRouter>
-          <Suspense fallback={null}>
+          <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -153,21 +167,21 @@ function App() {
             <Route path="/side" element={gppOnly("/side", <SideCreatePage />)} />
             <Route path="/gpp/pizzerias" element={gppOnly("/gpp/pizzerias", <GPPPizzeriasPage />)} />
             {/* sfincione-40417: public Pizza Price Index; must come before /:slug */}
-            <Route path="/pizza-index" element={gppOnly("/pizza-index", <Suspense fallback={null}><PizzaIndexPage /></Suspense>)} />
+            <Route path="/pizza-index" element={gppOnly("/pizza-index", <Suspense fallback={<PageFallback />}><PizzaIndexPage /></Suspense>)} />
             {/* /map must come before /:slug */}
-            <Route path="/events" element={<Suspense fallback={null}><EventsSearchPage /></Suspense>} />
+            <Route path="/events" element={<Suspense fallback={<PageFallback />}><EventsSearchPage /></Suspense>} />
             <Route path="/map" element={gppOnly("/map", <EventsMapPage />)} />
             {/* cacciatore-72814: /map/swc super-admin-only variant; must come before /:slug */}
-            <Route path="/map/swc" element={gppOnly("/map/swc", <Suspense fallback={null}><EventsMapSwcPage /></Suspense>)} />
+            <Route path="/map/swc" element={gppOnly("/map/swc", <Suspense fallback={<PageFallback />}><EventsMapSwcPage /></Suspense>)} />
             {/* focaccia-58293: /map/all public no-clustering variant; must come before /:slug */}
-            <Route path="/map/all" element={gppOnly("/map/all", <Suspense fallback={null}><EventsMapAllPage /></Suspense>)} />
+            <Route path="/map/all" element={gppOnly("/map/all", <Suspense fallback={<PageFallback />}><EventsMapAllPage /></Suspense>)} />
             {/* /partners must come before /:slug */}
             <Route path="/partners" element={gppOnly("/partners", <PartnersPage />)} />
             {/* stromboli-71593: /leaderboard + /gpp/leaderboard must come before /:slug */}
             <Route path="/leaderboard" element={gppOnly("/leaderboard", <LeaderboardPage />)} />
             <Route path="/gpp/leaderboard" element={gppOnly("/gpp/leaderboard", <LeaderboardPage />)} />
             {/* /payments must come before /:slug */}
-            <Route path="/tax-form" element={gppOnly("/tax-form", <Suspense fallback={null}><TaxFormRequestPage /></Suspense>)} />
+            <Route path="/tax-form" element={gppOnly("/tax-form", <Suspense fallback={<PageFallback />}><TaxFormRequestPage /></Suspense>)} />
             <Route path="/payments" element={gppOnly("/payments", <PaymentsAdminPage />)} />
             {/* trusted hosts phase 1: read-only admin report; must come before /:slug */}
             <Route path="/payments/hosts" element={gppOnly("/payments/hosts", <PaymentsHostsPage />)} />
@@ -215,8 +229,8 @@ function App() {
             <Route path="/suggestions" element={gppOnly("/suggestions", <SuggestionsPage />)} />
             <Route path="/admin/logo-cleanup" element={gppOnly("/admin/logo-cleanup", <AdminLogoCleanup />)} />
             <Route path="/admin/series" element={gppOnly("/admin/series", <AdminSeriesPage />)} />
-            <Route path="/brand-admin/accept" element={<Suspense fallback={null}><BrandAdminAcceptPage /></Suspense>} />
-            <Route path="/brand-admin/:tab?" element={<Suspense fallback={null}><BrandAdminPage /></Suspense>} />
+            <Route path="/brand-admin/accept" element={<Suspense fallback={<PageFallback />}><BrandAdminAcceptPage /></Suspense>} />
+            <Route path="/brand-admin/:tab?" element={<Suspense fallback={<PageFallback />}><BrandAdminPage /></Suspense>} />
             <Route path="/partner" element={gppOnly("/partner", <PartnerDashboardPage />)} />
             <Route path="/partner/report" element={gppOnly("/partner/report", <ConsolidatedReportPage />)} />
             {/* soppressata-72251: per-partner BizDev industry report — before /:slug catch-all */}
@@ -227,8 +241,8 @@ function App() {
             <Route path="/invoice/:viewToken" element={gppOnly("/invoice/:viewToken", <InvoicePage />)} />
             <Route path="/mou/:viewToken" element={gppOnly("/mou/:viewToken", <MouPage />)} />
             <Route path="/sponsor-intake/:token" element={gppOnly("/sponsor-intake/:token", <SponsorIntakeRedirect />)} />
-            <Route path="/graphics" element={gppOnly("/graphics", <Suspense fallback={null}><GraphicsDashboard /></Suspense>)} />
-            <Route path="/graphics/:slug/edit" element={gppOnly("/graphics/:slug/edit", <Suspense fallback={null}><GraphicsFlyerEdit /></Suspense>)} />
+            <Route path="/graphics" element={gppOnly("/graphics", <Suspense fallback={<PageFallback />}><GraphicsDashboard /></Suspense>)} />
+            <Route path="/graphics/:slug/edit" element={gppOnly("/graphics/:slug/edit", <Suspense fallback={<PageFallback />}><GraphicsFlyerEdit /></Suspense>)} />
             <Route path="/post" element={gppOnly("/post", <PostComposerPage />)} />
             <Route path="/onesheet/:slug" element={<OneSheetPage />} />
             <Route path="/raleigh" element={gppOnly("/raleigh", <Navigate to="/durham" replace />)} />
@@ -246,9 +260,9 @@ function App() {
                 Two segments, so they never shadow the /:slug catch-all; static first segments
                 (/host/:x, /map/swc, ...) still rank above them. */}
             {/* Photo booth: above /:slug, same reasoning as /projects */}
-            <Route path="/:slug/booth" element={<Suspense fallback={null}><BoothPage /></Suspense>} />
-            <Route path="/:slug/projects" element={<Suspense fallback={null}><HackathonGalleryPage /></Suspense>} />
-            <Route path="/:slug/projects/:projectSlug" element={<Suspense fallback={null}><HackathonProjectPage /></Suspense>} />
+            <Route path="/:slug/booth" element={<Suspense fallback={<PageFallback />}><BoothPage /></Suspense>} />
+            <Route path="/:slug/projects" element={<Suspense fallback={<PageFallback />}><HackathonGalleryPage /></Suspense>} />
+            <Route path="/:slug/projects/:projectSlug" element={<Suspense fallback={<PageFallback />}><HackathonProjectPage /></Suspense>} />
             <Route path="/:slug" element={<EventPage />} />
             {/* Unknown multi-segment paths used to render nothing. */}
             <Route path="*" element={<NotFoundPage />} />

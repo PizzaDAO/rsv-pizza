@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { CreditCard, Building2 } from 'lucide-react';
 import { Invoice } from '../../types';
-import { InvoiceStripePayment } from './InvoiceStripePayment';
+import { lazyComponent } from '../../lib/lazyComponent';
+
+const InvoiceStripePayment = lazyComponent(() => import('./InvoiceStripePayment').then((m) => ({ default: m.InvoiceStripePayment })));
 import { InvoiceCryptoPayment } from './InvoiceCryptoPayment';
 import { InvoiceWireDetails } from './InvoiceWireDetails';
 

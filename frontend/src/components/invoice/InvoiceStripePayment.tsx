@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
+import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Loader2, Check, AlertCircle, CreditCard } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { payInvoice } from '../../lib/api';
 import { Invoice } from '../../types';
 
-// Initialize Stripe (lazy-load only when key exists)
-const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-  : null;
+// Stripe.js is only fetched when a payment form actually renders (memoized), never at module load.
+let stripePromiseCache: Promise<Stripe | null> | null = null;
+const getStripePromise = (): Promise<Stripe | null> | null => {
+  if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) return null;
+  if (!stripePromiseCache) stripePromiseCache = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+  return stripePromiseCache;
+};
 
 interface InvoiceStripePaymentProps {
   invoice: Invoice;
@@ -159,6 +162,7 @@ export const InvoiceStripePayment: React.FC<InvoiceStripePaymentProps> = ({
     }).format(cents / 100);
   };
 
+  const stripePromise = getStripePromise();
   if (!stripePromise) {
     return (
       <div className="text-center py-6">

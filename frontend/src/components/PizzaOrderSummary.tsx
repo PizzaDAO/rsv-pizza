@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { PizzeriaSearch } from './PizzeriaSearch';
-import { OrderCheckout } from './OrderCheckout';
+import { lazyComponent } from '../lib/lazyComponent';
+
+const OrderCheckout = lazyComponent(() => import('./OrderCheckout').then((m) => ({ default: m.OrderCheckout })));
 import { PizzaOrderFlow } from './PizzaOrderFlow';
 import { AI_ORDERING_ENABLED } from '../lib/pizzaOrder';
 import { LocationAutocomplete } from './LocationAutocomplete';

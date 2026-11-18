@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Heart, DollarSign, Target, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getDonationStats } from '../lib/api';
-import { DonationForm } from './DonationForm';
+import { lazyComponent } from '../lib/lazyComponent';
 import { DonationPublicStats } from '../types';
+
+// Stripe.js + payment UI load only once the donation form is shown.
+const DonationForm = lazyComponent(() => import('./DonationForm').then((m) => ({ default: m.DonationForm })));
 
 interface DonationStepProps {
   partyId: string;

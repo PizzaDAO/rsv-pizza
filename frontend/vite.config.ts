@@ -68,6 +68,18 @@ export default defineConfig(({ mode }) => ({
   build: {
     // forno-81402: iPhone 8 tops out at iOS 16 (Safari 16).
     target: ['es2020', 'safari15'],
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            // TanStack Query is used by the entry (HomePage/main) AND by the lazy wallet stack
+            // (wagmi). Without an explicit chunk the bundler hoists it into the ~870KB wallet
+            // chunk, which then gets modulepreloaded on every page. Keep it separate.
+            { name: 'tanstack-query', test: /node_modules[\\/]@tanstack[\\/]/, priority: 20 },
+          ],
+        },
+      },
+    },
   },
   server: {
     port: 5176,
