@@ -8,6 +8,7 @@ import {
   INTERNAL_TAG_PATTERNS,
   mergeHostEventTags,
   HOST_WRITABLE_EVENT_TAGS,
+  withPrepay,
 } from './eventTags.js';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -218,5 +219,18 @@ describe('blackolive-70521: mergeHostEventTags', () => {
     const r = mergeHostEventTags(['swc', 'refund'], ['swc', 'prepay']); // client never saw refund
     expect(r.tags).toEqual(['swc', 'refund', 'prepay']);
     expect(mergeHostEventTags(['swc', 'refund', 'prepay'], ['swc']).tags).toEqual(['swc', 'refund']);
+  });
+});
+
+describe('scam-flag-private: withPrepay', () => {
+  it('adds canonical prepay without touching internal tags', () => {
+    expect(withPrepay(['swc', 'possible-scam', '500'], true)).toEqual(['swc', 'possible-scam', '500', 'prepay']);
+  });
+  it('is idempotent and normalizes case/whitespace variants', () => {
+    expect(withPrepay(['prepay', ' Prepay ', 'go'], true)).toEqual(['go', 'prepay']);
+  });
+  it('removes every prepay variant only', () => {
+    expect(withPrepay(['PREPAY', 'paid', 'prepay'], false)).toEqual(['paid']);
+    expect(withPrepay(null, false)).toEqual([]);
   });
 });

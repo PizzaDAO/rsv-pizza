@@ -986,6 +986,8 @@ export interface DbParty {
   rollup_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
+  // scam-flag-private: client-only flag, true once the raw event_tags were merged from the API.
+  raw_event_tags_loaded?: boolean;
   hidden_gpp_photos?: string[];
   extra_gpp_photos?: string[];
   // External event links
@@ -1597,7 +1599,10 @@ export function mergeHostOnlyPartyFields(party: DbParty, apiParty: any): void {
     // scam-flag-private: anon rows carry only the public tags (event_tags:public_event_tags).
     // Host flows need the raw list (prepay checkbox, 'go' gate, nonhub, numeric/k caps), and a
     // privileged PATCH of a stripped list would wipe internal tags, so editors get it from the API.
-    if (Array.isArray(apiParty.eventTags)) party.event_tags = apiParty.eventTags;
+    if (Array.isArray(apiParty.eventTags)) {
+      party.event_tags = apiParty.eventTags;
+      party.raw_event_tags_loaded = true;
+    }
   }
 }
 

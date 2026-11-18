@@ -148,12 +148,23 @@ describe('mergeHostOnlyPartyFields', () => {
     const p = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
     mergeHostOnlyPartyFields(p, { canEdit: true, eventTags: ['swc', 'prepay', 'go', '500'] });
     expect(p.event_tags).toEqual(['swc', 'prepay', 'go', '500']);
+    expect(p.raw_event_tags_loaded).toBe(true);
+  });
+
+  it('scam-flag-private: raw_event_tags_loaded stays unset when the API omits eventTags or enrich failed', () => {
+    const p = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
+    mergeHostOnlyPartyFields(p, { canEdit: true });
+    expect(p.raw_event_tags_loaded).toBeUndefined();
+    const q = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
+    mergeHostOnlyPartyFields(q, undefined);
+    expect(q.raw_event_tags_loaded).toBeUndefined();
   });
 
   it('scam-flag-private: non-editors never get raw event_tags merged in', () => {
     const p = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
     mergeHostOnlyPartyFields(p, { canEdit: false, eventTags: ['swc', 'possible-scam'] });
     expect(p.event_tags).toEqual(['swc']);
+    expect(p.raw_event_tags_loaded).toBeUndefined();
   });
 
   it('does not merge host-only fields when canEdit is not true', () => {
@@ -183,9 +194,10 @@ describe('preserveHostOnlyFields', () => {
   });
 
   it('scam-flag-private: keeps the raw event tags and derived cap across a SAFE re-read', () => {
-    const prev = { eventTags: ['swc', 'prepay', 'k40'], effectiveReimbursementCapUsd: 40 } as Party;
-    const next = { eventTags: ['swc'], effectiveReimbursementCapUsd: null } as Party;
+    const prev = { eventTags: ['swc', 'prepay', 'k40'], effectiveReimbursementCapUsd: 40, rawEventTagsLoaded: true } as Party;
+    const next = { eventTags: ['swc'], effectiveReimbursementCapUsd: null, rawEventTagsLoaded: false } as Party;
     preserveHostOnlyFields(next, prev);
+    expect(next.rawEventTagsLoaded).toBe(true);
     expect(next.eventTags).toEqual(['swc', 'prepay', 'k40']);
     expect(next.effectiveReimbursementCapUsd).toBe(40);
   });

@@ -172,7 +172,7 @@ describe('Field Mapping Consistency', () => {
       'host_name', 'has_password', 'password', 'host_profile',
       'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by', 'reimbursement_cap_appeal_note',
       ...SENSITIVE_PARTY_COLUMNS,
-      'can_edit', 'allowed_tabs',
+      'can_edit', 'allowed_tabs', 'raw_event_tags_loaded',
     ]);
     const coreDbPartyFields = dbPartyFields.filter(
       f => !computedOrExcluded.has(f)

@@ -26,7 +26,7 @@ import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { siteForParty, brandedSeriesBySlug, brandedSiteForParty, seriesSlugForOrigin } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
-import { changesGuardedTags, mergeHostEventTags } from '../lib/eventTags.js';
+import { changesGuardedTags, mergeHostEventTags, withPrepay } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
 import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
@@ -719,6 +719,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       expectedGuests,
       estimatedAttendance,
       eventTags,
+      // scam-flag-private: targeted 'prepay' toggle (PrepayCheckbox). Applied server-side to the
+      // stored tags, so the client never has to send (and can't wipe) the full tag list.
+      prepay,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress, donationAmountsPublic, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes, photoModeration,
@@ -856,6 +859,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         }
 
       }
+    }
+
+    // scam-flag-private: `prepay: boolean` toggles ONLY 'prepay' on the stored tags (or on the
+    // tags this request is already writing). Any editor may toggle it (it is HOST_WRITABLE).
+    if (prepay !== undefined) {
+      if (typeof prepay !== 'boolean') {
+        throw new AppError('prepay must be a boolean', 400, 'VALIDATION_ERROR');
+      }
+      const base =
+        eventTagsToWrite ??
+        (await prisma.party.findUnique({ where: { id }, select: { eventTags: true } }))?.eventTags ??
+        [];
+      const next = withPrepay(base, prepay);
+      const changed = next.length !== base.length || next.some((t, i) => t !== base[i]);
+      if (changed || eventTagsToWrite !== undefined) eventTagsToWrite = next;
     }
 
     // Validate externalLinks if provided

@@ -23,6 +23,10 @@
  *     node backend/scripts/apply-public-event-tags.cjs --revoke --apply
  *     node backend/scripts/apply-public-event-tags.cjs --rollback-revoke     # re-GRANT event_tags
  *
+ * Run from backend/ with `env -u DATABASE_URL` (dotenv never overrides an already-set variable, so a
+ * stray shell DATABASE_URL would otherwise win over backend/.env):
+ *     cd backend && env -u DATABASE_URL node scripts/apply-public-event-tags.cjs [flags]
+ *
  * Prints counts and party ids only, never tag values. No session-level SET / SET ROLE (the
  * DATABASE_URL is the 6543 transaction pooler): only SET LOCAL inside a transaction.
  */

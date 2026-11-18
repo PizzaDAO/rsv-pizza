@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Checkbox } from '../Checkbox';
-import { updateParty } from '../../lib/supabase';
+import { updatePartyApi } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 
 interface PrepayCheckboxProps {
@@ -12,8 +12,15 @@ interface PrepayCheckboxProps {
  * surfaced at the top of the Payments tab so the host can flag/unflag
  * regardless of whether they're in the list or new-payment view.
  *
- * Reads/writes `parties.event_tags` directly — checking adds `'prepay'`,
- * unchecking removes it. Admins can also add/remove the tag via /underboss.
+ * Checking adds `'prepay'`, unchecking removes it. Admins can also add/remove
+ * the tag via /underboss.
+ *
+ * scam-flag-private: writes are a targeted `PATCH { prepay }` (the backend
+ * toggles only 'prepay' on the STORED tags), never the full tag array — for
+ * payment admins the backend writes a full array as sent, so a stripped
+ * public list would wipe 'possible-scam' / 'paid' / 'go' / caps. The control
+ * is hidden unless the raw tags were loaded (otherwise its checked state is
+ * unknown).
  */
 export const PrepayCheckbox: React.FC<PrepayCheckboxProps> = ({ partyId }) => {
   const { party, setParty } = usePizza();
@@ -29,12 +36,12 @@ export const PrepayCheckbox: React.FC<PrepayCheckboxProps> = ({ partyId }) => {
     const next = !checked;
     setOptimistic(next);
     setSaving(true);
-    const current = Array.isArray(party?.eventTags) ? party!.eventTags : [];
-    const nextTags = next
-      ? Array.from(new Set([...current, 'prepay']))
-      : current.filter(t => t !== 'prepay');
     try {
-      await updateParty(partyId, { event_tags: nextTags });
+      await updatePartyApi(partyId, { prepay: next });
+      const current = Array.isArray(party?.eventTags) ? party!.eventTags : [];
+      const nextTags = next
+        ? Array.from(new Set([...current, 'prepay']))
+        : current.filter(t => t !== 'prepay');
       // Optimistic context patch: update the cached party in-place so a
       // remount (e.g. after tab switch) reads fresh eventTags without a
       // network refresh. No loadParty() — that triggered a delayed re-render
@@ -47,6 +54,8 @@ export const PrepayCheckbox: React.FC<PrepayCheckboxProps> = ({ partyId }) => {
       setSaving(false);
     }
   };
+
+  if (!party?.rawEventTagsLoaded) return null;
 
   return (
     <div className="card p-4">

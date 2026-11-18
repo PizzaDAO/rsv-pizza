@@ -326,6 +326,10 @@ export interface Party {
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null; // 'standard', 'gpp', 'private', etc.
   eventTags?: string[]; // Tags for filtering/grouping
+  // scam-flag-private: true only when eventTags is the RAW list (merged from GET /api/parties/:id).
+  // Otherwise eventTags holds only public tags (internal ones stripped) and tag-dependent write
+  // controls must not render.
+  rawEventTagsLoaded?: boolean;
   eventSeriesId?: string | null; // white-label: linked EventSeries id (Phase 1)
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
