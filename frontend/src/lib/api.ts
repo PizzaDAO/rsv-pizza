@@ -2008,16 +2008,20 @@ export async function markInvoicePaid(
   partyId: string,
   invoiceId: string,
   data: { paymentMethod?: string; paymentRef?: string; paidAmount?: number }
-): Promise<{ invoice: Invoice } | null> {
-  try {
-    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
-      method: 'POST',
-      body: data,
-    });
-  } catch (error) {
-    console.error('Error marking invoice paid:', error);
-    return null;
-  }
+): Promise<{ invoice: Invoice }> {
+  // Throws on failure so the UI can show the server's message.
+  return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
+    method: 'POST',
+    body: data,
+  });
+}
+
+// Reject a pending payment claim (pending_verification -> issued)
+export async function rejectInvoiceClaim(partyId: string, invoiceId: string): Promise<{ invoice: Invoice }> {
+  // Throws on failure so the UI can show the server's message.
+  return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/reject-claim`, {
+    method: 'POST',
+  });
 }
 
 // Get public invoice by view token (no auth required)
