@@ -13,10 +13,21 @@ import {
 
 const router = Router();
 
+/**
+ * basil-14648: placing or retrying a legacy Bland call is retired. AI ordering now goes through pizza-mcp
+ * (pizza-order.routes.ts): host approval code, a price ceiling, no card by voice. These two routes let ANY signed-in
+ * user dial ANY number with a "deviate from the order" prompt and no party check. Status, transcript and the
+ * webhook stay so old call history still reads. The whole file goes in the P2 cleanup (plan section 10).
+ */
+export function legacyCallRetired(_req: Request, _res: Response, next: NextFunction) {
+  next(new AppError('AI phone ordering moved. This endpoint no longer places calls.', 410, 'ENDPOINT_RETIRED'));
+}
+
 // POST /api/ai-phone/initiate - Start AI phone call
 router.post(
   '/initiate',
   requireAuth,
+  legacyCallRetired,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const {
@@ -167,6 +178,7 @@ router.get(
 router.post(
   '/:id/retry',
   requireAuth,
+  legacyCallRetired,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

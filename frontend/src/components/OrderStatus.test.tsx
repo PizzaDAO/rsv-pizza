@@ -420,4 +420,25 @@ describe('OrderStatus', () => {
     expect(screen.queryByText(/^Call Sal's/)).toBeNull();
     expect(screen.getByText('Order to read out')).toBeTruthy();
   });
+
+  it("basil-14648 fixes: a co-host's card polls too (the backend answers from the stored row)", async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    mocks.get.mockResolvedValue({ order: order({ status: 'confirmed_by_shop', isMine: false }), stale: false });
+    const onUpdate = vi.fn();
+    render(<OrderStatus partyId="p" order={order({ status: 'calling', confirmedTotalCents: null, isMine: false })} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'confirmed_by_shop' }));
+    mocks.get.mockReset();
+    vi.useRealTimers();
+  });
+
+  it('basil-14648 fixes: an approval link that is not https is never rendered', () => {
+    for (const url of ['javascript:alert(1)', 'http://api.openpizza.xyz/confirm/c1', 'not a url']) {
+      const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'awaiting_price_approval', nextAction: { type: 'open_url', url } })} orderScript="" onUpdate={noop} onDone={noop} />);
+      expect(screen.queryByText('Review the higher price')).toBeNull();
+      unmount();
+    }
+  });
 });

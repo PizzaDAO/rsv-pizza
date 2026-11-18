@@ -12,7 +12,7 @@ import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
   getPizzaHandoffs, recordPizzaHandoff, handoffToResume, releasedByOtherHost, HandoffBudget,
   isTerminalStatus, formatPhone, menuPanelFits, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderConfig, PizzaOrderView, PizzaShop,
-  emailOrderable, OrderChannel,
+  emailOrderable, OrderChannel, approvalHref,
 } from '../lib/pizzaOrder';
 import { generateCheckOrderScript, generatePhoneOrderScript } from '../lib/ordering';
 
@@ -60,7 +60,9 @@ function markReleasedSeen(id: string) {
 }
 
 /** An order that is still live at pizza-mcp: a second one now would race it. Email orders add `sending` and `awaiting_shop_reply`. */
-const LIVE = ['awaiting_approval', 'calling', 'awaiting_price_approval', 'sending', 'awaiting_shop_reply'];
+// `approval_timeout` and `held` are live too: approving the timed-out price calls the shop back, and a held native
+// order can still be paid. Offering "place a second order" next to them could end in two real orders.
+const LIVE = ['awaiting_approval', 'calling', 'awaiting_price_approval', 'approval_timeout', 'held', 'sending', 'awaiting_shop_reply'];
 const isLive = (s: string) => LIVE.includes(s);
 
 /**
@@ -138,6 +140,8 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
 
   const rememberPhones = useCallback((shops: PizzaShop[]) => {
     setPhones((prev) => {
+      // the same Map when nothing new: a fresh one re-runs the lookup effect below for ever (a shop not in the results)
+      if (!shops.some((s) => s.phone && prev.get(s.id) !== s.phone)) return prev;
       const next = new Map(prev);
       for (const s of shops) if (s.phone) next.set(s.id, s.phone);
       return next;
@@ -196,8 +200,13 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // A resumed order has no shop from this session: look its phone up in the listing once, unless pizza-mcp's order
   // view already names the number the order was placed with.
   const viewPhone = order?.shop?.phone ?? null;
+  const phoneLookedUp = useRef<Set<string>>(new Set());
+  const lookupShopId = order?.shopId ?? null;
   useEffect(() => {
-    if (!partyId || step !== 'status' || !order || viewPhone || phones.has(order.shopId)) return;
+    if (!partyId || step !== 'status' || !lookupShopId || viewPhone || phones.has(lookupShopId)) return;
+    // once per shop: a shop outside the search results stays without a number (each poll must not search again)
+    if (phoneLookedUp.current.has(lookupShopId)) return;
+    phoneLookedUp.current.add(lookupShopId);
     let cancelled = false;
     getPizzaShops(partyId)
       .then((r) => !cancelled && rememberPhones(r.pizzerias))
@@ -205,7 +214,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     return () => {
       cancelled = true;
     };
-  }, [partyId, step, order, viewPhone, phones, rememberPhones]);
+  }, [partyId, step, lookupShopId, viewPhone, phones, rememberPhones]);
 
   // Move focus to the step's heading when the step changes (not on first render), so screen readers follow.
   useEffect(() => {
@@ -357,7 +366,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         });
         // Open the approval page only once the order exists (no blank tab on an error). A blocked popup is fine:
         // the status card has an "Open the approval page" button, and we say so.
-        const url = r.next_action?.type === 'open_url' ? r.next_action.url : null;
+        const url = r.next_action?.type === 'open_url' ? approvalHref(r.next_action.url) : null;
         if (url) {
           const tab = window.open(url, '_blank');
           if (tab) tab.opener = null;

@@ -138,6 +138,16 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // basil-14648: retired. AI ordering goes through pizza-mcp now (host approval code, price ceiling, no card by
+  // voice). This function took only the public anon key and dialed any number with a "deviate from the order"
+  // prompt and a spoken card number. It never places a call again; delete it once this version is deployed.
+  if (req.method !== 'OPTIONS') {
+    return new Response(
+      JSON.stringify({ error: 'AI phone ordering moved. This endpoint no longer places calls.', code: 'ENDPOINT_RETIRED' }),
+      { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     if (!BLAND_API_KEY) {
       return new Response(
