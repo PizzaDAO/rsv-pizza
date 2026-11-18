@@ -5,7 +5,8 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import { markdownRemarkPlugins } from '../lib/safeMarkdown';
 import { MarkdownBoundary } from '../components/ErrorBoundary';
-import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
+import { MapPin, Users, Pizza, Loader2, Lock, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
+import { NotFoundView } from '../components/NotFoundView';
 import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, getMyGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats } from '../lib/api';
@@ -427,18 +428,7 @@ export function EventPage() {
   }
 
   if (error || !event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="card p-8 max-w-md text-center">
-          <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('notFound.title')}</h1>
-          <p className="text-theme-text-secondary mb-6">{error}</p>
-          <Link to="/" className="btn-primary inline-block">
-            {t('notFound.goHome')}
-          </Link>
-        </div>
-      </div>
-    );
+    return <NotFoundView kind="event" />;
   }
 
   // Show password prompt if event is password-protected and not authenticated

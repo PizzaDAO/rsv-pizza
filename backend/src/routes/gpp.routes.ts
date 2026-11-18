@@ -15,6 +15,7 @@ import { publicTags, isInternalTag } from '../lib/eventTags.js';
 import { brand } from '../config/brand.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { countryCodeToRegion, countryNameToRegion } from '../lib/countryRegion.js';
+import { TEST_PARTY_SQL_PATTERNS } from '../lib/testParty.js';
 
 const router = Router();
 
@@ -594,6 +595,8 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     id: event.id,
     name: event.name,
     city,
+    // Host/geocoded city only (no fallback to the event name); used by the /events city filter.
+    geoCity: event.city || null,
     customUrl: event.customUrl,
     inviteCode: event.inviteCode,
     url,
@@ -753,6 +756,18 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
         underbossStatus: 'approved',
         eventTags: { hasSome: swcTags },
       };
+    }
+
+    // Public callers never see obvious test/probe parties: exclude them in the query so
+    // total/limit/offset stay consistent (moderators see everything).
+    if (!callerIsModerator) {
+      const testIds = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM parties
+        WHERE name ~* ANY(${TEST_PARTY_SQL_PATTERNS}::text[])
+      `;
+      if (testIds.length > 0) {
+        where = { AND: [where, { id: { notIn: testIds.map((r) => r.id) } }] };
+      }
     }
 
     const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
