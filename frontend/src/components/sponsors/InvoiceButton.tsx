@@ -27,6 +27,15 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
   const isPendingVerification = invoice?.status === 'pending_verification';
   const [paymentMethod, setPaymentMethod] = useState(invoice?.paymentMethod || 'manual');
   const [paymentRef, setPaymentRef] = useState(invoice?.paymentRef || '');
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const openMarkPaid = () => {
+    setPaymentMethod(invoice?.paymentMethod || 'manual');
+    setPaymentRef(invoice?.paymentRef || '');
+    setActionError(null);
+    setShowMenu(false);
+    setShowMarkPaid(true);
+  };
 
   const invoiceUrl = invoice?.viewToken
     ? brandUrl(`invoice/${invoice.viewToken}`)
@@ -69,13 +78,13 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
   const handleRejectClaim = async () => {
     if (!invoice) return;
     setLoading(true);
+    setActionError(null);
     try {
       const result = await rejectInvoiceClaim(partyId, invoice.id);
-      if (result) {
-        onInvoiceUpdate(result.invoice);
-      }
+      onInvoiceUpdate(result.invoice);
     } catch (err) {
       console.error('Failed to reject claim:', err);
+      setActionError(err instanceof Error ? err.message : 'Could not reject the claim');
     } finally {
       setLoading(false);
       setShowMenu(false);
@@ -85,20 +94,22 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
   const handleMarkPaid = async () => {
     if (!invoice) return;
     setLoading(true);
+    setActionError(null);
+    let ok = false;
     try {
       const result = await markInvoicePaid(partyId, invoice.id, {
         paymentMethod,
         paymentRef: paymentRef.trim() || undefined,
       });
-      if (result) {
-        onInvoiceUpdate(result.invoice);
-        onSponsorUpdate({ ...sponsor, status: 'paid' });
-      }
+      onInvoiceUpdate(result.invoice);
+      onSponsorUpdate({ ...sponsor, status: 'paid' });
+      ok = true;
     } catch (err) {
       console.error('Failed to mark paid:', err);
+      setActionError(err instanceof Error ? err.message : 'Could not mark the invoice paid');
     } finally {
       setLoading(false);
-      setShowMarkPaid(false);
+      if (ok) setShowMarkPaid(false);
       setShowMenu(false);
     }
   };
@@ -239,6 +250,7 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
           ? `Verify payment${invoice.paymentMethod ? ` (${invoice.paymentMethod}${invoice.paymentRef ? ` ${invoice.paymentRef.slice(0, 14)}` : ''})` : ''}`
           : invoice.status === 'viewed' ? 'Viewed' : 'Issued'}
       </button>
+      {actionError && !showMarkPaid && <span className="text-xs text-red-400">{actionError}</span>}
       {showMenu && (
         <div className="absolute top-full right-0 mt-1 z-10 bg-theme-header border border-theme-stroke rounded-lg shadow-lg py-1 min-w-[160px]">
           {invoiceUrl && (
@@ -274,7 +286,7 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
             Edit Invoice
           </button>
           <button
-            onClick={() => { setShowMenu(false); setShowMarkPaid(true); }}
+            onClick={openMarkPaid}
             className="w-full px-3 py-1.5 text-xs text-left text-green-400 hover:bg-green-500/10 transition-colors flex items-center gap-2"
           >
             <DollarSign size={12} />
@@ -333,6 +345,7 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
                 >
                   <option value="manual">Manual</option>
                   <option value="usdc">USDC</option>
+                  <option value="crypto">Crypto</option>
                   <option value="wire">Wire Transfer</option>
                   <option value="stripe">Stripe</option>
                   <option value="check">Check</option>
@@ -345,6 +358,7 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
                 onChange={e => setPaymentRef(e.target.value)}
                 placeholder="Transaction hash, check #, etc."
               />
+              {actionError && <p className="text-xs text-red-400">{actionError}</p>}
             </div>
 
             <div className="flex gap-2">

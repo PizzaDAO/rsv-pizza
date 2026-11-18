@@ -543,7 +543,7 @@ hostRouter.post('/:partyId/invoices/:invoiceId/mark-paid', requireAuth, async (r
       throw new AppError('Invoice not found', 404, 'NOT_FOUND');
     }
 
-    const validMethods = ['usdc', 'wire', 'stripe', 'check', 'manual'];
+    const validMethods = ['usdc', 'crypto', 'wire', 'stripe', 'check', 'manual'];
     if (paymentMethod && !validMethods.includes(paymentMethod)) {
       throw new AppError(`Invalid payment method. Must be one of: ${validMethods.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
