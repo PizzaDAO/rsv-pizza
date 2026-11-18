@@ -36,6 +36,8 @@ export interface VercelAdapter {
   getProjectDomain(projectId: string, host: string): Promise<VercelProjectDomain | null>;
   verifyProjectDomain(projectId: string, host: string): Promise<VercelProjectDomain>;
   getDomainConfig(host: string): Promise<VercelDomainConfig>;
+  /** Detach a host from the project (only used to undo our own attach of a pending host). */
+  removeProjectDomain(projectId: string, host: string): Promise<void>;
   /** `target` null clears the redirect. Always a 308. */
   setRedirect(projectId: string, host: string, target: string | null): Promise<void>;
 }
@@ -143,6 +145,9 @@ export function createVercelAdapter(token: string, teamId: string, fetchImpl?: t
         misconfigured: j?.misconfigured !== false,
         cnameTarget: typeof rec?.value === 'string' ? rec.value.replace(/\.$/, '').toLowerCase() : null,
       };
+    },
+    async removeProjectDomain(projectId, host) {
+      await call('DELETE', `/v9/projects/${seg(projectId)}/domains/${seg(host)}`);
     },
     async setRedirect(projectId, host, target) {
       await call('PATCH', `/v9/projects/${seg(projectId)}/domains/${seg(host)}`, { redirect: target, redirectStatusCode: target ? 308 : null });

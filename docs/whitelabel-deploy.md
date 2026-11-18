@@ -129,8 +129,10 @@ deploys), and add the origin to Reown. Rollback restores the previous `site_url`
 detached (printed flyer QR codes). The partner removes their own DNS before we ever detach a domain.
 
 Sending domain: the backend creates the domain in Resend; `email_domain_verified_at` is set only when Resend
-reports it verified and the from address is on it. Crons (`/api/cron/recheck-domains` every 15 min,
-`/api/cron/recheck-email-domains` hourly) clear verification when the records disappear.
+reports it verified and the from address is on it. Crons: `/api/cron/recheck-domains` (15 min; also clears unproven `requested` claims after 14 days),
+`/api/cron/recheck-live-domains` (daily health check of ready/live hosts: audit row + `[wl-domain-alert]` log, never auto-removes),
+`/api/cron/recheck-email-domains` (hourly, GET only; clears verification only when Resend reports failed/not_found records).
+Super-admins can also remove a site alias and reset a domain claim (optionally detaching it from Vercel; not while live).
 
 ---
 

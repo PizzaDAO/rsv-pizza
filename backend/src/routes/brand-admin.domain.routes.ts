@@ -10,12 +10,14 @@
  *   POST   /:seriesId/domain/attach          SUPER-ADMIN: attach the TXT-verified host to the brand's Vercel project
  *   POST   /:seriesId/domain/cutover         SUPER-ADMIN: make it the site address (old origin kept as an alias)
  *   POST   /:seriesId/domain/rollback        SUPER-ADMIN: undo the cutover
+ *   POST   /:seriesId/domain/alias/remove {alias}   SUPER-ADMIN: remove one origin from site_aliases
+ *   POST   /:seriesId/domain/reset {detachVercel?}   SUPER-ADMIN: drop the domain claim (not while live), optionally detach from Vercel
  *   GET    /:seriesId/email-domain           State + the SPF/DKIM/MX records to add
  *   PUT    /:seriesId/email-domain           {emailDomain, emailFromAddress}: create the Resend domain
  *   DELETE /:seriesId/email-domain           Remove the sending domain (back to the default sender)
  *   POST   /:seriesId/email-domain/check     Verify with Resend now (rate limited)
  *
- * Cron (CRON_SECRET, /api/cron): recheck-domains (15 min) and recheck-email-domains (hourly).
+ * Cron (CRON_SECRET, /api/cron): recheck-domains (15 min), recheck-live-domains (daily), recheck-email-domains (hourly, GET only).
  * Missing VERCEL_DOMAINS_TOKEN / VERCEL_TEAM_ID / RESEND_ADMIN_KEY: the endpoints that need that
  * system answer 503 NOT_CONFIGURED; GET state still answers (with `configured` flags).
  */
@@ -30,8 +32,8 @@ import {
 } from '../lib/seriesInviteLimit.js';
 import {
   getDomain, requestDomain, cancelDomain, checkDomain, attachDomain, cutoverDomain, rollbackDomain,
-  getEmailDomain, setEmailDomain, removeEmailDomain, checkEmailDomain,
-  recheckPendingDomains, recheckEmailDomains,
+  removeAlias, resetDomain, getEmailDomain, setEmailDomain, removeEmailDomain, checkEmailDomain,
+  recheckPendingDomains, recheckLiveDomains, recheckEmailDomains,
 } from '../lib/domainService.js';
 
 type Handler = (req: SeriesAdminRequest, res: Response) => Promise<unknown>;
@@ -111,6 +113,13 @@ export function registerDomainRoutes(scoped: Router): void {
   }));
   scoped.post('/domain/rollback', superOnly, writeLimit, wrap(async (req, res) => res.json(await rollbackDomain(ctx(req)))));
 
+  scoped.post('/domain/alias/remove', superOnly, writeLimit, wrap(async (req, res) => res.json(await removeAlias({ ...ctx(req), alias: body(req).alias }))));
+  scoped.post('/domain/reset', superOnly, writeLimit, wrap(async (req, res) => {
+    const b = body(req);
+    if (b.detachVercel !== undefined && typeof b.detachVercel !== 'boolean') throw new AppError('detachVercel must be true or false', 400, 'VALIDATION_ERROR');
+    res.json(await resetDomain({ ...ctx(req), detachVercel: b.detachVercel as boolean | undefined }));
+  }));
+
   scoped.get('/email-domain', readLimit, wrap(async (req, res) => res.json(await getEmailDomain(req.seriesAdmin!.seriesId))));
   scoped.put('/email-domain', writeLimit, wrap(async (req, res) => {
     const b = body(req);
@@ -136,5 +145,7 @@ function cron(run: () => Promise<unknown>) {
 }
 domainsCronRouter.get('/recheck-domains', cron(() => recheckPendingDomains()));
 domainsCronRouter.post('/recheck-domains', cron(() => recheckPendingDomains()));
+domainsCronRouter.get('/recheck-live-domains', cron(() => recheckLiveDomains()));
+domainsCronRouter.post('/recheck-live-domains', cron(() => recheckLiveDomains()));
 domainsCronRouter.get('/recheck-email-domains', cron(() => recheckEmailDomains()));
 domainsCronRouter.post('/recheck-email-domains', cron(() => recheckEmailDomains()));

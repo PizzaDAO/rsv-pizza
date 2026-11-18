@@ -7,13 +7,17 @@
  * on (or under) a domain we operate. Pure functions; no I/O.
  */
 import { domainToASCII } from 'node:url';
+import { getDomain, getPublicSuffix } from 'tldts';
 import { AppError } from '../middleware/error.js';
 import { brand } from '../config/brand.js';
 import { hostnameOrNull } from './seriesEmailFields.js';
 
 /** Domains (and everything under them) a partner can never claim: ours, our infrastructure, loopback names. */
 const BASE_RESERVED = [
-  'globalpizza.party', 'pizzadao.org', 'vercel.app', 'vercel.com', 'vercel.dev', 'vercel-dns.com',
+  'rsv.pizza', // brand-check-ignore-line
+  'globalpizza.party', // brand-check-ignore-line
+  'pizzadao.org', // brand-check-ignore-line
+  'vercel.app', 'vercel.com', 'vercel.dev', 'vercel-dns.com',
   'supabase.co', 'supabase.com', 'resend.com', 'resend.dev', 'amazonses.com',
   'localhost', 'local', 'internal', 'invalid',
 ];
@@ -49,6 +53,11 @@ export function normalizePartnerHost(input: unknown, field = 'domain'): string {
   // hostnameOrNull enforces label rules and the apex (subdomains-only) rule.
   const host = hostnameOrNull(ascii, field, { subdomainOnly: true });
   if (!host) bad(`${field} is required`);
+  // Public-suffix list check (tldts): the host must be a real subdomain of a registrable domain,
+  // never an apex (`partner.co.uk`) or a public suffix itself (`co.uk`).
+  const h = host as string;
+  const registrable = getDomain(h);
+  if (!registrable || registrable === h || getPublicSuffix(h) === h) bad(`${field} must be a subdomain such as events.example.com, not a bare domain (${h})`);
   if (isReservedHost(host as string)) bad(`${field} can't be on a domain operated by PizzaDAO or its providers`);
   return host as string;
 }

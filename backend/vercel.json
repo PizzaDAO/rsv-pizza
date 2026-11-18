@@ -31,6 +31,7 @@
     { "path": "/api/cron/cleanup-hackathon-uploads", "schedule": "45 4 * * *" },
     { "path": "/api/cron/cleanup-brand-uploads", "schedule": "50 4 * * *" },
     { "path": "/api/cron/recheck-domains", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/recheck-live-domains", "schedule": "40 5 * * *" },
     { "path": "/api/cron/recheck-email-domains", "schedule": "20 * * * *" }
   ]
 }

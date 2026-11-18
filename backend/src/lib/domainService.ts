@@ -45,7 +45,12 @@ function upstream<T>(p: Promise<T>, what: string): Promise<T> {
     if (e instanceof AppError) throw e;
     if (e instanceof DomainApiError) {
       if (e.status === 504) throw err(`${what} did not answer in time. Try again in a moment.`, 504, 'UPSTREAM_TIMEOUT');
-      if (e.status === 409 || e.status === 403 || e.status === 422 || e.status === 400) throw err(`${what} refused the request: ${e.message}`, 409, 'UPSTREAM_REFUSED');
+      if (e.status === 401 || e.status === 403) {
+        // A bad / under-scoped token or a plan limit: never show the provider's text to a client.
+        console.error(`[domains] ${what} rejected our credentials or plan (${e.status}): ${e.message}`);
+        throw err('The domain service has a configuration problem. PizzaDAO has been notified.', 502, 'UPSTREAM_CONFIG');
+      }
+      if (e.status === 409 || e.status === 422 || e.status === 400) throw err(`${what} refused the request: ${e.message}`, 409, 'UPSTREAM_REFUSED');
       throw err(`${what} is unavailable right now. Try again shortly.`, 502, 'UPSTREAM_ERROR');
     }
     throw e;
@@ -137,14 +142,24 @@ export function domainView(row: any, extra: { cnameTarget?: string | null; verce
   };
 }
 
-/** A host already used by another series (site_url, alias or pending), or by this series' own site_url. */
-async function assertHostFree(seriesId: string, host: string): Promise<void> {
-  const others: any[] = await prisma.eventSeries.findMany({
+/** An unproven (`requested`) claim never blocks anyone and expires after this long. */
+export const REQUEST_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const PROVEN: readonly string[] = ['dns_ok', 'attached', 'ready', 'live'];
+const ATTACHED: readonly string[] = ['attached', 'ready', 'live'];
+
+/**
+ * A host already used by another series. site_url and aliases always block. A pending claim blocks
+ * only once TXT-proven: at request time `dns_ok` and later; at attach time only claims already
+ * attached (so the first to prove TXT and attach wins, and a `requested` squat blocks nobody).
+ */
+async function assertHostFree(seriesId: string, host: string, mode: 'request' | 'attach' = 'request', db: any = prisma): Promise<void> {
+  const blocking = mode === 'attach' ? ATTACHED : PROVEN;
+  const others: any[] = await db.eventSeries.findMany({
     where: { id: { not: seriesId } },
-    select: { id: true, siteUrl: true, siteAliases: true, pendingDomain: true },
+    select: { id: true, siteUrl: true, siteAliases: true, pendingDomain: true, pendingDomainStatus: true },
   });
   for (const o of others) {
-    const used = [hostOfOrigin(o.siteUrl), ...((o.siteAliases ?? []) as string[]).map(hostOfOrigin), o.pendingDomain ? String(o.pendingDomain).toLowerCase() : null];
+    const used = [hostOfOrigin(o.siteUrl), ...((o.siteAliases ?? []) as string[]).map(hostOfOrigin), o.pendingDomain && blocking.includes(o.pendingDomainStatus) ? String(o.pendingDomain).toLowerCase() : null];
     if (used.includes(host)) throw err('That domain is already in use by another brand', 409, 'DOMAIN_TAKEN');
   }
 }
@@ -274,6 +289,11 @@ export async function checkDomain(args: { seriesId: string; actor: Actor }) {
   return domainView(fresh, { cnameTarget, vercelRecords, checks: { txtOk: txt.ok, cnameOk, vercel, dnsError: txt.dnsError || undefined }, changed: moved });
 }
 
+/** `[wl-audit]` line (same shape as admin-series) for every change to site_url / site_aliases, which CORS trusts. */
+function logOriginChange(slug: string, actor: Actor, changes: Record<string, unknown>): void {
+  console.log(`[wl-audit] series ${slug} origin change by ${actor.actorEmail}: ${JSON.stringify(changes)}`);
+}
+
 /** Super-admin: attach the TXT-verified host to the brand's Vercel project. */
 export async function attachDomain(args: { seriesId: string; actor: Actor }) {
   requireSuper(args.actor);
@@ -294,18 +314,37 @@ export async function attachDomain(args: { seriesId: string; actor: Actor }) {
     }
     throw err('The ownership TXT record was not found, so the domain was not attached', 409, 'TXT_MISSING');
   }
-  await assertHostFree(row.id, host);
+  await assertHostFree(row.id, host, 'attach');
 
   const pd = await upstream(v.addProjectDomain(project, host), 'Vercel');
-  const res = await prisma.eventSeries.updateMany({
-    where: { id: row.id, pendingDomain: host },
-    data: { pendingDomainStatus: 'attached', pendingDomainCheckedAt: new Date() },
-  });
-  if (res.count === 1) {
-    await writeSeriesAudit(prisma, {
-      seriesId: row.id, ...args.actor, action: 'domain.attach',
-      changes: { pendingDomainStatus: { old: row.pendingDomainStatus ?? null, new: 'attached' }, vercelProject: { old: null, new: project } },
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Lock the row, then re-read: the claim may have changed while we were talking to Vercel.
+      await tx.$queryRaw`SELECT id FROM event_series WHERE id = ${row.id}::uuid FOR UPDATE`;
+      const cur: any = await tx.eventSeries.findFirst({ where: { id: row.id } });
+      if (!cur || cur.pendingDomain !== host || cur.pendingDomainToken !== row.pendingDomainToken || ATTACHED.includes(cur.pendingDomainStatus)) {
+        throw err('The domain changed while attaching. Check it and try again.', 409, 'CONFLICT');
+      }
+      await assertHostFree(row.id, host, 'attach', tx);
+      const res = await tx.eventSeries.updateMany({
+        where: { id: row.id, pendingDomain: host, pendingDomainToken: row.pendingDomainToken, pendingDomainStatus: { in: ['requested', 'dns_ok'] } },
+        data: { pendingDomainStatus: 'attached', pendingDomainCheckedAt: new Date() },
+      });
+      if (res.count !== 1) throw err('The domain changed while attaching. Check it and try again.', 409, 'CONFLICT');
+      await writeSeriesAudit(tx, {
+        seriesId: row.id, ...args.actor, action: 'domain.attach',
+        changes: { pendingDomainStatus: { old: row.pendingDomainStatus ?? null, new: 'attached' }, vercelProject: { old: null, new: project } },
+      });
     });
+  } catch (e) {
+    // We attached on Vercel but could not record it: undo the attach (best effort) and say so in the audit.
+    let detached = false;
+    try { await v.removeProjectDomain(project, host); detached = true; } catch { /* reported in the audit row */ }
+    await writeSeriesAudit(prisma, {
+      seriesId: row.id, ...args.actor, action: 'domain.attach_undone',
+      changes: { pendingDomain: { old: host, new: null }, vercelDetached: { old: null, new: detached } },
+    }).catch(() => undefined);
+    throw e;
   }
   const vercelRecords: DnsRecord[] = pd.verification.map((x) => ({ purpose: 'vercel_verification', type: x.type.toUpperCase(), name: x.domain, value: x.value, note: x.reason || 'Required by the hosting provider to confirm the domain.' }));
   return domainView({ ...row, pendingDomainStatus: 'attached' }, { vercelRecords, changed: true });
@@ -346,6 +385,7 @@ export async function cutoverDomain(args: { seriesId: string; actor: Actor; redi
     });
   });
   invalidateSiteBrandCache();
+  logOriginChange(row.slug, args.actor, { siteUrl: { old: oldOrigin, new: newOrigin }, siteAliases: { old: row.siteAliases ?? [], new: aliases } });
 
   const steps: string[] = [];
   const project = brandProjectFor(row.slug);
@@ -400,6 +440,7 @@ export async function rollbackDomain(args: { seriesId: string; actor: Actor }) {
     });
   });
   invalidateSiteBrandCache();
+  logOriginChange(row.slug, args.actor, { siteUrl: { old: row.siteUrl, new: restored }, siteAliases: { old: row.siteAliases ?? [], new: aliases } });
 
   const steps: string[] = [];
   const project = brandProjectFor(row.slug);
@@ -414,6 +455,79 @@ export async function rollbackDomain(args: { seriesId: string; actor: Actor }) {
   if (!cleared) steps.push(`Remove the redirect on ${oldHost}: Vercel > ${project ?? 'the brand project'} > Settings > Domains.`);
   steps.push(`If you changed VITE_BRAND_DOMAIN during the cutover, set it back to ${oldHost} and redeploy production.`);
   return domainView({ ...row, siteUrl: restored, siteAliases: aliases, pendingDomainStatus: 'ready' }, { steps, changed: true });
+}
+
+/** Super-admin: remove one origin from site_aliases (e.g. the old host once nothing points at it any more). Re-add via the admin series PATCH. */
+export async function removeAlias(args: { seriesId: string; actor: Actor; alias: unknown }) {
+  requireSuper(args.actor);
+  const alias = typeof args.alias === 'string' ? args.alias.trim().toLowerCase() : '';
+  const row = await loadSeries(args.seriesId);
+  const aliases: string[] = (row.siteAliases ?? []) as string[];
+  if (!alias || !aliases.map((a) => a.toLowerCase()).includes(alias)) throw err('That alias is not set on this brand', 404, 'NOT_FOUND');
+  const next = aliases.filter((a) => a.toLowerCase() !== alias);
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.eventSeries.update({ where: { id: row.id }, data: { siteAliases: next, configVersion: { increment: 1 } } });
+    await writeSeriesAudit(tx, { seriesId: row.id, ...args.actor, action: 'domain.alias_removed', changes: { siteAliases: { old: aliases, new: next } } });
+    return u;
+  });
+  invalidateSiteBrandCache();
+  logOriginChange(row.slug, args.actor, { siteAliases: { old: aliases, new: next } });
+  return domainView(updated, { changed: true, steps: [`Links and CORS for ${alias} stop working. To undo, add it back under site aliases in the series admin.`] });
+}
+
+/**
+ * Super-admin: drop a domain claim (not while live: roll back first). Clears the pending fields and
+ * the new host's alias; with `detachVercel` also removes the pending host from the brand's Vercel
+ * project (best effort; a failure becomes a manual step). Never touches site_url or the old host.
+ * Reversible: the audit row keeps the old values, and the host can be requested and attached again.
+ */
+export async function resetDomain(args: { seriesId: string; actor: Actor; detachVercel?: boolean }) {
+  requireSuper(args.actor);
+  const row = await loadSeries(args.seriesId);
+  const host: string | null = row.pendingDomain;
+  if (!host) return domainView(row, { changed: false });
+  if (row.pendingDomainStatus === 'live' || hostOfOrigin(row.siteUrl) === host) throw err('This domain is live. Roll it back first.', 409, 'DOMAIN_LIVE');
+  const origin = originOf(host);
+  const aliases: string[] = (row.siteAliases ?? []) as string[];
+  const nextAliases = aliases.filter((a) => a.toLowerCase() !== origin);
+  const wasAttached = ATTACHED.includes(row.pendingDomainStatus);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const r = await tx.eventSeries.updateMany({
+      where: { id: row.id, pendingDomain: host, pendingDomainStatus: { not: 'live' } },
+      data: { pendingDomain: null, pendingDomainToken: null, pendingDomainStatus: null, pendingDomainCheckedAt: null, siteAliases: nextAliases, ...(nextAliases.length !== aliases.length ? { configVersion: { increment: 1 } } : {}) },
+    });
+    if (r.count !== 1) throw err('The domain changed while resetting. Check it and try again.', 409, 'CONFLICT');
+    await writeSeriesAudit(tx, {
+      seriesId: row.id, ...args.actor, action: 'domain.reset',
+      changes: {
+        pendingDomain: { old: host, new: null }, pendingDomainStatus: { old: row.pendingDomainStatus ?? null, new: null },
+        ...(nextAliases.length !== aliases.length ? { siteAliases: { old: aliases, new: nextAliases } } : {}),
+      },
+    });
+    return { ...row, pendingDomain: null, pendingDomainToken: null, pendingDomainStatus: null, pendingDomainCheckedAt: null, siteAliases: nextAliases };
+  });
+  if (nextAliases.length !== aliases.length) {
+    invalidateSiteBrandCache();
+    logOriginChange(row.slug, args.actor, { siteAliases: { old: aliases, new: nextAliases } });
+  }
+
+  const steps: string[] = [];
+  if (args.detachVercel && wasAttached) {
+    const project = brandProjectFor(row.slug);
+    let done = false;
+    if (project && adapterAvailability().vercel) {
+      try {
+        await upstream(getVercel().removeProjectDomain(project, host), 'Vercel');
+        done = true;
+        await writeSeriesAudit(prisma, { seriesId: row.id, ...args.actor, action: 'domain.detach', changes: { vercelDomain: { old: { project, host }, new: null } } });
+      } catch { /* manual step below */ }
+    }
+    if (!done) steps.push(`Remove ${host} from the ${project ?? 'brand'} Vercel project (Settings > Domains) by hand.`);
+  } else if (wasAttached) {
+    steps.push(`${host} is still attached to the Vercel project. Remove it there if the partner no longer uses it.`);
+  }
+  return domainView(updated, { changed: true, steps });
 }
 
 // ======================================================================
@@ -527,18 +641,24 @@ export async function removeEmailDomain(args: { seriesId: string; actor: Actor }
 }
 
 /**
- * Ask Resend to re-verify and read the status. `verified` (with a matching from address) sets
- * `email_domain_verified_at`; `failed` / `not_started` clears it. `pending` / `temporary_failure`
- * change nothing. Used by the Check button and the hourly recheck.
+ * Read Resend's status for the sending domain. `verified` (with a matching from address) sets
+ * `email_domain_verified_at`. A previously verified domain is cleared only when Resend says the domain
+ * is `failed` / `not_found`, or reports a record as `failed` / `not_found`; `pending` and
+ * `temporary_failure` never clear it. `mode: 'manual'` (the Check button) asks Resend to re-verify
+ * first, but only when the domain is not already verified; the cron (`mode: 'cron'`) only reads (GET).
  */
-export async function checkEmailDomain(args: { seriesId: string; actor: Actor }) {
+export async function checkEmailDomain(args: { seriesId: string; actor: Actor; mode?: 'manual' | 'cron' }) {
   const row = await loadSeries(args.seriesId);
   if (!row.resendDomainId || !row.emailDomain) throw err('No sending domain has been set up yet', 409, 'NO_EMAIL_DOMAIN');
   const resend = getResend();
-  await upstream(resend.verifyDomain(row.resendDomainId), 'Resend');
-  const d = await upstream(resend.getDomain(row.resendDomainId), 'Resend');
+  let d = await upstream(resend.getDomain(row.resendDomainId), 'Resend');
+  if ((args.mode ?? 'manual') === 'manual' && d.status !== 'verified') {
+    await upstream(resend.verifyDomain(row.resendDomainId), 'Resend');
+    d = await upstream(resend.getDomain(row.resendDomainId), 'Resend');
+  }
 
   const matches = d.name === String(row.emailDomain).toLowerCase() && !!row.emailFromAddress && addressUnderDomain(row.emailFromAddress, row.emailDomain);
+  const gone = d.status === 'failed' || d.status === 'not_found' || d.records.some((r) => r.status === 'failed' || r.status === 'not_found');
   let changed = false;
   let verifiedAt: Date | null = row.emailDomainVerifiedAt ?? null;
   const guard = { id: row.id, resendDomainId: row.resendDomainId, emailDomain: row.emailDomain, emailFromAddress: row.emailFromAddress };
@@ -550,7 +670,7 @@ export async function checkEmailDomain(args: { seriesId: string; actor: Actor })
       verifiedAt = now;
       await writeSeriesAudit(prisma, { seriesId: row.id, ...args.actor, action: 'email.verified', changes: { emailDomainVerifiedAt: { old: null, new: now.toISOString() } } });
     }
-  } else if ((d.status === 'failed' || d.status === 'not_started') && row.emailDomainVerifiedAt) {
+  } else if (d.status !== 'verified' && gone && row.emailDomainVerifiedAt) {
     const r = await prisma.eventSeries.updateMany({ where: guard, data: { emailDomainVerifiedAt: null } });
     if (r.count === 1) {
       changed = true;
@@ -566,42 +686,122 @@ export async function checkEmailDomain(args: { seriesId: string; actor: Actor })
 // Cron
 // ======================================================================
 
-/** Re-check pending web domains (DNS + Vercel state). Never attaches or cuts over. */
-export async function recheckPendingDomains(limit = 25): Promise<{ checked: number; moved: number }> {
+export const CRON_CONCURRENCY = 4;
+export const CRON_BUDGET_MS = 240_000;
+
+/** Run `fn` over `items` with a small worker pool; stop starting new items once `deadline` passes. Returns how many ran. */
+async function pool<T>(items: T[], deadline: number, fn: (item: T) => Promise<void>): Promise<number> {
+  let next = 0;
+  let ran = 0;
+  const worker = async () => {
+    while (next < items.length && Date.now() < deadline) {
+      const item = items[next++];
+      ran++;
+      await fn(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CRON_CONCURRENCY, items.length) }, worker));
+  return ran;
+}
+
+/** Expected conditions (a missing secret, a 4xx) are not log noise; real failures are. */
+function logCronError(tag: string, e: unknown): void {
+  if (e instanceof AppError && e.statusCode < 500) return;
+  if (e instanceof AppError && e.code === 'NOT_CONFIGURED') return;
+  console.error(`[${tag}] recheck failed for a series`, (e as Error).message);
+}
+
+/** Clear a `requested` claim older than REQUEST_TTL_MS (measured from its latest domain.request audit row). */
+async function expireIfStale(rowId: string, now: number): Promise<boolean> {
+  const last: any = await prisma.seriesAudit.findFirst({ where: { seriesId: rowId, action: 'domain.request' }, orderBy: { createdAt: 'desc' } });
+  if (!last?.createdAt || now - new Date(last.createdAt).getTime() < REQUEST_TTL_MS) return false;
+  const row = await loadSeries(rowId);
+  if (row.pendingDomainStatus !== 'requested' || !row.pendingDomain) return false;
+  const r = await prisma.eventSeries.updateMany({
+    where: { id: rowId, pendingDomain: row.pendingDomain, pendingDomainStatus: 'requested' },
+    data: { pendingDomain: null, pendingDomainToken: null, pendingDomainStatus: null, pendingDomainCheckedAt: null },
+  });
+  if (r.count !== 1) return false;
+  await writeSeriesAudit(prisma, { seriesId: rowId, ...SYSTEM_ACTOR, action: 'domain.expire', changes: { pendingDomain: { old: row.pendingDomain, new: null }, pendingDomainStatus: { old: 'requested', new: null } } });
+  return true;
+}
+
+/**
+ * Re-check pending web domains (DNS + Vercel state). Never attaches or cuts over. Unproven
+ * `requested` claims older than 14 days are cleared. Rows that need Vercel are skipped quietly
+ * when its secrets are missing.
+ */
+export async function recheckPendingDomains(opts: { limit?: number; budgetMs?: number; now?: number } = {}): Promise<{ checked: number; moved: number; expired: number; skipped: number }> {
+  const now = opts.now ?? Date.now();
   const rows: any[] = await prisma.eventSeries.findMany({
     where: { pendingDomain: { not: null }, pendingDomainStatus: { in: ['requested', 'dns_ok', 'attached'] } },
     orderBy: { pendingDomainCheckedAt: { sort: 'asc', nulls: 'first' } },
-    take: limit,
-    select: { id: true },
+    take: opts.limit ?? 25,
+    select: { id: true, pendingDomainStatus: true },
   });
-  let moved = 0;
-  for (const r of rows) {
+  const vercelOk = adapterAvailability().vercel;
+  let moved = 0, expired = 0, skipped = 0;
+  const todo = rows.filter((r) => (r.pendingDomainStatus === 'attached' && !vercelOk ? (skipped++, false) : true));
+  const ran = await pool(todo, now + (opts.budgetMs ?? CRON_BUDGET_MS), async (r) => {
     try {
-      const v = await checkDomain({ seriesId: r.id, actor: SYSTEM_ACTOR });
-      if (v.changed) moved++;
+      if (r.pendingDomainStatus === 'requested' && (await expireIfStale(r.id, now))) { expired++; return; }
+      if ((await checkDomain({ seriesId: r.id, actor: SYSTEM_ACTOR })).changed) moved++;
     } catch (e) {
-      console.error('[domains] recheck failed for a series', (e as Error).message);
+      logCronError('domains', e);
     }
-  }
-  return { checked: rows.length, moved };
+  });
+  return { checked: ran, moved, expired, skipped };
 }
 
-/** Re-verify sending domains currently marked verified; clears verification when Resend says the records are gone. */
-export async function recheckEmailDomains(limit = 50): Promise<{ checked: number; revoked: number }> {
+/**
+ * Daily health check of `ready` / `live` hosts (TXT, CNAME, Vercel state). A failure writes a
+ * `domain.health_failed` audit row and a `[wl-domain-alert]` log line (no email); it never removes or
+ * changes anything on its own. Skipped quietly when Vercel is not configured.
+ */
+export async function recheckLiveDomains(opts: { limit?: number; budgetMs?: number } = {}): Promise<{ checked: number; failing: number; skipped: number }> {
+  if (!adapterAvailability().vercel) return { checked: 0, failing: 0, skipped: 0 };
+  const rows: any[] = await prisma.eventSeries.findMany({
+    where: { pendingDomain: { not: null }, pendingDomainStatus: { in: ['ready', 'live'] } },
+    take: opts.limit ?? 50,
+    select: { id: true, slug: true, pendingDomain: true },
+  });
+  let failing = 0;
+  const ran = await pool(rows, Date.now() + (opts.budgetMs ?? CRON_BUDGET_MS), async (r) => {
+    try {
+      const v = await checkDomain({ seriesId: r.id, actor: SYSTEM_ACTOR });
+      const c = v.checks;
+      if (c && !c.dnsError && !(c.txtOk && c.cnameOk && c.vercel?.attached && c.vercel.configured)) {
+        failing++;
+        const summary = { txtOk: c.txtOk, cnameOk: c.cnameOk, vercelAttached: !!c.vercel?.attached, vercelConfigured: !!c.vercel?.configured };
+        console.error(`[wl-domain-alert] series ${r.slug} domain ${r.pendingDomain} is failing its health check: ${JSON.stringify(summary)}`);
+        await writeSeriesAudit(prisma, { seriesId: r.id, ...SYSTEM_ACTOR, action: 'domain.health_failed', changes: { checks: { old: null, new: summary } } });
+      }
+    } catch (e) {
+      logCronError('domains', e);
+    }
+  });
+  return { checked: ran, failing, skipped: rows.length - ran };
+}
+
+/**
+ * Re-read (GET only, never POST /verify) the status of sending domains marked verified, and clear
+ * verification when Resend says the domain or its records are failed / not found.
+ */
+export async function recheckEmailDomains(opts: { limit?: number; budgetMs?: number } = {}): Promise<{ checked: number; revoked: number }> {
   if (!adapterAvailability().resend) return { checked: 0, revoked: 0 };
   const rows: any[] = await prisma.eventSeries.findMany({
     where: { emailDomainVerifiedAt: { not: null }, resendDomainId: { not: null } },
-    take: limit,
+    take: opts.limit ?? 50,
     select: { id: true },
   });
   let revoked = 0;
-  for (const r of rows) {
+  const ran = await pool(rows, Date.now() + (opts.budgetMs ?? CRON_BUDGET_MS), async (r) => {
     try {
-      const v = await checkEmailDomain({ seriesId: r.id, actor: SYSTEM_ACTOR });
+      const v = await checkEmailDomain({ seriesId: r.id, actor: SYSTEM_ACTOR, mode: 'cron' });
       if (v.changed && !v.verified) revoked++;
     } catch (e) {
-      console.error('[email-domains] recheck failed for a series', (e as Error).message);
+      logCronError('email-domains', e);
     }
-  }
-  return { checked: rows.length, revoked };
+  });
+  return { checked: ran, revoked };
 }

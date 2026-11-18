@@ -44,6 +44,7 @@
     "sharp": "^0.35.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "tldts": "^7.5.4",
     "viem": "^2.57.18"
   },
   "devDependencies": {

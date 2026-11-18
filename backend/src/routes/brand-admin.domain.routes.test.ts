@@ -69,8 +69,13 @@ function buildState() {
     },
     seriesAudit: {
       create: async ({ data }: any) => { audit.push({ ...data, createdAt: new Date(Date.now() + audit.length) }); return data; },
-      findFirst: async ({ where }: any) => [...audit].reverse().find((r) => matches(r, where)) ?? null,
+      findFirst: async ({ where, orderBy }: any) => {
+        const hit = audit.filter((r) => matches(r, where));
+        if (orderBy?.createdAt) hit.sort((a, b) => (orderBy.createdAt === 'desc' ? 1 : -1) * (b.createdAt.getTime() - a.createdAt.getTime()));
+        return hit[0] ?? null;
+      },
     },
+    $queryRaw: async () => [],
     $transaction: async (fn: any) => fn(db),
   };
   return { db, series, audit, writes };
@@ -86,6 +91,8 @@ function adapters() {
     misconfigured: false,
     vercelError: null as any,
     resendStatus: 'not_started' as string,
+    recordStatus: null as string | null,
+    onAdd: null as null | (() => void),
     calls: [] as string[],
   };
   const dns: DnsAdapter = {
@@ -95,11 +102,13 @@ function adapters() {
   const vercel: VercelAdapter = {
     addProjectDomain: async (p, h) => {
       f.calls.push(`vercel.add ${p} ${h}`);
+      f.onAdd?.();
       if (f.vercelError) throw f.vercelError;
       f.vercelDomains.set(h, { verified: true, redirect: null });
       return { name: h, verified: true, verification: [], redirect: null };
     },
     getProjectDomain: async (_p, h) => { const d = f.vercelDomains.get(h); return d ? { name: h, verified: d.verified, verification: [], redirect: d.redirect } : null; },
+    removeProjectDomain: async (p, h) => { f.calls.push(`vercel.remove ${p} ${h}`); f.vercelDomains.delete(h); },
     verifyProjectDomain: async (_p, h) => ({ name: h, verified: true, verification: [], redirect: null }),
     getDomainConfig: async () => ({ misconfigured: f.misconfigured, cnameTarget: 'abc123.vercel-dns-016.com' }),
     setRedirect: async (p, h, t) => {
@@ -121,7 +130,7 @@ function adapters() {
       resendDomains.set(d.id, d);
       return d;
     },
-    getDomain: async (id) => { const d = resendDomains.get(id) ?? { id, name: m.state.series[A].emailDomain ?? 'x', status: 'not_started', records: [] }; return { ...d, status: f.resendStatus }; },
+    getDomain: async (id) => { const d = resendDomains.get(id) ?? { id, name: m.state.series[A].emailDomain ?? 'x', status: 'not_started', records: [] }; return { ...d, status: f.resendStatus, records: f.recordStatus ? d.records.map((r) => ({ ...r, status: f.recordStatus as string })) : d.records }; },
     verifyDomain: async (id) => { f.calls.push(`resend.verify ${id}`); },
     removeDomain: async (id) => { f.calls.push(`resend.remove ${id}`); resendDomains.delete(id); },
   };
@@ -152,9 +161,12 @@ const base = (p: string, id = A) => `/api/brand-admin/${id}${p}`;
 const request_ = (host = 'events.partner.example.org') => request(app).put(base('/domain')).send({ domain: host });
 
 describe('host validation', () => {
-  const bad = ['example.org', 'partner.example.org/path', 'https://events.partner.example.org', '*.partner.example.org', 'events.partner.example.org:8080', '192.168.1.1', '10.0.0.1', '0x7f.1', 'partner.com', 'partner.co.uk', `events.${brand.domain}`, brand.domain, 'x.vercel.app', 'foo.pizzadao.org', 'a b.example.org', 'localhost', '', 'user@events.example.org'];
+  const bad = ['co.uk', 'partner.co.uk', 'example.org', 'partner.example.org/path', 'https://events.partner.example.org', '*.partner.example.org', 'events.partner.example.org:8080', '192.168.1.1', '10.0.0.1', '0x7f.1', 'partner.com', 'partner.co.uk', `events.${brand.domain}`, brand.domain, 'x.vercel.app', 'foo.pizzadao.org', 'a b.example.org', 'localhost', '', 'user@events.example.org'];
   it.each(bad)('rejects %j', (h) => {
     expect(() => normalizePartnerHost(h)).toThrow();
+  });
+  it('accepts a real subdomain of a multi-label suffix', () => {
+    expect(normalizePartnerHost('events.partner.co.uk')).toBe('events.partner.co.uk');
   });
   it('punycode-normalizes and lowercases', () => {
     expect(normalizePartnerHost('Events.Partner.Example.ORG.')).toBe('events.partner.example.org');
@@ -196,13 +208,19 @@ describe('web domain: request', () => {
     expect(S().pendingDomain).toBeNull();
     expect(audits()).toHaveLength(0);
   });
-  it("refuses a host used by another series' site_url, alias or pending request (no takeover)", async () => {
-    for (const h of ['other.example.org', 'old-other.example.org', 'events.taken.example.org']) {
+  it("refuses a host used by another series' site_url or alias, or a TXT-proven claim (dns_ok and later)", async () => {
+    S(B).pendingDomain = 'proven.taken.example.org'; S(B).pendingDomainStatus = 'dns_ok';
+    for (const h of ['other.example.org', 'old-other.example.org', 'proven.taken.example.org']) {
       const res = await request_(h);
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe('DOMAIN_TAKEN');
     }
     expect(S().pendingDomain).toBeNull();
+  });
+  it('an unproven (`requested`) claim on another series does not block the host', async () => {
+    const res = await request_('events.taken.example.org'); // series B holds it as `requested`
+    expect(res.status).toBe(200);
+    expect(S().pendingDomain).toBe('events.taken.example.org');
   });
   it('is idempotent for the same host (keeps the token) and re-issues for a new host', async () => {
     await request_();
@@ -274,7 +292,7 @@ describe('web domain: attach / cutover / rollback are super-admin only', () => {
   it('a brand admin gets 403 on attach, cutover and rollback, with no write and no outside call', async () => {
     pending('dns_ok');
     ad.f.txt = ['rsvpizza-verify=tk'];
-    for (const p of ['/domain/attach', '/domain/cutover', '/domain/rollback']) {
+    for (const p of ['/domain/attach', '/domain/cutover', '/domain/rollback', '/domain/reset', '/domain/alias/remove']) {
       const res = await request(app).post(base(p)).send({});
       expect(res.status).toBe(403);
     }
@@ -479,10 +497,23 @@ describe('email domain', () => {
   });
 
   it('a Resend failure writes nothing', async () => {
-    ad.resend.createDomain = async () => { throw new DomainApiError('resend', 403, 'nope'); };
+    ad.resend.createDomain = async () => { throw new DomainApiError('resend', 422, 'nope'); };
     expect((await put(good)).status).toBe(409);
     expect(S().emailDomain).toBeNull();
     expect(audits()).toHaveLength(0);
+  });
+
+  it('provider 401/403 become a generic 502 configuration problem with no provider text', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (const status of [401, 403]) {
+      ad.resend.createDomain = async () => { throw new DomainApiError('resend', status, 'SECRET-PROVIDER-DETAIL token re_abc'); };
+      const res = await put(good);
+      expect(res.status).toBe(502);
+      expect(res.body.error.code).toBe('UPSTREAM_CONFIG');
+      expect(JSON.stringify(res.body)).not.toMatch(/SECRET-PROVIDER|re_abc/);
+    }
+    expect(spy.mock.calls.flat().join(' ')).toMatch(/SECRET-PROVIDER-DETAIL/);
+    spy.mockRestore();
   });
 
   it('503 NOT_CONFIGURED without the Resend admin key', async () => {
@@ -542,6 +573,42 @@ describe('email domain', () => {
   });
 });
 
+describe('email check semantics', () => {
+  const good = { emailDomain: 'mail.partner.example.org', emailFromAddress: 'events@mail.partner.example.org' };
+  const setup = async (verifiedStatus = 'verified') => {
+    await request(app).put(base('/email-domain')).send(good);
+    ad.f.resendStatus = verifiedStatus;
+    await request(app).post(base('/email-domain/check'));
+    ad.f.calls.length = 0;
+  };
+  it('manual check does not POST /verify when Resend already says verified', async () => {
+    await setup();
+    await request(app).post(base('/email-domain/check'));
+    expect(ad.f.calls.some((c) => c.startsWith('resend.verify'))).toBe(false);
+  });
+  it('pending / temporary_failure on a verified domain never clear it; a failed record or not_found does', async () => {
+    await setup();
+    for (const st of ['pending', 'temporary_failure']) {
+      ad.f.resendStatus = st;
+      await request(app).post(base('/email-domain/check'));
+      expect(S().emailDomainVerifiedAt).toBeInstanceOf(Date);
+    }
+    ad.f.resendStatus = 'not_started';
+    await request(app).post(base('/email-domain/check'));
+    expect(S().emailDomainVerifiedAt).toBeInstanceOf(Date); // not_started alone does not clear
+    ad.f.resendStatus = 'pending'; ad.f.recordStatus = 'failed';
+    await request(app).post(base('/email-domain/check'));
+    expect(S().emailDomainVerifiedAt).toBeNull();
+    expect(audits('email.verification_revoked')).toHaveLength(1);
+  });
+  it('not_found clears', async () => {
+    await setup();
+    ad.f.resendStatus = 'not_found';
+    await request(app).post(base('/email-domain/check'));
+    expect(S().emailDomainVerifiedAt).toBeNull();
+  });
+});
+
 describe('cron', () => {
   const cron = (path: string, token = 's3cret') => request(app).get(`/api/cron/${path}`).set('Authorization', `Bearer ${token}`);
   beforeEach(() => { process.env.CRON_SECRET = 's3cret'; });
@@ -570,8 +637,66 @@ describe('cron', () => {
     S(B).emailDomainVerifiedAt = null;
     const res = await cron('recheck-email-domains');
     expect(res.body).toEqual({ checked: 1, revoked: 1 });
+    expect(ad.f.calls.some((c) => c.startsWith('resend.verify'))).toBe(false); // GET only
     expect(S().emailDomainVerifiedAt).toBeNull();
     expect(audits('email.verification_revoked')[0].actorKind).toBe('system');
+  });
+
+  it('does not clear a verified domain while Resend says pending / temporary_failure', async () => {
+    Object.assign(S(), { emailDomain: 'mail.partner.example.org', emailFromAddress: 'e@mail.partner.example.org', resendDomainId: 'rd-9', emailDomainVerifiedAt: new Date() });
+    S(B).emailDomainVerifiedAt = null;
+    for (const status of ['pending', 'temporary_failure']) {
+      ad.resend.getDomain = async (id) => ({ id, name: 'mail.partner.example.org', status, records: [] });
+      expect((await cron('recheck-email-domains')).body).toEqual({ checked: 1, revoked: 0 });
+      expect(S().emailDomainVerifiedAt).toBeInstanceOf(Date);
+    }
+  });
+
+  it('expires `requested` claims after 14 days (audited) and leaves fresh ones; expired ones are not checked', async () => {
+    await request_();
+    ad.f.txt = [`rsvpizza-verify=${S().pendingDomainToken}`];
+    const req = m.state.audit.find((a: any) => a.action === 'domain.request');
+    req.createdAt = new Date(Date.now() - 13 * 86_400_000);
+    let res = await cron('recheck-domains');
+    expect(res.body.expired).toBe(0);
+    expect(S().pendingDomainStatus).toBe('dns_ok'); // fresh claim was checked normally
+    S().pendingDomainStatus = 'requested';
+    req.createdAt = new Date(Date.now() - 15 * 86_400_000);
+    ad.f.calls.length = 0;
+    res = await cron('recheck-domains');
+    expect(res.body.expired).toBe(1);
+    expect(S().pendingDomain).toBeNull();
+    expect(audits('domain.expire')).toHaveLength(1);
+    expect(ad.f.calls.filter((c) => c === 'txt _rsvpizza.events.partner.example.org')).toEqual([]);
+  });
+
+  it('skips Vercel-dependent rows quietly when Vercel is not configured (no error logs)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    S(B).pendingDomainStatus = null; S(B).pendingDomain = null;
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'attached' });
+    setDomainAdaptersForTest({ dns: ad.dns, vercel: null, resend: ad.resend });
+    const res = await cron('recheck-domains');
+    expect(res.body).toMatchObject({ checked: 0, skipped: 1 });
+    expect((await cron('recheck-live-domains')).body).toEqual({ checked: 0, failing: 0, skipped: 0 });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('live recheck: a failing host gets an audit row and an alert log, and nothing is removed', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'live', siteUrl: 'https://events.partner.example.org' });
+    ad.f.vercelDomains.set('events.partner.example.org', { verified: true, redirect: null });
+    ad.f.txt = ['rsvpizza-verify=tk']; ad.f.cname = ['abc123.vercel-dns-016.com'];
+    let res = await cron('recheck-live-domains');
+    expect(res.body).toEqual({ checked: 1, failing: 0, skipped: 0 });
+    ad.f.txt = [];
+    res = await cron('recheck-live-domains');
+    expect(res.body.failing).toBe(1);
+    expect(audits('domain.health_failed')).toHaveLength(1);
+    expect(spy.mock.calls.flat().join(' ')).toMatch(/\[wl-domain-alert\] series acme/);
+    expect(S().pendingDomainStatus).toBe('live');
+    expect(S().siteUrl).toBe('https://events.partner.example.org');
+    spy.mockRestore();
   });
 
   it('is a no-op without the Resend admin key', async () => {
@@ -586,6 +711,7 @@ describe('tenant isolation', () => {
   const routes: Array<[string, string, object?]> = [
     ['get', '/domain'], ['put', '/domain', { domain: 'x.partner.example.org' }], ['delete', '/domain'], ['post', '/domain/check'],
     ['post', '/domain/attach'], ['post', '/domain/cutover'], ['post', '/domain/rollback'],
+    ['post', '/domain/reset'], ['post', '/domain/alias/remove', { alias: 'https://old-other.example.org' }],
     ['get', '/email-domain'], ['put', '/email-domain', { emailDomain: 'mail.p.example.org', emailFromAddress: 'a@mail.p.example.org' }],
     ['delete', '/email-domain'], ['post', '/email-domain/check'],
   ];
@@ -594,5 +720,89 @@ describe('tenant isolation', () => {
     expect(res.status).toBe(404);
     expect(m.state.writes).not.toHaveBeenCalled();
     expect(ad.f.calls).toEqual([]);
+  });
+});
+
+describe('super-admin: alias removal, reset, attach race, audit log', () => {
+  beforeEach(() => as('boss@example.org'));
+
+  it('removes one alias (audited, [wl-audit] logged) and 404s for one that is not set', async () => {
+    S().siteAliases = ['https://old.example.org', 'https://keep.example.org'];
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const res = await request(app).post(base('/domain/alias/remove')).send({ alias: 'https://old.example.org' });
+    expect(res.status).toBe(200);
+    expect(S().siteAliases).toEqual(['https://keep.example.org']);
+    expect(audits('domain.alias_removed')).toHaveLength(1);
+    expect(log.mock.calls.flat().join(' ')).toMatch(/\[wl-audit\] series acme origin change by boss@example.org/);
+    expect((await request(app).post(base('/domain/alias/remove')).send({ alias: 'https://nope.example.org' })).status).toBe(404);
+    log.mockRestore();
+  });
+
+  it('reset after rollback clears the claim and the new host alias, optionally detaches from Vercel, and is audited', async () => {
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'ready', siteAliases: ['https://events.partner.example.org', 'https://keep.example.org'] });
+    ad.f.vercelDomains.set('events.partner.example.org', { verified: true, redirect: null });
+    const res = await request(app).post(base('/domain/reset')).send({ detachVercel: true });
+    expect(res.status).toBe(200);
+    expect(S()).toMatchObject({ pendingDomain: null, pendingDomainToken: null, pendingDomainStatus: null, siteAliases: ['https://keep.example.org'], siteUrl: 'https://acme.rsv-old.example.org' });
+    expect(ad.f.calls).toContain('vercel.remove prj_acme events.partner.example.org');
+    expect(audits('domain.reset')).toHaveLength(1);
+    expect(audits('domain.detach')).toHaveLength(1);
+    // reversible: the host can be requested again
+    expect((await request_()).status).toBe(200);
+  });
+
+  it('reset without detach leaves Vercel alone and says so; a failed detach becomes a manual step', async () => {
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'attached' });
+    let res = await request(app).post(base('/domain/reset')).send({});
+    expect(ad.f.calls.some((c) => c.startsWith('vercel.remove'))).toBe(false);
+    expect(res.body.steps.join(' ')).toMatch(/still attached/);
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'attached' });
+    ad.vercel.removeProjectDomain = async () => { throw new DomainApiError('vercel', 500, 'x'); };
+    res = await request(app).post(base('/domain/reset')).send({ detachVercel: true });
+    expect(res.status).toBe(200);
+    expect(res.body.steps.join(' ')).toMatch(/by hand/);
+  });
+
+  it('reset is refused while live, and never touches site_url', async () => {
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'live', siteUrl: 'https://events.partner.example.org' });
+    const res = await request(app).post(base('/domain/reset')).send({ detachVercel: true });
+    expect(res.status).toBe(409);
+    expect(ad.f.calls).toEqual([]);
+    expect(S().pendingDomain).toBe('events.partner.example.org');
+  });
+
+  it('attach: if the claim changes while talking to Vercel, the attach is undone on Vercel and audited', async () => {
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'dns_ok' });
+    ad.f.txt = ['rsvpizza-verify=tk'];
+    ad.f.onAdd = () => { S().pendingDomain = 'someone-else.example.org'; };
+    const res = await request(app).post(base('/domain/attach'));
+    expect(res.status).toBe(409);
+    expect(ad.f.calls).toContain('vercel.remove prj_acme events.partner.example.org');
+    expect(audits('domain.attach_undone')).toHaveLength(1);
+    expect(audits('domain.attach')).toHaveLength(0);
+  });
+
+  it('first to prove and attach wins: a `requested` or dns_ok rival does not stop attach, an attached one does', async () => {
+    Object.assign(S(), { pendingDomain: 'events.taken.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'dns_ok' });
+    ad.f.txt = ['rsvpizza-verify=tk'];
+    expect((await request(app).post(base('/domain/attach'))).status).toBe(200); // B is only `requested`
+    // now B proves TXT and tries to attach the same host
+    Object.assign(S(B), { slug: 'other', pendingDomain: 'events.taken.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'dns_ok' });
+    const res = await request(app).post(base('/domain/attach', B));
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DOMAIN_TAKEN');
+  });
+
+  it('cutover and rollback log the [wl-audit] origin change', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    Object.assign(S(), { pendingDomain: 'events.partner.example.org', pendingDomainToken: 'tk', pendingDomainStatus: 'attached' });
+    ad.f.txt = ['rsvpizza-verify=tk'];
+    ad.f.vercelDomains.set('events.partner.example.org', { verified: true, redirect: null });
+    await request(app).post(base('/domain/cutover')).send({});
+    await request(app).post(base('/domain/rollback'));
+    const lines = log.mock.calls.flat().filter((l) => String(l).startsWith('[wl-audit]'));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/series acme origin change by boss@example.org: .*"siteUrl"/);
+    log.mockRestore();
   });
 });

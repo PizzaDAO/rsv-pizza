@@ -5,7 +5,7 @@ import { Checkbox } from '../Checkbox';
 import { DnsRecordsTable, StatusChip, type ChipTone } from './DnsRecordsTable';
 import {
   fetchBrandDomain, requestBrandDomain, cancelBrandDomain, checkBrandDomain, attachBrandDomain, cutoverBrandDomain,
-  rollbackBrandDomain, describeApiError, type DomainState, type DomainStatus,
+  rollbackBrandDomain, resetBrandDomain, removeBrandAlias, describeApiError, type DomainState, type DomainStatus,
 } from '../../lib/brandAdminApi';
 
 interface Props {
@@ -55,6 +55,7 @@ export const DomainPanel: React.FC<Props> = ({ seriesId, isSuperAdmin }) => {
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [ack, setAck] = useState(false);
   const [redirectOld, setRedirectOld] = useState(true);
+  const [detach, setDetach] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -173,6 +174,22 @@ export const DomainPanel: React.FC<Props> = ({ seriesId, isSuperAdmin }) => {
         </section>
       )}
 
+      {isSuperAdmin && state.aliases.length > 0 && (
+        <section className="rounded-xl border border-theme-stroke p-3 space-y-2" data-testid="domain-aliases">
+          <h3 className="text-sm font-semibold text-theme-text">Site aliases (PizzaDAO admin)</h3>
+          <ul className="space-y-2">
+            {state.aliases.map((a) => (
+              <li key={a} className="flex items-center justify-between gap-2 min-w-0">
+                <span className="text-xs break-all text-theme-text">{a}</span>
+                <button type="button" className="btn-secondary text-xs shrink-0 disabled:opacity-50" disabled={busy !== null}
+                  onClick={() => run(`alias:${a}`, () => removeBrandAlias(seriesId, a), () => 'Alias removed.')}>Remove</button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-theme-text-muted">Links and API access from a removed alias stop working.</p>
+        </section>
+      )}
+
       {isSuperAdmin && state.domain && (
         <section className="rounded-xl border border-theme-stroke p-3 space-y-3" data-testid="domain-super-admin">
           <h3 className="text-sm font-semibold text-theme-text">PizzaDAO admin</h3>
@@ -198,6 +215,12 @@ export const DomainPanel: React.FC<Props> = ({ seriesId, isSuperAdmin }) => {
               </button>
             </div>
             <p className="text-xs text-theme-text-muted">Cutover needs every DNS check to pass first. The old address is never detached.</p>
+            <Checkbox checked={detach} onChange={() => setDetach((v) => !v)} label="Also remove the domain from the Vercel project" className="text-left" checkboxRole />
+            <button type="button" className="btn-secondary text-sm disabled:opacity-50" disabled={busy !== null || state.status === 'live'}
+              onClick={() => run('reset', () => resetBrandDomain(seriesId, detach), () => 'Domain claim reset. It can be requested again.')}>
+              {busy === 'reset' ? 'Resetting…' : 'Reset domain claim'}
+            </button>
+            <p className="text-xs text-theme-text-muted">Reset is not available while live: roll back first.</p>
           </div>
         </section>
       )}

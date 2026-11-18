@@ -170,6 +170,11 @@ export const cutoverBrandDomain = (id: string, redirectOld: boolean) =>
   apiRequest<DomainState>(`${base(id)}/domain/cutover`, { method: 'POST', body: { redirectOld } });
 export const rollbackBrandDomain = (id: string) => apiRequest<DomainState>(`${base(id)}/domain/rollback`, { method: 'POST', body: {} });
 
+export const resetBrandDomain = (id: string, detachVercel: boolean) =>
+  apiRequest<DomainState>(`${base(id)}/domain/reset`, { method: 'POST', body: { detachVercel } });
+export const removeBrandAlias = (id: string, alias: string) =>
+  apiRequest<DomainState>(`${base(id)}/domain/alias/remove`, { method: 'POST', body: { alias } });
+
 export const fetchBrandEmailDomain = (id: string) => apiRequest<EmailDomainState>(`${base(id)}/email-domain`);
 export const saveBrandEmailDomain = (id: string, emailDomain: string, emailFromAddress: string) =>
   apiRequest<EmailDomainState>(`${base(id)}/email-domain`, { method: 'PUT', body: { emailDomain, emailFromAddress } });

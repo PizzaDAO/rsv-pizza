@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const api = vi.hoisted(() => ({
   fetchBrandDomain: vi.fn(), requestBrandDomain: vi.fn(), cancelBrandDomain: vi.fn(), checkBrandDomain: vi.fn(),
-  attachBrandDomain: vi.fn(), cutoverBrandDomain: vi.fn(), rollbackBrandDomain: vi.fn(),
+  attachBrandDomain: vi.fn(), resetBrandDomain: vi.fn(), removeBrandAlias: vi.fn(), cutoverBrandDomain: vi.fn(), rollbackBrandDomain: vi.fn(),
   fetchBrandEmailDomain: vi.fn(), saveBrandEmailDomain: vi.fn(), checkBrandEmailDomain: vi.fn(), removeBrandEmailDomain: vi.fn(),
 }));
 vi.mock('../../lib/brandAdminApi', async (orig) => ({ ...(await orig<typeof import('../../lib/brandAdminApi')>()), ...api }));
@@ -96,6 +96,24 @@ describe('DomainPanel', () => {
     render(<DomainPanel seriesId={SID} isSuperAdmin />);
     fireEvent.click(await screen.findByRole('button', { name: 'Attach to site project' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('not set up on the server');
+  });
+
+  it('super-admin can reset a claim (optionally detaching) and remove an alias; brand admins see neither', async () => {
+    api.fetchBrandDomain.mockResolvedValue(withDomain('attached', { aliases: ['https://old.example.org'] }));
+    api.resetBrandDomain.mockResolvedValue(domainState());
+    api.removeBrandAlias.mockResolvedValue(withDomain('attached'));
+    const { unmount } = render(<DomainPanel seriesId={SID} isSuperAdmin />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(api.removeBrandAlias).toHaveBeenCalledWith(SID, 'https://old.example.org'));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /remove the domain from the Vercel project/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset domain claim' }));
+    await waitFor(() => expect(api.resetBrandDomain).toHaveBeenCalledWith(SID, true));
+    unmount();
+    api.fetchBrandDomain.mockResolvedValue(withDomain('attached', { aliases: ['https://old.example.org'] }));
+    render(<DomainPanel seriesId={SID} isSuperAdmin={false} />);
+    await screen.findByTestId('domain-panel');
+    expect(screen.queryByText('Reset domain claim')).toBeNull();
+    expect(screen.queryByTestId('domain-aliases')).toBeNull();
   });
 
   it('chips', () => {

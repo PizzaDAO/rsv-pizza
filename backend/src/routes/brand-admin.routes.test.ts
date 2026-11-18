@@ -192,8 +192,8 @@ describe('route registry', () => {
       'DELETE /assets/:slot', 'DELETE /checklist/:itemId', 'DELETE /domain', 'DELETE /email-domain', 'GET /audit', 'GET /checklist',
       'GET /domain', 'GET /email-domain', 'GET /events', 'GET /settings',
       'PATCH /alerts', 'PATCH /checklist/:itemId', 'PATCH /events/:partyId/status', 'PATCH /settings',
-      'POST /assets/attach', 'POST /assets/upload-url', 'POST /checklist', 'POST /domain/attach', 'POST /domain/check',
-      'POST /domain/cutover', 'POST /domain/rollback', 'POST /email-domain/check', 'POST /revert',
+      'POST /assets/attach', 'POST /assets/upload-url', 'POST /checklist', 'POST /domain/alias/remove', 'POST /domain/attach', 'POST /domain/check',
+      'POST /domain/cutover', 'POST /domain/reset', 'POST /domain/rollback', 'POST /email-domain/check', 'POST /revert',
       'PUT /domain', 'PUT /email-domain',
     ]);
   });
