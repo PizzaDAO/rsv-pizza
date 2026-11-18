@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Modal } from './Modal';
 import { useTranslation } from 'react-i18next';
 import { X, User } from 'lucide-react';
@@ -76,14 +76,6 @@ export const DonorAvatar: React.FC<AvatarProps> = ({ displayName, avatarUrl, siz
 
 export const SupportersModal: React.FC<SupportersModalProps> = ({ stats, onClose }) => {
   const { t } = useTranslation('event');
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const donors = stats.donors ?? [];
   const recipient = stats.recipient || t('thisEvent');

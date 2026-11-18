@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -38,11 +38,12 @@ export function Modal({
   closeOnBackdrop = true,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Captured during render, before any child autoFocus effect moves focus into the dialog.
+  const [opener] = useState(() => (typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null)));
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     // Move focus into the dialog unless a child (e.g. an autoFocus input) already has it.
     if (panel && !panel.contains(document.activeElement)) {
@@ -58,7 +59,7 @@ export function Modal({
       }
       if (e.key !== 'Tab' || !panel) return;
       const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-        (el) => getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden',
+        (el) => el.getClientRects().length > 0,
       );
       if (items.length === 0) {
         e.preventDefault();
@@ -79,8 +80,9 @@ export function Modal({
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+      if (opener && document.contains(opener)) opener.focus();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return createPortal(

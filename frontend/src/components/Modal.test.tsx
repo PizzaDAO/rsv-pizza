@@ -1,10 +1,32 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Modal } from './Modal';
 import { IconInput } from './IconInput';
 import { LoadingState } from './StateViews';
 
 describe('Modal', () => {
+  const original = HTMLElement.prototype.getClientRects;
+  beforeEach(() => {
+    // jsdom has no layout; report every element as rendered so the trap's visibility filter works.
+    HTMLElement.prototype.getClientRects = () => [{}] as unknown as DOMRectList;
+  });
+  afterEach(() => { HTMLElement.prototype.getClientRects = original; });
+
+  it('returns focus to the opener even when a child autoFocuses', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const { unmount } = render(
+      <Modal onClose={() => {}} ariaLabel="AF" showClose={false}>
+        <IconInput placeholder="Email" autoFocus />
+      </Modal>,
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText('Email'));
+    unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
   it('exposes a labelled aria-modal dialog and moves focus inside', () => {
     render(
       <Modal onClose={() => {}} labelledBy="t">

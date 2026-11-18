@@ -25,7 +25,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
     // everywhere, so derive an aria-label from it unless the caller supplied a label.
     const a11yProps = {
       id: props.id ?? autoId,
-      ...(props['aria-label'] || props['aria-labelledby'] || !placeholder
+      ...(props['aria-label'] || props['aria-labelledby'] || props.id || !placeholder
         ? {}
         : { 'aria-label': placeholder.replace(/\s*\*$/, '') }),
     };
@@ -47,7 +47,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
           {iconElement}
           <textarea
             ref={ref as React.Ref<HTMLTextAreaElement>}
-            className={`w-full !pl-14 resize-none ${className}`}
+            className={`w-full !pl-14 ${className.includes('resize-') ? '' : 'resize-y'} ${className}`}
             placeholder={displayPlaceholder}
             required={required}
             rows={rows}

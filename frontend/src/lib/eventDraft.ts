@@ -57,6 +57,18 @@ function stampKey(key: string, owner: string): void {
   localStorage.setItem(key, JSON.stringify(parsed));
 }
 
+/** Remove every series create draft (all slugs). */
+export function clearSeriesDrafts(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(SERIES_DRAFT_PREFIX)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch { /* ignore */ }
+}
+
 /** Bind the draft(s) to the account that just signed in (so another user on this browser never sees them). */
 export function stampEventDraftOwner(email: string | null | undefined): void {
   if (!email) return;

@@ -1,4 +1,4 @@
-import { clearEventDraft } from '../lib/eventDraft';
+import { clearEventDraft, clearSeriesDrafts } from '../lib/eventDraft';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AUTH_EXPIRED_EVENT } from '../lib/api';
 import { rememberAuthCodeEmail } from '../lib/authCodeEmail';
@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     clearEventDraft();
+    clearSeriesDrafts();
   }, []);
 
   // Check for stored token on mount
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     clearEventDraft();
+    clearSeriesDrafts();
     setUser(null);
   };
 

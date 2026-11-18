@@ -788,6 +788,7 @@ export function EventPage() {
         {event.address && <meta property="event:location" content={event.address} />}
       </Helmet>
 
+      <a href="#content" className="skip-link">Skip to content</a>
       <Header variant="transparent" />
 
       {/* Edit Password Prompt Modal */}
@@ -866,7 +867,7 @@ export function EventPage() {
         />
       )}
 
-      <div className="max-w-[1212px] mx-auto py-8 px-4">
+      <div id="content" className="max-w-[1212px] mx-auto py-8 px-4">
         {/* porchetta-81402: cancelled banner. Shown above the event card so
             visitors see the cancel state before anything else. Past RSVPers
             still see the full event details below — the page is preserved. */}
