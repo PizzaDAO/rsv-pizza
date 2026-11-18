@@ -111,6 +111,8 @@ type PayoutMethod = (typeof PAYOUT_METHODS)[number];
 // post-bocconcini-49102 cap recheck would now reject the row at execute time).
 // `paid`, `rejected`, and `failed` remain terminal from the host side.
 const WITHDRAWABLE_STATUSES = ['pending', 'approved'] as const;
+// Statuses where a host may PATCH at all (amount/method/wallet edits additionally need 'pending').
+const HOST_EDITABLE_STATUSES = ['pending', 'approved', 'queued'] as const;
 
 // tiramisu-58530: in addition to the 3 designated role photos (group/box_stack/
 // pizza), hosts must upload at least this many ADDITIONAL event photos (gallery
@@ -1834,14 +1836,21 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           // instead of inserting a new row. Same bytes uploaded a second
           // time via the payout flow should NOT create a duplicate row in
           // the canonical `photos` table.
-          const dup = await tx.photo.findFirst({
-            where: {
-              partyId,
-              fileSize: d.fileSize,
-              mimeType: d.mimeType,
-            },
-            select: { id: true },
-          });
+          // Conservative dedup (no content-hash column): same uploader + size + mime + filename.
+          // Never reuse another uploader's photo row.
+          const dup = uploaderEmail
+            ? await tx.photo.findFirst({
+                where: {
+                  partyId,
+                  fileSize: d.fileSize,
+                  mimeType: d.mimeType,
+                  fileName: d.fileName,
+                  uploaderEmail,
+                  deletedAt: null,
+                },
+                select: { id: true },
+              })
+            : null;
           if (dup) {
             photoId = dup.id;
           } else {
@@ -2204,12 +2213,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       mercuryCardLast4 !== undefined ||
       hostNotes !== undefined;
 
-    // Paid/failed/rejected payouts are frozen entirely on the host side.
-    if (
-      existing.status === 'paid' ||
-      existing.status === 'rejected' ||
-      existing.status === 'failed'
-    ) {
+    // Host edits are only possible while the payout is pending (everything) or
+    // approved/queued (documents only). Every other status (paid, rejected, failed,
+    // withdrawn, completed, ...) is frozen entirely on the host side.
+    if (!HOST_EDITABLE_STATUSES.includes(existing.status as (typeof HOST_EDITABLE_STATUSES)[number])) {
       throw new AppError(
         `Payments cannot be edited once ${existing.status}.`,
         400,
@@ -2217,9 +2224,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       );
     }
 
-    // Approved payouts: doc-only edits allowed, but amount/method/wallet/notes
-    // are frozen so the admin-approved amount can't be silently changed.
-    if (existing.status === 'approved' && hasAmountOrMethodChanges) {
+    // Approved/queued payouts: doc-only edits allowed, but amount/method/wallet/bank/notes
+    // are frozen so the admin-approved amount and destination can't be silently changed.
+    if (existing.status !== 'pending' && hasAmountOrMethodChanges) {
       throw new AppError(
         'Approved payments cannot have amount, method, wallet, or notes changed. Ask an admin to revert to pending first.',
         400,
@@ -2685,6 +2692,16 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     // Single transaction: delete removed docs, insert new docs, update payout,
     // write the audit row(s).
     const updated = await prisma.$transaction(async (tx) => {
+      // Race guard: lock the row and require it is still in the status we validated
+      // against (an admin approve/pay between the read above and here would otherwise
+      // let a host edit slip onto a frozen payout). 409 rolls the whole edit back.
+      const stillSame = await tx.payout.updateMany({
+        where: { id: payoutId, partyId, status: existing.status },
+        data: { updatedAt: new Date() },
+      });
+      if (stillSame.count !== 1) {
+        throw new AppError('This payment changed while you were editing. Reload and try again.', 409, 'PAYOUT_STATUS_CHANGED');
+      }
       if (removeIds.length > 0) {
         await tx.payoutDocument.deleteMany({
           where: { id: { in: removeIds }, payoutId: existing.id },
@@ -2710,14 +2727,21 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         // instead of creating a duplicate row.
         const now = new Date();
         for (const d of [...newPizzaDocs, ...newEventDocs]) {
-          const dup = await tx.photo.findFirst({
-            where: {
-              partyId,
-              fileSize: d.fileSize,
-              mimeType: d.mimeType,
-            },
-            select: { id: true },
-          });
+          // Conservative dedup (no content-hash column): same uploader + size + mime + filename.
+          // Never reuse another uploader's photo row.
+          const dup = uploaderEmail
+            ? await tx.photo.findFirst({
+                where: {
+                  partyId,
+                  fileSize: d.fileSize,
+                  mimeType: d.mimeType,
+                  fileName: d.fileName,
+                  uploaderEmail,
+                  deletedAt: null,
+                },
+                select: { id: true },
+              })
+            : null;
           if (dup) {
             d.photoId = dup.id;
             continue;

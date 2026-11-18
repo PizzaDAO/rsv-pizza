@@ -8,6 +8,7 @@ import { generateInvoicePdf } from '../lib/invoicePdf.js';
 import { WIRE_DETAILS_PDF_B64 } from '../assets/wireDetailsPdf.js';
 import { W9_PDF_B64 } from '../assets/w9Pdf.js';
 import { brand } from '../config/brand.js';
+import { retrievePaymentIntent } from '../lib/stripeVerify.js';
 
 /**
  * Compute the calendar year for the given date in the specified timezone.
@@ -654,7 +655,7 @@ publicRouter.post('/:viewToken/record-view', async (req: Request, res: Response,
 publicRouter.post('/:viewToken/pay', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { viewToken } = req.params;
-    const { paymentMethod, paymentRef, paidAmount, chainId, tokenSymbol } = req.body;
+    const { paymentMethod, paymentRef, chainId, tokenSymbol } = req.body;
 
     if (!paymentMethod || !paymentRef) {
       throw new AppError('paymentMethod and paymentRef are required', 400, 'VALIDATION_ERROR');
@@ -676,6 +677,27 @@ publicRouter.post('/:viewToken/pay', async (req: Request, res: Response, next: N
       throw new AppError('Invoice not found', 404, 'NOT_FOUND');
     }
 
+    const include = {
+      party: { select: { name: true, eventImageUrl: true } },
+      sponsor: { select: { name: true, logoUrl: true } },
+    };
+
+    // Build payment ref with chain/token info for crypto payments
+    const buildRef = (ref: string) => {
+      const parts = [ref];
+      if (chainId) parts.push(`chain:${chainId}`);
+      if (tokenSymbol) parts.push(`token:${tokenSymbol}`);
+      return parts.join(' | ');
+    };
+
+    // Idempotent replay: same payment already recorded on this invoice.
+    const refMatches = (existingRef: string | null) =>
+      !!existingRef && (existingRef === paymentRef || existingRef.startsWith(`${paymentRef} |`));
+    if (['paid', 'pending_verification'].includes(invoice.status) && refMatches(invoice.paymentRef)) {
+      const current = await prisma.invoice.findUnique({ where: { id: invoice.id }, include });
+      return res.json({ invoice: current });
+    }
+
     // Only allow payment on issued or viewed invoices
     if (!['issued', 'viewed'].includes(invoice.status)) {
       throw new AppError(
@@ -687,38 +709,53 @@ publicRouter.post('/:viewToken/pay', async (req: Request, res: Response, next: N
       );
     }
 
-    // Build payment ref with chain/token info for crypto payments
-    let fullPaymentRef = paymentRef;
-    if (chainId || tokenSymbol) {
-      const parts = [paymentRef];
-      if (chainId) parts.push(`chain:${chainId}`);
-      if (tokenSymbol) parts.push(`token:${tokenSymbol}`);
-      fullPaymentRef = parts.join(' | ');
+    if (paymentMethod === 'stripe') {
+      // Never trust the client: the PaymentIntent must be succeeded, for this invoice, for the
+      // exact amount due. Intents are created with metadata.invoiceId (InvoiceStripePayment.tsx).
+      const pi = await retrievePaymentIntent(String(paymentRef));
+      if (
+        !pi ||
+        pi.status !== 'succeeded' ||
+        pi.metadata?.invoiceId !== invoice.id ||
+        pi.amount !== invoice.total ||
+        (pi.currency || '').toLowerCase() !== (invoice.currency || 'usd').toLowerCase()
+      ) {
+        throw new AppError('Payment could not be verified', 402, 'PAYMENT_NOT_VERIFIED');
+      }
+
+      // Atomic transition so concurrent/replayed calls cannot double-apply.
+      const res1 = await prisma.invoice.updateMany({
+        where: { id: invoice.id, status: { in: ['issued', 'viewed'] } },
+        data: {
+          status: 'paid',
+          paidAt: new Date(),
+          paidAmount: pi.amount_received ?? pi.amount,
+          paymentMethod: 'stripe',
+          paymentRef: pi.id,
+        },
+      });
+      if (res1.count === 1) {
+        await prisma.sponsor.update({ where: { id: invoice.sponsorId }, data: { status: 'paid' } });
+      }
+      const updatedInvoice = await prisma.invoice.findUnique({ where: { id: invoice.id }, include });
+      return res.json({ invoice: updatedInvoice });
     }
 
-    // Update invoice to paid
-    const updatedInvoice = await prisma.invoice.update({
-      where: { id: invoice.id },
+    // Crypto/USDC: a tx hash cannot be verified here, so record it for host/admin review.
+    // The invoice stays unpaid (sponsor status untouched) until a host marks it paid.
+    const claimed = await prisma.invoice.updateMany({
+      where: { id: invoice.id, status: { in: ['issued', 'viewed'] } },
       data: {
-        status: 'paid',
-        paidAt: new Date(),
-        paidAmount: paidAmount ?? invoice.total,
+        status: 'pending_verification',
         paymentMethod,
-        paymentRef: fullPaymentRef,
-      },
-      include: {
-        party: { select: { name: true, eventImageUrl: true } },
-        sponsor: { select: { name: true, logoUrl: true } },
+        paymentRef: buildRef(String(paymentRef)),
       },
     });
-
-    // Auto-update sponsor status to 'paid'
-    await prisma.sponsor.update({
-      where: { id: invoice.sponsorId },
-      data: { status: 'paid' },
-    });
-
-    res.json({ invoice: updatedInvoice });
+    if (claimed.count === 0) {
+      throw new AppError('Invoice is no longer payable', 409, 'INVALID_STATUS');
+    }
+    const pending = await prisma.invoice.findUnique({ where: { id: invoice.id }, include });
+    res.json({ invoice: pending, pendingVerification: true });
   } catch (error) {
     next(error);
   }
