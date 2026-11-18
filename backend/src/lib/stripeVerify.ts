@@ -17,20 +17,27 @@ export interface StripePaymentIntent {
   amount_received?: number;
   currency: string;
   latest_charge?: string | { id: string } | null;
+  receipt_email?: string | null;
   metadata?: Record<string, string>;
 }
 
-export async function retrievePaymentIntent(id: string): Promise<StripePaymentIntent | null> {
+export type RetrieveResult =
+  | { ok: true; pi: StripePaymentIntent }
+  | { ok: false; reason: 'unconfigured' | 'unreachable' | 'not_found' };
+
+export async function retrievePaymentIntent(id: string): Promise<RetrieveResult> {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key || !/^pi_[A-Za-z0-9_]+$/.test(id)) return null;
+  if (!key) return { ok: false, reason: 'unconfigured' };
+  if (!/^pi_[A-Za-z0-9_]+$/.test(id)) return { ok: false, reason: 'not_found' };
   try {
     const r = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(id)}`, {
       headers: { Authorization: `Bearer ${key}` },
     });
-    if (!r.ok) return null;
-    return (await r.json()) as StripePaymentIntent;
+    if (r.status === 404 || r.status === 400) return { ok: false, reason: 'not_found' };
+    if (!r.ok) return { ok: false, reason: 'unreachable' };
+    return { ok: true, pi: (await r.json()) as StripePaymentIntent };
   } catch {
-    return null;
+    return { ok: false, reason: 'unreachable' };
   }
 }
 
@@ -58,10 +65,8 @@ export function verifyStripeSignature(
   }
   const ts = Number(t);
   if (!ts || sigs.length === 0 || Math.abs(nowSec - ts) > toleranceSec) return false;
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(`${t}.${typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8')}`)
-    .digest('hex');
+  // HMAC over the raw bytes (no utf8 round-trip).
+  const expected = crypto.createHmac('sha256', secret).update(`${t}.`).update(rawBody).digest('hex');
   const eb = Buffer.from(expected, 'hex');
   return sigs.some((s) => {
     const sb = Buffer.from(s, 'hex');

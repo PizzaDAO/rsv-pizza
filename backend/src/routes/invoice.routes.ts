@@ -9,6 +9,7 @@ import { WIRE_DETAILS_PDF_B64 } from '../assets/wireDetailsPdf.js';
 import { W9_PDF_B64 } from '../assets/w9Pdf.js';
 import { brand } from '../config/brand.js';
 import { retrievePaymentIntent } from '../lib/stripeVerify.js';
+import { judgeInvoiceIntent, markInvoicePaidFromIntent, markInvoicePendingFromIntent } from '../lib/invoicePayment.js';
 
 /**
  * Compute the calendar year for the given date in the specified timezone.
@@ -370,6 +371,14 @@ hostRouter.post('/:partyId/invoices/:invoiceId/send', requireAuth, async (req: A
       throw new AppError('Invoice not found', 404, 'NOT_FOUND');
     }
 
+    if (invoice.status === 'pending_verification' || invoice.status === 'paid') {
+      throw new AppError(
+        invoice.status === 'paid' ? 'Invoice is already paid' : 'A payment is awaiting verification. Confirm or reject it first.',
+        409,
+        'INVALID_STATUS'
+      );
+    }
+
     // Validate
     const lineItems = invoice.lineItems as Array<{ description: string; amount: number }>;
     if (!lineItems || lineItems.length === 0) {
@@ -545,8 +554,8 @@ hostRouter.post('/:partyId/invoices/:invoiceId/mark-paid', requireAuth, async (r
         status: 'paid',
         paidAt: new Date(),
         paidAmount: paidAmount ?? existing.total,
-        paymentMethod: paymentMethod || 'manual',
-        paymentRef: paymentRef || null,
+        paymentMethod: paymentMethod || existing.paymentMethod || 'manual',
+        paymentRef: paymentRef || existing.paymentRef || null,
       },
       include: {
         sponsor: {
@@ -561,6 +570,42 @@ hostRouter.post('/:partyId/invoices/:invoiceId/mark-paid', requireAuth, async (r
       data: { status: 'paid' },
     });
 
+    res.json({ invoice });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/invoices/:invoiceId/reject-claim - Revert a pending_verification claim to issued
+hostRouter.post('/:partyId/invoices/:invoiceId/reject-claim', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, invoiceId } = req.params;
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
+    }
+    const canAccess = await canUserAccessTab(partyId, req.userEmail, req.userId, 'partners');
+    if (!canAccess) {
+      throw new AppError('You do not have access to the partners tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    const existing = await prisma.invoice.findFirst({ where: { id: invoiceId, partyId } });
+    if (!existing) {
+      throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+    }
+
+    const r = await prisma.invoice.updateMany({
+      where: { id: invoiceId, partyId, status: 'pending_verification' },
+      data: { status: 'issued', paymentMethod: null, paymentRef: null },
+    });
+    if (r.count !== 1) {
+      throw new AppError('Invoice has no pending payment claim', 409, 'INVALID_STATUS');
+    }
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { sponsor: { select: { id: true, name: true, contactEmail: true, logoUrl: true } } },
+    });
     res.json({ invoice });
   } catch (error) {
     next(error);
@@ -710,35 +755,33 @@ publicRouter.post('/:viewToken/pay', async (req: Request, res: Response, next: N
     }
 
     if (paymentMethod === 'stripe') {
-      // Never trust the client: the PaymentIntent must be succeeded, for this invoice, for the
-      // exact amount due. Intents are created with metadata.invoiceId (InvoiceStripePayment.tsx).
-      const pi = await retrievePaymentIntent(String(paymentRef));
-      if (
-        !pi ||
-        pi.status !== 'succeeded' ||
-        pi.metadata?.invoiceId !== invoice.id ||
-        pi.amount !== invoice.total ||
-        (pi.currency || '').toLowerCase() !== (invoice.currency || 'usd').toLowerCase()
-      ) {
+      // Never trust the client. Verify the PaymentIntent with Stripe: succeeded, for this invoice,
+      // exact amount. Intents are created with metadata.invoiceId (InvoiceStripePayment.tsx).
+      const got = await retrievePaymentIntent(String(paymentRef));
+      const open = ['issued', 'viewed'];
+      let verdict: 'verified' | 'pending' | 'reject' = 'pending';
+      let reason = '';
+      if (!got.ok) {
+        if (got.reason === 'not_found') verdict = 'reject';
+        else reason = `stripe ${got.reason}`;
+      } else {
+        const j = judgeInvoiceIntent(invoice, got.pi);
+        if (j === 'verified') verdict = 'verified';
+        else if (j === 'amount_mismatch') reason = 'amount/currency mismatch';
+        else verdict = 'reject';
+      }
+      if (verdict === 'reject') {
         throw new AppError('Payment could not be verified', 402, 'PAYMENT_NOT_VERIFIED');
       }
-
-      // Atomic transition so concurrent/replayed calls cannot double-apply.
-      const res1 = await prisma.invoice.updateMany({
-        where: { id: invoice.id, status: { in: ['issued', 'viewed'] } },
-        data: {
-          status: 'paid',
-          paidAt: new Date(),
-          paidAmount: pi.amount_received ?? pi.amount,
-          paymentMethod: 'stripe',
-          paymentRef: pi.id,
-        },
-      });
-      if (res1.count === 1) {
-        await prisma.sponsor.update({ where: { id: invoice.sponsorId }, data: { status: 'paid' } });
+      if (verdict === 'verified' && got.ok) {
+        await markInvoicePaidFromIntent(invoice, got.pi, open);
+        const updatedInvoice = await prisma.invoice.findUnique({ where: { id: invoice.id }, include });
+        return res.json({ invoice: updatedInvoice });
       }
-      const updatedInvoice = await prisma.invoice.findUnique({ where: { id: invoice.id }, include });
-      return res.json({ invoice: updatedInvoice });
+      // Stripe not configured / unreachable / amount mismatch: keep the claim for host review.
+      await markInvoicePendingFromIntent(invoice, String(paymentRef), open, reason);
+      const pendingInvoice = await prisma.invoice.findUnique({ where: { id: invoice.id }, include });
+      return res.json({ invoice: pendingInvoice, pendingVerification: true });
     }
 
     // Crypto/USDC: a tx hash cannot be verified here, so record it for host/admin review.

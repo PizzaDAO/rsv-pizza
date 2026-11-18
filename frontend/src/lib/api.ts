@@ -2020,6 +2020,18 @@ export async function markInvoicePaid(
   }
 }
 
+// Reject a pending payment claim (pending_verification -> issued)
+export async function rejectInvoiceClaim(partyId: string, invoiceId: string): Promise<{ invoice: Invoice } | null> {
+  try {
+    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/reject-claim`, {
+      method: 'POST',
+    });
+  } catch (error) {
+    console.error('Error rejecting invoice claim:', error);
+    return null;
+  }
+}
+
 // Get public invoice by view token (no auth required)
 export async function getPublicInvoice(viewToken: string): Promise<{ invoice: Invoice } | null> {
   try {

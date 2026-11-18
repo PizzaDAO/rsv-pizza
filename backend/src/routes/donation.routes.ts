@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { retrievePaymentIntent, chargeIdOf } from '../lib/stripeVerify.js';
+import { withDonationLock } from '../lib/donationLock.js';
 
 const router = Router();
 
@@ -251,10 +252,8 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
         where: { id: String(guestId), partyId: id },
         select: { id: true },
       });
-      if (!guest) {
-        throw new AppError('Guest not found for this event', 400, 'VALIDATION_ERROR');
-      }
-      safeGuestId = guest.id;
+      // A guest from another party is silently dropped (the donation itself is still valid).
+      safeGuestId = guest ? guest.id : null;
     }
 
     // Card donations: status is decided by Stripe, never by the client. Verify the PaymentIntent
@@ -262,7 +261,8 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
     let status: 'pending' | 'succeeded' = 'pending';
     let verifiedChargeId: string | null = null;
     if (paymentIntentId && (paymentMethod || 'stripe') === 'stripe') {
-      const pi = await retrievePaymentIntent(String(paymentIntentId));
+      const got = await retrievePaymentIntent(String(paymentIntentId));
+      const pi = got.ok ? got.pi : null;
       if (
         pi &&
         pi.status === 'succeeded' &&
@@ -276,51 +276,55 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
       }
     }
 
-    // Idempotent: the Stripe webhook may already have created the row for this intent.
+    const createData = {
+      amount,
+      currency,
+      status, // pending unless Stripe confirmed the payment server-side above
+      paymentIntentId,
+      chargeId: verifiedChargeId ?? (status === 'succeeded' ? null : chargeId),
+      donorName: donorName || null,
+      donorEmail: donorEmail || null,
+      isAnonymous,
+      message: message || null,
+      partyId: id,
+      guestId: safeGuestId,
+      // Crypto donation fields
+      paymentMethod: paymentMethod || 'stripe',
+      chainId: chainId ? Number(chainId) : null,
+      tokenSymbol: tokenSymbol || null,
+      tokenAddress: tokenAddress || null,
+      txHash: txHash || null,
+      walletAddress: walletAddress || null,
+    };
+
+    // Idempotent: the Stripe webhook may already have created the row for this intent. The
+    // find-then-create runs under a per-intent transaction lock so the two cannot both insert.
     if (paymentIntentId) {
-      const existing = await prisma.donation.findFirst({ where: { paymentIntentId: String(paymentIntentId) } });
-      if (existing) {
-        if (existing.partyId !== id) {
-          throw new AppError('Payment already recorded', 409, 'CONFLICT');
+      const outcome = await withDonationLock(String(paymentIntentId), async (tx) => {
+        const existing = await tx.donation.findFirst({ where: { paymentIntentId: String(paymentIntentId) } });
+        if (existing) {
+          if (existing.partyId !== id) {
+            throw new AppError('Payment already recorded', 409, 'CONFLICT');
+          }
+          const updated = await tx.donation.update({
+            where: { id: existing.id },
+            data: {
+              donorName: donorName || existing.donorName,
+              donorEmail: donorEmail || existing.donorEmail,
+              isAnonymous,
+              message: message || existing.message,
+              guestId: safeGuestId ?? existing.guestId,
+              ...(status === 'succeeded' && existing.status === 'pending' && { status }),
+            },
+          });
+          return { donation: updated, created: false };
         }
-        const donation = await prisma.donation.update({
-          where: { id: existing.id },
-          data: {
-            donorName: donorName || existing.donorName,
-            donorEmail: donorEmail || existing.donorEmail,
-            isAnonymous,
-            message: message || existing.message,
-            guestId: safeGuestId ?? existing.guestId,
-            ...(status === 'succeeded' && existing.status === 'pending' && { status }),
-          },
-        });
-        return res.status(200).json({ donation });
-      }
+        return { donation: await tx.donation.create({ data: createData }), created: true };
+      });
+      return res.status(outcome.created ? 201 : 200).json({ donation: outcome.donation });
     }
 
-    // Create the donation record
-    const donation = await prisma.donation.create({
-      data: {
-        amount,
-        currency,
-        status, // pending unless Stripe confirmed the payment server-side above
-        paymentIntentId,
-        chargeId: verifiedChargeId ?? (status === 'succeeded' ? null : chargeId),
-        donorName: donorName || null,
-        donorEmail: donorEmail || null,
-        isAnonymous,
-        message: message || null,
-        partyId: id,
-        guestId: safeGuestId,
-        // Crypto donation fields
-        paymentMethod: paymentMethod || 'stripe',
-        chainId: chainId ? Number(chainId) : null,
-        tokenSymbol: tokenSymbol || null,
-        tokenAddress: tokenAddress || null,
-        txHash: txHash || null,
-        walletAddress: walletAddress || null,
-      },
-    });
+    const donation = await prisma.donation.create({ data: createData });
 
     res.status(201).json({ donation });
   } catch (error) {

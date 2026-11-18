@@ -633,7 +633,7 @@ export interface SponsorStats {
 }
 
 // Invoice types
-export type InvoiceStatus = 'draft' | 'issued' | 'viewed' | 'paid' | 'cancelled';
+export type InvoiceStatus = 'draft' | 'issued' | 'viewed' | 'pending_verification' | 'paid' | 'cancelled';
 
 export interface InvoiceLineItem {
   description: string;

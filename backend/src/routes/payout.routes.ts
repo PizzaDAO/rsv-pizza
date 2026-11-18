@@ -2228,7 +2228,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     // are frozen so the admin-approved amount and destination can't be silently changed.
     if (existing.status !== 'pending' && hasAmountOrMethodChanges) {
       throw new AppError(
-        'Approved payments cannot have amount, method, wallet, or notes changed. Ask an admin to revert to pending first.',
+        `${existing.status === 'queued' ? 'Queued' : 'Approved'} payments cannot have amount, method, wallet, or notes changed. Ask an admin to revert to pending first.`,
         400,
         'APPROVED_NOT_EDITABLE'
       );

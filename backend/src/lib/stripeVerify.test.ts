@@ -29,9 +29,9 @@ describe('retrievePaymentIntent', () => {
   it('returns null without a key or for malformed ids, never calling Stripe', async () => {
     const f = vi.fn();
     vi.stubGlobal('fetch', f);
-    expect(await retrievePaymentIntent('pi_123')).toBeNull();
+    expect(await retrievePaymentIntent('pi_123')).toEqual({ ok: false, reason: 'unconfigured' });
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
-    expect(await retrievePaymentIntent('../customers')).toBeNull();
+    expect(await retrievePaymentIntent('../customers')).toEqual({ ok: false, reason: 'not_found' });
     expect(f).not.toHaveBeenCalled();
   });
   it('fetches the intent with the secret key', async () => {
@@ -39,8 +39,17 @@ describe('retrievePaymentIntent', () => {
     const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'pi_1', status: 'succeeded', amount: 100, currency: 'usd' }) });
     vi.stubGlobal('fetch', f);
     const pi = await retrievePaymentIntent('pi_1');
-    expect(pi?.status).toBe('succeeded');
+    expect(pi.ok && pi.pi.status).toBe('succeeded');
     expect(f.mock.calls[0][0]).toBe('https://api.stripe.com/v1/payment_intents/pi_1');
+  });
+  it('maps 404 to not_found, 500 and network errors to unreachable', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    expect(await retrievePaymentIntent('pi_1')).toEqual({ ok: false, reason: 'not_found' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    expect(await retrievePaymentIntent('pi_1')).toEqual({ ok: false, reason: 'unreachable' });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('net')));
+    expect(await retrievePaymentIntent('pi_1')).toEqual({ ok: false, reason: 'unreachable' });
   });
   it('chargeIdOf handles string and expanded', () => {
     expect(chargeIdOf({ id: 'pi', status: 's', amount: 1, currency: 'usd', latest_charge: 'ch_1' })).toBe('ch_1');
