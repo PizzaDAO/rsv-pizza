@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getCallStatus, getCallRecordingUrl, CallStatus } from '../lib/ordering';
+import { getCallStatus, fetchCallRecordingObjectUrl, CallStatus } from '../lib/ordering';
 
 interface UseCallRecordingReturn {
   status: CallStatus['status'];
@@ -23,6 +23,7 @@ export function useCallRecording(callId: string | null): UseCallRecordingReturn 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   const pollCountRef = useRef(0);
+  const objectUrlRef = useRef<string | null>(null);
 
   const getInterval = useCallback(() => {
     const elapsed = Date.now() - startTimeRef.current;
@@ -42,8 +43,16 @@ export function useCallRecording(callId: string | null): UseCallRecordingReturn 
       setAnsweredBy(data.answeredBy);
 
       if (data.status === 'completed') {
-        setRecordingUrl(getCallRecordingUrl(callId));
         setIsPolling(false);
+        // The recording proxy needs the auth header, so it is fetched as a blob, not used as <audio src> directly.
+        if (data.recordingAvailable) {
+          const url = await fetchCallRecordingObjectUrl(callId).catch(() => null);
+          if (url) {
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = url;
+            setRecordingUrl(url);
+          }
+        }
         return;
       }
 
@@ -92,6 +101,10 @@ export function useCallRecording(callId: string | null): UseCallRecordingReturn 
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
+      }
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
       setIsPolling(false);
     };

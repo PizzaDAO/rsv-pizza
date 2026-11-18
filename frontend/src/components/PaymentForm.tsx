@@ -7,9 +7,7 @@ import {
 } from '@stripe/react-stripe-js';
 import {
   getStripe,
-  createStripeCustomer,
-  getSetupIntent,
-  getStoredCustomerId,
+  createSetupIntent,
   storeCustomerId,
   storeCustomerEmail,
   setHasPaymentMethod,
@@ -47,22 +45,10 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
     setError(null);
 
     try {
-      // Get or create customer
-      let customerId = getStoredCustomerId();
-
-      if (!customerId) {
-        const { customerId: newCustomerId } = await createStripeCustomer(
-          customerEmail,
-          customerName
-        );
-        customerId = newCustomerId;
-        storeCustomerId(customerId);
-      }
-
+      // The backend finds or creates the logged-in user's own Stripe customer
+      const { customerId, clientSecret } = await createSetupIntent();
+      storeCustomerId(customerId);
       storeCustomerEmail(customerEmail);
-
-      // Get a SetupIntent
-      const { clientSecret } = await getSetupIntent(customerId);
 
       // Confirm the SetupIntent with the card
       const cardElement = elements.getElement(CardElement);

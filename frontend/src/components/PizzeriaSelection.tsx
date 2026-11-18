@@ -825,6 +825,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
           pizzeria={orderPizzeria}
           orderingOption={aiOrderOption}
           recommendations={recommendations}
+          partyId={party?.id}
           onClose={() => setOrderPizzeria(null)}
           onOrderComplete={handleOrderComplete}
         />

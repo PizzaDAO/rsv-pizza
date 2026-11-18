@@ -3,7 +3,7 @@ import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { DollarSign, Loader2, Check, AlertCircle, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../lib/supabase';
+import { createDonationIntent } from '../lib/stripe';
 import { createDonation } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { IconInput } from './IconInput';
@@ -207,21 +207,13 @@ export const DonationForm: React.FC<DonationFormProps> = ({
     setError(null);
 
     try {
-      // Call Supabase edge function to create payment intent
-      const { data, error: fnError } = await supabase.functions.invoke('stripe-payment', {
-        body: {
-          action: 'create_donation_intent',
-          amount: finalAmount,
-          currency: 'usd',
-          customerEmail: guestEmail || undefined,
-          customerName: guestName || undefined,
-          partyId,
-        },
+      // Backend validates the party and amount, and sets the metadata itself
+      const data = await createDonationIntent({
+        amount: finalAmount,
+        customerEmail: guestEmail || undefined,
+        customerName: guestName || undefined,
+        partyId,
       });
-
-      if (fnError) {
-        throw new Error(fnError.message);
-      }
 
       if (data?.clientSecret) {
         setClientSecret(data.clientSecret);

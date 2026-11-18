@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Loader2, Check, AlertCircle, CreditCard } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { createInvoiceIntent } from '../../lib/stripe';
 import { payInvoice } from '../../lib/api';
 import { Invoice } from '../../types';
 
@@ -175,24 +175,8 @@ export const InvoiceStripePayment: React.FC<InvoiceStripePaymentProps> = ({
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('stripe-payment', {
-        body: {
-          action: 'create_donation_intent',
-          amount: invoice.total,
-          currency: invoice.currency || 'usd',
-          customerEmail: invoice.billToEmail || undefined,
-          partyId: invoice.partyId,
-          metadata: {
-            type: 'invoice_payment',
-            invoiceId: invoice.id,
-            invoiceNumber: invoice.invoiceNumber,
-          },
-        },
-      });
-
-      if (fnError) {
-        throw new Error(fnError.message);
-      }
+      // Amount, currency and metadata are taken from the invoice on the server
+      const data = await createInvoiceIntent(invoice.viewToken);
 
       if (data?.clientSecret) {
         setClientSecret(data.clientSecret);
