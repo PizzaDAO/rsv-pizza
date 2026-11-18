@@ -1023,6 +1023,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // of the save still succeeds). Unknown keys are dropped; more than the max is a 400.
     let labelsToWrite: string[] | undefined = undefined;
     if (labels !== undefined) {
+      if (!Array.isArray(labels)) {
+        throw new AppError('labels must be an array', 400, 'VALIDATION_ERROR');
+      }
       const canSetLabels = await canUserAccessTab(id, req.userEmail, req.userId, 'details');
       if (canSetLabels) {
         const normalized = normalizeLabels(labels);

@@ -663,6 +663,12 @@ describe('Party Routes', () => {
       expect(data().labels).toEqual([]);
     });
 
+    it.each([null, 'dj', { dj: true }])('non-array labels (%j) returns 400 and nothing is written', async (labels) => {
+      const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, { labels });
+      expect(res.status).toBe(400);
+      expect(mockPrisma.party.update).not.toHaveBeenCalled();
+    });
+
     it('6 valid labels returns 400 VALIDATION_ERROR and nothing is written', async () => {
       const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, {
         labels: ['family-friendly', 'kid-friendly', 'all-ages', '21-plus', 'outdoor', 'dj'],
