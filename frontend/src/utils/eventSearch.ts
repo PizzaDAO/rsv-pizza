@@ -62,7 +62,7 @@ export function eventContinent(e: SearchableEvent): string | null {
 export function filterEvents(events: SearchableEvent[], f: EventSearchFilters): SearchableEvent[] {
   const tokens = fold(f.q).split(/\s+/).filter(Boolean);
   const country = fold(f.country);
-  const city = fold(f.city);
+  const city = fold(cleanCity(f.city) || f.city);
   const now = new Date();
   return events.filter((e) => {
     if (f.when && !inDateWindow(e.date, f.when, now)) return false;

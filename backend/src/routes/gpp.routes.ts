@@ -15,7 +15,7 @@ import { publicTags, isInternalTag } from '../lib/eventTags.js';
 import { brand } from '../config/brand.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { countryCodeToRegion, countryNameToRegion } from '../lib/countryRegion.js';
-import { isTestParty } from '../lib/testParty.js';
+import { TEST_PARTY_SQL_PATTERNS } from '../lib/testParty.js';
 
 const router = Router();
 
@@ -758,6 +758,18 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       };
     }
 
+    // Public callers never see obvious test/probe parties: exclude them in the query so
+    // total/limit/offset stay consistent (moderators see everything).
+    if (!callerIsModerator) {
+      const testIds = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM parties
+        WHERE name ~* ANY(${TEST_PARTY_SQL_PATTERNS}::text[])
+      `;
+      if (testIds.length > 0) {
+        where = { AND: [where, { id: { notIn: testIds.map((r) => r.id) } }] };
+      }
+    }
+
     const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
@@ -777,10 +789,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       callerIsModerator ? 'private, no-store' : 'public, max-age=300'
     );
     res.json({
-      // Public callers never see obvious test/probe parties (moderators see everything).
-      events: events
-        .filter((e) => callerIsModerator || !isTestParty(e.name))
-        .map((e) => formatGppEvent(e, callerIsModerator)),
+      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
       total,
       limit: parsedLimit,
       offset: parsedOffset,

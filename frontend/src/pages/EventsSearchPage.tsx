@@ -14,6 +14,7 @@ import {
   EventSearchFilters,
   SearchableEvent,
   cityOptions,
+  cleanCity,
   eventContinent,
   eventDistanceKm,
   regionDuplicatesCountry,
@@ -120,6 +121,12 @@ export function EventsSearchPage() {
     const present = new Set(scoped.map((e) => (e.region || '').toLowerCase()));
     return GPP_REGIONS.filter((r) => present.has(r.id));
   }, [events, filters.continent, filters.country]);
+  const showRegion = useMemo(() => {
+    const scoped = filterEvents(events, { ...EMPTY_FILTERS, continent: filters.continent, country: filters.country });
+    return regions.length > 1 && !regionDuplicatesCountry(scoped);
+  }, [events, regions, filters.continent, filters.country]);
+  // A hidden Region select must not keep filtering (e.g. from an old ?region= link).
+  const activeRegion = showRegion ? filters.region : '';
   // City options come from the clean city field only (normalized, deduped); event names and
   // test data never show up here.
   const cities = useMemo(
@@ -129,19 +136,15 @@ export function EventsSearchPage() {
           ...EMPTY_FILTERS,
           continent: filters.continent,
           country: filters.country,
-          region: filters.region,
+          region: activeRegion,
         })
       ),
-    [events, filters.continent, filters.country, filters.region]
+    [events, filters.continent, filters.country, activeRegion]
   );
-  const showRegion = useMemo(() => {
-    const scoped = filterEvents(events, { ...EMPTY_FILTERS, continent: filters.continent, country: filters.country });
-    return regions.length > 1 && !regionDuplicatesCountry(scoped);
-  }, [events, regions, filters.continent, filters.country]);
 
   const results = useMemo(
     () =>
-      filterEvents(events, filters).sort((a, b) => {
+      filterEvents(events, { ...filters, region: activeRegion }).sort((a, b) => {
         if (origin) {
           const da = eventDistanceKm(a, origin);
           const db = eventDistanceKm(b, origin);
@@ -157,7 +160,7 @@ export function EventsSearchPage() {
         if (b.date) return 1;
         return a.city.localeCompare(b.city);
       }),
-    [events, filters, origin]
+    [events, filters, activeRegion, origin]
   );
 
   const hasFilters = Object.values(filters).some(Boolean);
@@ -180,7 +183,7 @@ export function EventsSearchPage() {
             onChange={(e) => setQInput(e.target.value)}
             placeholder="Search by event name, city, venue, or country"
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${IS_SERIES_SCOPED ? '' : 'lg:grid-cols-4'}`}>
             {!IS_SERIES_SCOPED && (
             <select
               aria-label="Continent"
@@ -221,7 +224,7 @@ export function EventsSearchPage() {
             <select
               aria-label="City"
               className={SELECT_CLASS}
-              value={filters.city}
+              value={cleanCity(filters.city) || filters.city}
               onChange={(e) => update({ city: e.target.value })}
             >
               <option value="">All cities</option>
