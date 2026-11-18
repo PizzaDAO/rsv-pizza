@@ -107,4 +107,21 @@ describe('EventPage network calls', () => {
     expect(supa.getMyGuest).not.toHaveBeenCalled();
     expect(api.checkEventHost).not.toHaveBeenCalled();
   });
+
+  it('refetches a not-found event when the signed-in user changes', async () => {
+    auth.loading = false;
+    api.getEventBySlug.mockResolvedValueOnce(null).mockResolvedValue(EVENT);
+    const view = renderPage();
+    await screen.findByText(/Event not found/i);
+    expect(api.getEventBySlug).toHaveBeenCalledTimes(1);
+
+    auth.user = { id: 'admin1', email: 'admin@example.org' };
+    await act(async () => { view.rerender(
+      <HelmetProvider>
+        <MemoryRouter initialEntries={['/slice-night']}><Routes><Route path="/:slug" element={<EventPage />} /></Routes></MemoryRouter>
+      </HelmetProvider>,
+    ); });
+    await waitFor(() => expect(api.getEventBySlug).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/Event not found/i)).toBeNull());
+  });
 });

@@ -93,7 +93,7 @@
       ]
     },
     {
-      "source": "/((?!assets/|cdn/|brands/|fonts/|vendor/).*)\\.(?:png|jpg|jpeg|webp|avif|gif|svg|ico)",
+      "source": "/((?!assets/|cdn/|brands/|fonts/|vendor/).*\\.(?:png|jpg|jpeg|webp|avif|gif|svg|ico))",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=2592000" }
       ]

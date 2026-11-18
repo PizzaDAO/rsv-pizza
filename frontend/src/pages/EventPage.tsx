@@ -160,6 +160,19 @@ export function EventPage() {
 
   // 1) Event + public stats. Depends only on [slug, yearParam] so it does NOT re-run when auth resolves.
   const viewTrackedFor = useRef<string | null>(null);
+  // A failed fetch (not found / gated, e.g. a pre-launch event only admins can see) is retried once the
+  // signed-in user changes, since the request carries the caller's token.
+  const failedForUserRef = useRef<string | null | undefined>(undefined);
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+  userIdRef.current = user?.id ?? null;
+  const [retryTick, setRetryTick] = useState(0);
+  useEffect(() => {
+    if (error && !authLoading && failedForUserRef.current !== (user?.id ?? null)) {
+      failedForUserRef.current = user?.id ?? null;
+      setLoading(true);
+      setRetryTick((n) => n + 1);
+    }
+  }, [error, user?.id, authLoading]);
   useEffect(() => {
     if (!slug) {
       setLoading(false);
@@ -186,10 +199,12 @@ export function EventPage() {
       if (cancelled) return;
       if (!foundEvent) {
         setError('Event not found. The link may be invalid or expired.');
+        failedForUserRef.current = userIdRef.current;
         setLoading(false);
         return;
       }
 
+      setError(null);
       setEvent(foundEvent);
       setCanEditAsCoHost(false);
 
@@ -224,7 +239,7 @@ export function EventPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, yearParam]);
+  }, [slug, yearParam, retryTick]);
 
   // 2) User-specific access (RSVP'd? host? password) runs when the event loads or the user changes,
   // with the two network calls in parallel. This never refetches the event.
