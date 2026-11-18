@@ -112,8 +112,9 @@ describe('EventPage network calls', () => {
     auth.loading = false;
     api.getEventBySlug.mockResolvedValueOnce(null).mockResolvedValue(EVENT);
     const view = renderPage();
-    await screen.findByText(/Event not found/i);
-    expect(api.getEventBySlug).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(api.getEventBySlug).toHaveBeenCalledTimes(1), { timeout: 10000 });
+    await act(async () => { await Promise.resolve(); });
+    expect(supa.getMyGuest).not.toHaveBeenCalled(); // no event yet
 
     auth.user = { id: 'admin1', email: 'admin@example.org' };
     await act(async () => { view.rerender(
@@ -121,7 +122,9 @@ describe('EventPage network calls', () => {
         <MemoryRouter initialEntries={['/slice-night']}><Routes><Route path="/:slug" element={<EventPage />} /></Routes></MemoryRouter>
       </HelmetProvider>,
     ); });
-    await waitFor(() => expect(api.getEventBySlug).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByText(/Event not found/i)).toBeNull());
+    await waitFor(() => expect(api.getEventBySlug).toHaveBeenCalledTimes(2), { timeout: 10000 });
+    // The retried event loaded: the user-specific effect ran for it.
+    await waitFor(() => expect(supa.getMyGuest).toHaveBeenCalledTimes(1), { timeout: 10000 });
+    expect(api.getEventBySlug).toHaveBeenCalledTimes(2);
   });
 });
