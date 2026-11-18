@@ -553,6 +553,7 @@ const gppEventSelect = {
   eventImageUrl: true,
   eventType: true,
   eventTags: true,
+  labels: true,
   underbossStatus: true,
   rsvpClosedAt: true,
   // porchetta-81402: surface cancelled state so moderator views (which
@@ -614,6 +615,7 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     eventImageUrl: event.eventImageUrl,
     eventType: event.eventType,
     eventTags: publicTags(event.eventTags),
+    labels: event.labels ?? [],
     createdAt: event.createdAt,
     hostName: 'PizzaDAO',
     guestCount: event._count?.guests ?? 0,

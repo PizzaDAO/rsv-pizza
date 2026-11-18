@@ -49,6 +49,7 @@ const EVENT_SELECT = {
     eventType: true,
     eventSeriesId: true,
     eventTags: true,
+    labels: true,
     donationEnabled: true,
     donationRecipient: true,
     donationRecipientUrl: true,
@@ -329,6 +330,8 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         underbossStatus: party.underbossStatus,
         // calzone-50114: strip internal control tags from the public payload.
         eventTags: publicTags(party.eventTags),
+        // blackolive-70521: host-chosen public tags (curated keys; public by construction)
+        labels: party.labels ?? [],
         donationEnabled: party.donationEnabled,
         donationRecipient: party.donationRecipient,
         donationRecipientUrl: party.donationRecipientUrl,

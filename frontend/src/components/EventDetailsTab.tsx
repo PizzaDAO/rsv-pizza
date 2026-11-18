@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { EventLabelPicker } from './EventLabelPicker';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Ban, RefreshCcw, Calendar, Play, Wand2, MessageCircle, Send, Check } from 'lucide-react';
@@ -43,6 +44,8 @@ export const EventDetailsTab: React.FC = () => {
   const [venueName, setVenueName] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
+  // blackolive-70521: host-chosen public tags (parties.labels), saved on every toggle.
+  const [labels, setLabels] = useState<string[]>([]);
   const [customUrl, setCustomUrl] = useState('');
   const [customUrlValid, setCustomUrlValid] = useState(true);
   const [, setCustomUrlError] = useState<string | undefined>();
@@ -129,6 +132,11 @@ export const EventDetailsTab: React.FC = () => {
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState<any>(null);
+
+  // blackolive-70521: keep the tag picker in sync with the loaded party (load / re-fetch).
+  useEffect(() => {
+    setLabels(party?.labels ?? []);
+  }, [party?.id, party?.labels]);
 
   // Load party data into form
   useEffect(() => {
@@ -591,6 +599,13 @@ export const EventDetailsTab: React.FC = () => {
   // matching camelCase Partial<Party> patch — the second arg flows into
   // setParty so sibling consumers see the change without a refetch. TS will
   // catch misspelled camelCase keys here.
+  const saveLabels = async (next: string[]) => {
+    const prev = labels;
+    setLabels(next);
+    const ok = await saveField('options', { labels: next }, { labels: next });
+    if (!ok) setLabels(prev);
+  };
+
   const saveOptions = async (
     updates: Record<string, any>,
     partyPatch: Partial<Party>,
@@ -807,6 +822,11 @@ export const EventDetailsTab: React.FC = () => {
 
           {showOptionalFields && (
             <div className="space-y-3 border-l-2 border-theme-stroke pl-4 mt-3">
+              <div data-testid="event-labels-picker">
+                <p className="text-sm text-theme-text-secondary mb-2">{t('event:labels.title')}</p>
+                <EventLabelPicker value={labels} onChange={saveLabels} disabled={savingField === 'options'} />
+              </div>
+
               <Checkbox
                 checked={requireApproval}
                 onChange={() => {

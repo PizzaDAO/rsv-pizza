@@ -289,6 +289,8 @@ export interface UpdatePartyData {
   targetAttendance?: number | null;
   expectedAttendance?: number | null;
   eventTags?: string[];
+  /** blackolive-70521: host-chosen public tags (curated keys); backend normalizes + enforces max 5. */
+  labels?: string[];
   // scam-flag-private: targeted toggle; the backend adds/removes only 'prepay' on the stored tags.
   prepay?: boolean;
   telegramGroup?: string | null;
@@ -436,6 +438,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       targetAttendance: data.targetAttendance,
       expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
+      labels: data.labels,
       prepay: data.prepay,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
@@ -1125,6 +1128,8 @@ export interface PublicEvent {
   eventSeriesId?: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  /** blackolive-70521: host-chosen public tags (curated keys). */
+  labels?: string[];
   donationEnabled?: boolean;
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
@@ -4889,6 +4894,7 @@ export interface GPPEventMapItem {
   country: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  labels?: string[];
   telegramGroup: string | null;
   hostTelegram?: string | null;
   coHostTelegrams?: string[];
@@ -4912,6 +4918,7 @@ interface GPPEventApiResponse {
   region?: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
+  labels?: string[];
   telegramGroup: string | null;
   hostTelegram?: string | null;
   coHostTelegrams?: string[];
@@ -4954,6 +4961,7 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     country: e.country,
     underbossStatus: e.underbossStatus,
     eventTags: e.eventTags ?? [],
+    labels: e.labels ?? [],
     telegramGroup: e.telegramGroup ?? null,
     hostTelegram: e.hostTelegram ?? null,
     coHostTelegrams: e.coHostTelegrams ?? [],
@@ -4988,6 +4996,7 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
       eventImageUrl: e.eventImageUrl ?? null,
       latitude: e.latitude ?? null,
       longitude: e.longitude ?? null,
+      labels: e.labels ?? [],
     }));
   }
   const data = await apiRequest<GPPEventsApiPayload>(
@@ -5009,6 +5018,7 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
     eventImageUrl: e.eventImageUrl ?? null,
     latitude: e.latitude ?? null,
     longitude: e.longitude ?? null,
+    labels: e.labels ?? [],
   }));
 }
 

@@ -5,6 +5,9 @@ import { Crosshair, Map as MapIcon, MapPin, Search, Users, X } from 'lucide-reac
 import { Layout } from '../components/Layout';
 import { BRAND } from '../config/brand';
 import { IconInput } from '../components/IconInput';
+import { EventLabelChips } from '../components/EventLabelChips';
+import { EVENT_LABEL_KEYS, type EventLabelKey } from '../lib/eventLabels';
+import { useTranslation } from 'react-i18next';
 import { fetchPublicEventsForSearch } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import { formatShortDate } from '../utils/dateUtils';
@@ -48,6 +51,7 @@ function SkeletonGrid() {
 }
 
 export function EventsSearchPage() {
+  const { t } = useTranslation('event');
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => searchParamsToFilters(searchParams), [searchParams]);
   const [events, setEvents] = useState<SearchableEvent[]>([]);
@@ -142,6 +146,20 @@ export function EventsSearchPage() {
     [events, filters.continent, filters.country, activeRegion]
   );
 
+  // blackolive-70521: tags present in the loaded events (scoped to the other active filters), with counts.
+  const tagCounts = useMemo(() => {
+    const scoped = filterEvents(events, { ...filters, region: activeRegion, tags: [] });
+    const counts: Record<string, number> = {};
+    for (const e of scoped) for (const k of e.labels || []) counts[k] = (counts[k] || 0) + 1;
+    return counts;
+  }, [events, filters, activeRegion]);
+  const availableTags = useMemo(
+    () => EVENT_LABEL_KEYS.filter((k) => tagCounts[k] || filters.tags.includes(k)),
+    [tagCounts, filters.tags]
+  );
+  const toggleTag = (key: EventLabelKey) =>
+    update({ tags: filters.tags.includes(key) ? filters.tags.filter((k) => k !== key) : [...filters.tags, key] });
+
   const results = useMemo(
     () =>
       filterEvents(events, { ...filters, region: activeRegion }).sort((a, b) => {
@@ -163,7 +181,7 @@ export function EventsSearchPage() {
     [events, filters, activeRegion, origin]
   );
 
-  const hasFilters = Object.values(filters).some(Boolean);
+  const hasFilters = Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : Boolean(v)));
 
   return (
     <Layout>
@@ -271,6 +289,29 @@ export function EventsSearchPage() {
               </span>
             )}
           </div>
+          {availableTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2" data-testid="events-tag-filter">
+              <button
+                type="button"
+                aria-pressed={filters.tags.length === 0}
+                onClick={() => update({ tags: [] })}
+                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  filters.tags.length === 0
+                    ? 'border-[#ff393a] bg-theme-surface-hover text-theme-text'
+                    : 'border-theme-stroke bg-theme-surface text-theme-text-secondary hover:border-[#ff393a] hover:text-theme-text'
+                }`}
+              >
+                {t('labels.filterAll')}
+              </button>
+              <EventLabelChips
+                labels={availableTags}
+                mode="select"
+                selected={filters.tags}
+                counts={tagCounts}
+                onToggle={toggleTag}
+              />
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm text-theme-text-muted">
             <span>{loading ? 'Loading…' : `${results.length} event${results.length === 1 ? '' : 's'}`}</span>
             {hasFilters && (
@@ -324,6 +365,7 @@ export function EventsSearchPage() {
                         </span>
                       )}
                     </div>
+                    <EventLabelChips labels={e.labels} mode="static" className="mt-2" />
                   </Link>
                 </li>
               ))}

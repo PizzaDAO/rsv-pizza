@@ -79,6 +79,13 @@ describe('GET /api/events/:slug', () => {
     expect(res.body.event.guestCount).toBe(3);
   });
 
+  it('exposes host labels (blackolive-70521), defaulting to []', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([{ ...PARTY, labels: ['dj', 'outdoor'] }]);
+    expect((await request(app).get('/api/events/abc123')).body.event.labels).toEqual(['dj', 'outdoor']);
+    mockPrisma.party.findMany.mockResolvedValue([PARTY]);
+    expect((await request(app).get('/api/events/abc123')).body.event.labels).toEqual([]);
+  });
+
   it('prefers the invite-code match when both columns match different parties', async () => {
     mockPrisma.party.findMany.mockResolvedValue([
       { ...PARTY, id: 'by-custom', inviteCode: 'zzz', customUrl: 'dup' },

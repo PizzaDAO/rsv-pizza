@@ -6,6 +6,8 @@
  * backend/src/services/pizzaIndex.service.ts (keep in sync).
  */
 
+import { knownLabels } from '../lib/eventLabels';
+
 export interface SearchableEvent {
   id: string;
   name: string;
@@ -20,6 +22,8 @@ export interface SearchableEvent {
   eventImageUrl?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** blackolive-70521: host-chosen public tags (curated keys). */
+  labels?: string[];
 }
 
 export interface EventSearchFilters {
@@ -29,12 +33,14 @@ export interface EventSearchFilters {
   region: string;
   city: string;
   when: DateWindow | '';
+  /** blackolive-70521: selected tag keys; an event must have ALL of them (AND). */
+  tags: string[];
 }
 
 export type DateWindow = 'week' | 'month' | 'upcoming' | 'past';
 export const DATE_WINDOWS: DateWindow[] = ['week', 'month', 'upcoming', 'past'];
 
-export const EMPTY_FILTERS: EventSearchFilters = { q: '', continent: '', country: '', region: '', city: '', when: '' };
+export const EMPTY_FILTERS: EventSearchFilters = { q: '', continent: '', country: '', region: '', city: '', when: '', tags: [] };
 
 const REGION_TO_CONTINENT: Record<string, string> = {
   usa: 'North America', canada: 'North America', 'central-america': 'North America',
@@ -69,6 +75,7 @@ export function filterEvents(events: SearchableEvent[], f: EventSearchFilters): 
     if (f.continent && eventContinent(e) !== f.continent) return false;
     if (country && fold(e.country) !== country) return false;
     if (f.region && (e.region || '').toLowerCase() !== f.region) return false;
+    if (f.tags?.length && !f.tags.every((t) => (e.labels || []).includes(t))) return false;
     if (city && fold(cleanCity(e.city) || '') !== city) return false;
     if (tokens.length) {
       const hay = fold([e.name, e.city, e.venueName, e.address, e.country, e.region].filter(Boolean).join(' '));
@@ -81,9 +88,18 @@ export function filterEvents(events: SearchableEvent[], f: EventSearchFilters): 
 export function filtersToSearchParams(f: EventSearchFilters): URLSearchParams {
   const p = new URLSearchParams();
   (Object.keys(f) as (keyof EventSearchFilters)[]).forEach((k) => {
-    if (f[k]) p.set(k, f[k]);
+    if (k === 'tags') return;
+    const v = f[k];
+    if (typeof v === 'string' && v) p.set(k, v);
   });
+  if (f.tags?.length) p.set('tags', f.tags.join(','));
   return p;
+}
+
+/** `?tags=a,b` -> known label keys only (deduped, canonical order); unknown values are ignored. */
+export function parseTagsParam(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return knownLabels(raw.split(',').map((s) => s.trim().toLowerCase()));
 }
 
 export function searchParamsToFilters(p: URLSearchParams): EventSearchFilters {
@@ -94,6 +110,7 @@ export function searchParamsToFilters(p: URLSearchParams): EventSearchFilters {
     region: p.get('region') || '',
     city: p.get('city') || '',
     when: (DATE_WINDOWS as string[]).includes(p.get('when') || '') ? (p.get('when') as DateWindow) : '',
+    tags: parseTagsParam(p.get('tags')),
   };
 }
 

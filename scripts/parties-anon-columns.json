@@ -104,5 +104,6 @@
   "one_sheet_config",
   "cancelled_at",
   "cancellation_reason",
-  "has_password"
+  "has_password",
+  "labels"
 ]

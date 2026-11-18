@@ -635,6 +635,77 @@ describe('Party Routes', () => {
     });
   });
 
+  describe('PATCH /api/parties/:id - labels (blackolive-70521 public host tags)', () => {
+    async function patchLabels(email: string, userId: string, body: any, coHosts: any[] = [], extra: any = {}) {
+      const app = createTestApp();
+      const party = {
+        id: PARTY_ID, userId: HOST_USER_ID, coHosts, eventTags: ['swc', 'paid'], eventType: 'standard',
+        region: null, city: 'X', name: 'Test Party', ...extra,
+      };
+      mockPrisma.party.findUnique.mockResolvedValue(party);
+      mockPrisma.party.update.mockResolvedValue({ ...party, user: { name: 'H' } });
+      return request(app)
+        .patch(`/api/parties/${PARTY_ID}`)
+        .set('Authorization', `Bearer ${makeToken(userId, email)}`)
+        .send(body);
+    }
+    const data = () => mockPrisma.party.update.mock.calls[0]?.[0]?.data;
+
+    it('owner sets labels; they are normalized (trim/lowercase/dedupe/unknown dropped/allowlist order)', async () => {
+      const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, { labels: [' DJ ', 'dj', 'family-friendly', 'bogus'] });
+      expect(res.status).toBe(200);
+      expect(data().labels).toEqual(['family-friendly', 'dj']);
+    });
+
+    it('an empty array clears labels', async () => {
+      const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, { labels: [] });
+      expect(res.status).toBe(200);
+      expect(data().labels).toEqual([]);
+    });
+
+    it('6 valid labels returns 400 VALIDATION_ERROR and nothing is written', async () => {
+      const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, {
+        labels: ['family-friendly', 'kid-friendly', 'all-ages', '21-plus', 'outdoor', 'dj'],
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(mockPrisma.party.update).not.toHaveBeenCalled();
+    });
+
+    it('full co-host (no allowedTabs) can set labels', async () => {
+      const res = await patchLabels(OTHER_EMAIL, OTHER_USER_ID, { labels: ['outdoor'] }, [{ email: OTHER_EMAIL, canEdit: true }]);
+      expect(res.status).toBe(200);
+      expect(data().labels).toEqual(['outdoor']);
+    });
+
+    it('restricted co-host WITH the details tab can set labels', async () => {
+      const res = await patchLabels(OTHER_EMAIL, OTHER_USER_ID, { labels: ['outdoor'] },
+        [{ email: OTHER_EMAIL, canEdit: true, allowedTabs: ['details'] }]);
+      expect(res.status).toBe(200);
+      expect(data().labels).toEqual(['outdoor']);
+    });
+
+    it('restricted co-host WITHOUT details: labels silently dropped, other fields still save', async () => {
+      const res = await patchLabels(OTHER_EMAIL, OTHER_USER_ID, { labels: ['outdoor'], name: 'New name' },
+        [{ email: OTHER_EMAIL, canEdit: true, allowedTabs: ['guests'] }]);
+      expect(res.status).toBe(200);
+      expect(data().name).toBe('New name');
+      expect(data()).not.toHaveProperty('labels');
+    });
+
+    it('setting labels never touches eventTags', async () => {
+      const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, { labels: ['dj'] });
+      expect(res.status).toBe(200);
+      expect(data()).not.toHaveProperty('eventTags');
+    });
+
+    it('omitting labels does not write labels', async () => {
+      const res = await patchLabels(HOST_EMAIL, HOST_USER_ID, { name: 'Only name' });
+      expect(res.status).toBe(200);
+      expect(data()).not.toHaveProperty('labels');
+    });
+  });
+
   describe('PATCH /api/parties/:id - Update party', () => {
     it('updates party with selective fields', async () => {
       const app = createTestApp();
