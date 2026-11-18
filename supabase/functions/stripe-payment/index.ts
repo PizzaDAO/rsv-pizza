@@ -4,6 +4,9 @@ import Stripe from 'https://esm.sh/stripe@14.11.0?target=deno';
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 const STRIPE_ISSUING_CARDHOLDER_ID = Deno.env.get('STRIPE_ISSUING_CARDHOLDER_ID') || '';
 
+/** basil-14648: retired with the old Bland / virtual-card ordering path (see the guard in serve()). */
+const RETIRED_ACTIONS = new Set(['create_virtual_card', 'get_virtual_card', 'capture_payment']);
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -92,6 +95,16 @@ serve(async (req) => {
     }
 
     const request: StripeRequest = await req.json();
+
+    // basil-14648: the old pay-first / virtual-card AI ordering is retired (ordering now goes through pizza-mcp,
+    // and the host pays at pickup). These actions took no caller auth beyond the public anon key: anyone could
+    // mint an active Issuing card, read a card's full number + CVC, or capture any PaymentIntent. Refused for good.
+    if (RETIRED_ACTIONS.has((request as { action?: string }).action ?? '')) {
+      return new Response(
+        JSON.stringify({ error: 'This action is no longer available.', code: 'ACTION_RETIRED' }),
+        { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     switch (request.action) {
       case 'create_customer': {

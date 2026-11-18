@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock, BellRing, Phone, Info } from 'lucide-react';
 import {
   getPizzaOrder, cancelPizzaOrder, settlePizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents,
-  formatWhen, approvalDeadline, callNumber, emailStatusInfo,
+  formatWhen, approvalDeadline, callNumber, emailStatusInfo, approvalHref,
 } from '../lib/pizzaOrder';
 import { InlineConfirm } from './InlineConfirm';
 
@@ -71,7 +71,9 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
   // The webhook updates the server row; this fallback poll keeps the page current. A `calling` order whose call is
   // being checked (pizza-mcp 662d51c `call.checking`) is not final: no webhook announces the check, so keep polling.
   useEffect(() => {
-    if ((isTerminalStatus(order.status) && !order.settling) || order.restartable || !order.isMine) return;
+    // A co-host polls too: the backend answers them from the stored row (only the owner's poll reaches pizza-mcp), so
+    // their card follows the webhook instead of reading "calling" until a reload.
+    if ((isTerminalStatus(order.status) && !order.settling) || order.restartable) return;
     let stop = false;
     const tick = async () => {
       if (stop || document.hidden) return;
@@ -92,14 +94,14 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [partyId, order.opopOrderId, order.status, order.restartable, order.settling, order.isMine, onUpdate]);
+  }, [partyId, order.opopOrderId, order.status, order.restartable, order.settling, onUpdate]);
 
   // basil-14648 P2: an email order has its own truthful copy (nothing reads as ordered before the shop confirms)
   const isEmail = order.channel === 'email';
   const info = (isEmail ? emailStatusInfo(order, t, Date.now(), { timeZone }) : null) ?? statusInfo(order, Date.now(), { timeZone });
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
   // `live: false` (pizza-mcp's approval view): approving can no longer do anything, so no link to a dead page
-  const url = order.nextAction?.type === 'open_url' && order.nextAction.live !== false ? order.nextAction.url : null;
+  const url = order.nextAction?.type === 'open_url' && order.nextAction.live !== false ? approvalHref(order.nextAction.url) : null;
   const deferred = order.call?.deferred ?? null;
   // an email order's scheduled send is in its own copy
   const nextTry = isEmail ? '' : formatWhen(deferred?.until, timeZone);

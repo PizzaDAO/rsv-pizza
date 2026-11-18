@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { PizzaOrderFlow } from './PizzaOrderFlow';
 import type { PizzaOrderView, PizzaShop } from '../lib/pizzaOrder';
 
-const mocks = vi.hoisted(() => ({ config: vi.fn(), orders: vi.fn(), order: vi.fn(), build: vi.fn(), place: vi.fn(), handoffs: vi.fn() }));
+const mocks = vi.hoisted(() => ({ config: vi.fn(), orders: vi.fn(), order: vi.fn(), build: vi.fn(), place: vi.fn(), handoffs: vi.fn(), shops: vi.fn() }));
 vi.mock('../lib/pizzaOrder', async () => {
   const actual = await vi.importActual<typeof import('../lib/pizzaOrder')>('../lib/pizzaOrder');
   return {
@@ -16,6 +16,7 @@ vi.mock('../lib/pizzaOrder', async () => {
     buildPizzaCart: mocks.build,
     placePizzaOrder: mocks.place,
     getPizzaHandoffs: mocks.handoffs,
+    getPizzaShops: mocks.shops,
   };
 });
 vi.mock('../contexts/PizzaContext', () => ({
@@ -57,6 +58,7 @@ beforeEach(() => {
   mocks.config.mockResolvedValue(cfg());
   mocks.orders.mockResolvedValue({ orders: [] });
   mocks.handoffs.mockResolvedValue({ handoffs: [] });
+  mocks.shops.mockResolvedValue({ pizzerias: [] });
 });
 
 describe('PizzaOrderFlow: stays inert', () => {
@@ -404,5 +406,32 @@ describe('PizzaOrderFlow: second review', () => {
     flow();
     expect(await screen.findByText("Pick Sal's")).toBeTruthy();
     expect(screen.queryByText(/Another host released/)).toBeNull();
+  });
+});
+
+describe('PizzaOrderFlow: basil-14648 fixes', () => {
+  const toApprove = async () => {
+    mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    flow();
+    await userEvent.click(await screen.findByText("Pick Sal's"));
+    await userEvent.click(await screen.findByText('Build'));
+  };
+
+  it.each(['approval_timeout', 'held'])('basil-14648 fixes: no second order while the first is %s (it can still go through)', async (status) => {
+    mocks.place.mockRejectedValue(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingOrderId: 'ord_0', existingStatus: status } }));
+    mocks.order.mockResolvedValue({ order: row({ opopOrderId: 'ord_0', status }), stale: false });
+    await toApprove();
+    await userEvent.click(screen.getByText('Approve'));
+    expect(await screen.findByText('View that order')).toBeTruthy();
+    expect(screen.queryByText('Place a second order anyway')).toBeNull();
+  });
+
+  it("basil-14648 fixes: a resumed order's shop phone is looked up once, not in a loop, when the shop is not listed", async () => {
+    mocks.orders.mockResolvedValue({ orders: [row({ status: 'calling', shopId: 'pzl_far_away' })] });
+    mocks.shops.mockResolvedValue({ pizzerias: [{ id: 'pzl_other', name: 'Other', tier: 'listing', phone: '+16175550101' }] });
+    flow();
+    await screen.findAllByText(/Sal's/);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(mocks.shops).toHaveBeenCalledTimes(1);
   });
 });

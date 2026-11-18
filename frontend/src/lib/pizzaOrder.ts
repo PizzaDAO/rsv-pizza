@@ -541,6 +541,15 @@ export function safeHref(url: unknown): string | null {
   }
 }
 
+/**
+ * pizza-mcp's approval / pay page (`next_action.url`): opened in a new tab or rendered as a button, so https only.
+ * The backend stores next_action as pizza-mcp sent it; a javascript: or plain-http value is never opened.
+ */
+export function approvalHref(url: unknown): string | null {
+  const href = safeHref(url);
+  return href && href.startsWith('https:') ? href : null;
+}
+
 /** The shop's ordering links we can render, best first, with the bare website last. */
 export function orderingLinks(shop: Pick<PizzaShop, 'ordering_links'>): OrderingLink[] {
   const links = Array.isArray(shop.ordering_links) ? shop.ordering_links : [];
