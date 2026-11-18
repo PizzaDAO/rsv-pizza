@@ -40,7 +40,7 @@
     "submitting": "Wird gesendet...",
     "saving": "Wird gespeichert...",
     "skip": "Überspringen – ich esse alles",
-    "optionalHint": "Optional: du bist schon dabei. Füge Vorlieben hinzu oder überspringe."
+    "optionalHint": "Optional: Vorlieben angeben oder überspringen, um die Zusage abzuschließen."
   },
   "success": {
     "seeYou": "Wir sehen uns bei {{eventName}}!",

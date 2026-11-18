@@ -40,7 +40,7 @@
     "submitting": "Submitting...",
     "saving": "Saving...",
     "skip": "Skip — I'll eat anything",
-    "optionalHint": "Optional: you're already in. Add preferences or skip."
+    "optionalHint": "Optional: add preferences, or skip to finish your RSVP."
   },
   "success": {
     "seeYou": "See you at {{eventName}}!",

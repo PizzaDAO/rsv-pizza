@@ -40,7 +40,7 @@
     "submitting": "Envoi en cours...",
     "saving": "Enregistrement...",
     "skip": "Passer : je mange de tout",
-    "optionalHint": "Facultatif : vous êtes déjà inscrit. Ajoutez vos préférences ou passez."
+    "optionalHint": "Facultatif : ajoutez vos préférences ou passez pour terminer votre RSVP."
   },
   "success": {
     "seeYou": "À bientôt à {{eventName}} !",

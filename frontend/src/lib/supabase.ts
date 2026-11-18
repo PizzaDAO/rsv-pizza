@@ -1788,7 +1788,7 @@ export async function addGuestToParty(
   ethconfOptIn?: boolean,
   optinAbVariant?: 'control' | 'variant' | null,
   visitorSessionId?: string,
-): Promise<{ guest: DbGuest; guestToken: string | null; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
+): Promise<{ guest: DbGuest; guestToken: string | null; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null; emailSent: boolean }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     throw new Error('Invite code is required to submit RSVP');
@@ -1912,6 +1912,7 @@ export async function addGuestToParty(
       updated: data.updated || false,
       waitlisted: data.waitlisted || false,
       waitlistPosition: data.waitlistPosition || null,
+      emailSent: data.emailSent === true,
     };
   } catch (error) {
     console.error('Error adding guest:', error);

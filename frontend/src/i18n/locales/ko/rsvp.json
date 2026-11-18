@@ -40,7 +40,7 @@
     "submitting": "제출 중...",
     "saving": "저장 중...",
     "skip": "건너뛰기 — 아무거나 잘 먹어요",
-    "optionalHint": "선택 사항: 이미 참석 등록이 완료되었습니다. 취향을 추가하거나 건너뛰세요."
+    "optionalHint": "선택 사항: 취향을 추가하거나 건너뛰어 RSVP를 완료하세요."
   },
   "success": {
     "seeYou": "{{eventName}}에서 만나요!",

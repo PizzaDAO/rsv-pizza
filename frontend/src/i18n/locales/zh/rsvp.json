@@ -40,7 +40,7 @@
     "submitting": "提交中...",
     "saving": "保存中...",
     "skip": "跳过：我什么都吃",
-    "optionalHint": "可选：你已经报名成功。可添加偏好或跳过。"
+    "optionalHint": "可选：添加偏好，或跳过以完成报名。"
   },
   "success": {
     "seeYou": "{{eventName}} 见！",

@@ -38,7 +38,7 @@ export function RSVPFlowContent({
   mintResult,
   twitterHandles,
 }: RSVPFlowContentProps) {
-  const { t } = useTranslation('rsvp');
+  const { t, i18n } = useTranslation('rsvp');
   const closeLabel = t('close');
   // Calendar popup state (success screen)
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -84,12 +84,18 @@ export function RSVPFlowContent({
 
     const isNewRsvp = !form.alreadyRegistered && !form.wasUpdated;
     const eventDate = event.date ? new Date(event.date) : null;
-    const dateText = eventDate && !isNaN(eventDate.getTime())
-      ? eventDate.toLocaleString(undefined, {
-          weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
-          timeZone: event.timezone || undefined,
-        })
-      : null;
+    const formatRecap = (timeZone?: string) => eventDate!.toLocaleString(i18n.language, {
+      weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      timeZoneName: 'short', timeZone,
+    });
+    let dateText: string | null = null;
+    if (eventDate && !isNaN(eventDate.getTime())) {
+      try {
+        dateText = formatRecap(event.timezone || undefined);
+      } catch {
+        dateText = formatRecap(undefined); // invalid timezone string
+      }
+    }
     const placeText = [event.venueName, event.city].filter(Boolean).join(', ') || event.address || null;
 
     return (
@@ -122,7 +128,7 @@ export function RSVPFlowContent({
             )}
           </div>
         )}
-        {isNewRsvp && form.email.trim() && (
+        {isNewRsvp && form.emailSent && form.email.trim() && (
           <p className="text-xs text-theme-text-muted mb-4 flex items-center justify-center gap-1" data-testid="rsvp-confirmation-sent">
             <Mail size={12} aria-hidden="true" />
             {t('success.confirmationSent', { email: form.email.trim() })}

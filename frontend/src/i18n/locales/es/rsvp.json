@@ -40,7 +40,7 @@
     "submitting": "Enviando...",
     "saving": "Guardando...",
     "skip": "Omitir: como de todo",
-    "optionalHint": "Opcional: ya estás dentro. Añade preferencias u omite."
+    "optionalHint": "Opcional: añade preferencias u omite para terminar tu RSVP."
   },
   "success": {
     "seeYou": "¡Nos vemos en {{eventName}}!",

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '../i18n';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -53,7 +53,7 @@ function Harness() {
 }
 
 const result = (over: object = {}) => ({
-  guest: { id: 'g1' }, guestToken: 't', alreadyRegistered: false, requireApproval: false,
+  guest: { id: 'g1' }, guestToken: 't', emailSent: true, alreadyRegistered: false, requireApproval: false,
   updated: false, waitlisted: false, waitlistPosition: null, ...over,
 });
 
@@ -106,5 +106,14 @@ describe('success screen states', () => {
     await waitFor(() => expect(screen.getByText("You're already on the list")).toBeInTheDocument());
     expect(screen.queryByTestId('rsvp-confirmation-sent')).toBeNull();
     expect(screen.queryByText(/already registered!/)).toBeNull();
+  });
+
+  it('no confirmation line when the backend did not send an email', async () => {
+    vi.mocked(addGuestToParty).mockResolvedValue(result({ emailSent: false }) as any);
+    render(<Harness />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('rsvp-skip-prefs'));
+    await waitFor(() => expect(screen.getByText('See you at Pizza Night!')).toBeInTheDocument());
+    expect(screen.queryByTestId('rsvp-confirmation-sent')).toBeNull();
   });
 });

@@ -403,8 +403,8 @@ export function RSVPFormStep2({
       {!isEditing && !hasPrefs && (
         <button
           type="button"
-          onClick={() => void form.submitRsvp()}
-          disabled={form.submitting}
+          onClick={() => void form.submitRsvp(undefined, { skipProfileSave: true })}
+          disabled={form.submitting || form.prefsPending}
           className="w-full text-sm text-theme-text-secondary hover:text-theme-text underline disabled:opacity-50"
           data-testid="rsvp-skip-prefs"
         >
