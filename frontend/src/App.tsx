@@ -113,6 +113,8 @@ function App() {
       : cls === 'monad-theme' ? 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap'
       // Stand With Crypto: Satoshi (their site's typeface), served by Fontshare; only fetched for that brand.
       : cls === 'swc-theme' ? 'https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap'
+      // Runtime build: the tokens load Inter (heading + body); the Monad buttons also need JetBrains Mono.
+      : __BRAND_RUNTIME__ && cls === 'brand-monad' ? 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap'
       : '';
     if (fontHref) {
       fontLink = document.createElement('link');

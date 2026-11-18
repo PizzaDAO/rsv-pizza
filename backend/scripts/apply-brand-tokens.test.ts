@@ -44,6 +44,62 @@ describe('data file', () => {
     expect(t.tokens.hideHeroLogo).toBe(true);
   });
 
+  // The variable set each old `.<slug>-theme` block resolved to (final values, after the QA overrides).
+  const OLD_VARS: Record<string, Record<string, string>> = {
+    team1: {
+      '--bg-main': '#000000', '--bg-card': '#1a1b1c', '--bg-card-hover': '#222324', '--bg-surface': '#161617',
+      '--bg-surface-hover': '#1f2021', '--bg-overlay': 'rgba(0, 0, 0, 0.72)', '--bg-input': '#1a1b1c',
+      '--bg-input-focus': '#222324', '--bg-header': 'rgba(0, 0, 0, 0.9)', '--text-primary': '#ffffff',
+      '--text-secondary': '#e5e7eb', '--text-muted': '#9ca3af', '--text-faint': 'rgba(255, 255, 255, 0.55)',
+      '--text-inverted': '#1a1a1a', '--stroke': '#2a2d31', '--stroke-hover': '#3d4147', '--stroke-strong': '#565b63',
+      '--accent': '#e6212f', '--accent-hover': '#ff4d5a', '--success': '#39d98a', '--warning': '#ffb347',
+      '--error': '#ff4d5a', '--color-scheme': 'dark',
+    },
+    monad: {
+      '--bg-main': '#fafafa', '--bg-card': '#ffffff', '--bg-card-hover': '#f6f4ff', '--bg-surface': '#ffffff',
+      '--bg-surface-hover': '#f6f4ff', '--bg-overlay': 'rgba(14, 9, 28, 0.55)', '--bg-input': '#ffffff',
+      '--bg-input-focus': '#ffffff', '--bg-header': '#fdfcfb', '--text-primary': '#111111',
+      '--text-secondary': 'rgba(17, 17, 17, 0.78)', '--text-muted': 'rgba(17, 17, 17, 0.66)',
+      '--text-faint': 'rgba(17, 17, 17, 0.64)', '--text-inverted': '#ffffff', '--stroke': '#e5e3ec',
+      '--stroke-hover': '#c9c2f5', '--stroke-strong': '#6e54ff', '--accent': '#6e54ff', '--accent-hover': '#5a41e8',
+      '--success': '#1f7a45', '--warning': '#8a5a00', '--error': '#b3261e', '--color-scheme': 'light',
+    },
+    swc: {
+      '--bg-main': '#ffffff', '--bg-card': '#f2f5f9', '--bg-card-hover': '#eaeff6', '--bg-surface': '#f2f5f9',
+      '--bg-surface-hover': '#eaeff6', '--bg-overlay': 'rgba(19, 0, 59, 0.55)', '--bg-input': '#ffffff',
+      '--bg-input-focus': '#ffffff', '--bg-header': '#ffffff', '--text-primary': '#020817',
+      '--text-secondary': 'rgba(2, 8, 23, 0.8)', '--text-muted': '#52607a', '--text-faint': 'rgba(2, 8, 23, 0.64)',
+      '--text-inverted': '#ffffff', '--stroke': '#dbe4f0', '--stroke-hover': '#caabff', '--stroke-strong': '#6c11ff',
+      '--accent': '#6c11ff', '--accent-hover': '#5a0de0', '--success': '#1f7a45', '--warning': '#8a5a00',
+      '--error': '#b3261e', '--color-scheme': 'light',
+    },
+  };
+
+  for (const slug of ['team1', 'monad', 'swc']) {
+    it(`${slug} derives exactly the variables the old .${slug}-theme block resolved to, with the build-time env values`, () => {
+      expect(Object.keys(data)).toContain(slug);
+      expect(data[slug].themeClass).toBe(`brand-${slug}`);
+      const t = parseThemeTokens(data[slug].themeTokens, { allowOverrides: true });
+      if (!t.ok) throw new Error(t.errors.join('; '));
+      const v = deriveThemeVars(t.tokens);
+      for (const [k, want] of Object.entries(OLD_VARS[slug])) expect(v[k], `${slug} ${k}`).toBe(want);
+      expect(t.tokens.hideHeaderName).toBe(true);
+      expect(t.tokens.hideHeroLogo).toBe(true);
+    });
+  }
+
+  it('team1 / monad / swc reproduce each brand project\'s VITE_BRAND_* tagline, description and favicon', () => {
+    expect(data.team1.tagline).toBe('Pizza parties for the Team1 community');
+    expect(data.team1.metaDescription).toBe('RSVP and plan pizza parties for the Team1 community.');
+    expect(data.team1.faviconUrl).toBe('/brands/team1/logo.png'); // no VITE_BRAND_FAVICON_URL: the logo
+    expect(data.monad.tagline).toBe('Pizza parties for the Monad community');
+    expect(data.monad.metaDescription).toBe('RSVP and plan pizza parties for the Monad community.');
+    expect(data.monad.faviconUrl).toBe('/brands/monad/logo.png');
+    expect(data.swc.tagline).toBe('Crypto meetups');
+    expect(data.swc.metaDescription).toBe('Host or join a Stand With Crypto meetup. Pizza, community and crypto advocacy.');
+    expect(data.swc.faviconUrl).toBe('/brands/swc/favicon.png');
+  });
+
   it('does not loosen the validator: low-contrast or wrong-mode tokens are rejected', () => {
     const bad = { ...data.doge, themeTokens: { ...data.doge.themeTokens, textMuted: '#d9cfb8' } };
     expect(runner.validateEntry(bad).ok).toBe(false);

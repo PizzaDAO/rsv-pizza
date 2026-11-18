@@ -60,7 +60,9 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity min-h-[40px]">
           <img
-            src={BRAND.themeClass === 'monad-theme' && BRAND.logoUrl === '/brands/monad/logo.png' ? '/brands/monad/logo-dark.png' : BRAND.logoUrl}
+            src={(__BRAND_RUNTIME__
+              ? BRAND.themeClass === 'brand-monad' && BRAND.logoUrl.endsWith('/brands/monad/logo.png')
+              : BRAND.themeClass === 'monad-theme' && BRAND.logoUrl === '/brands/monad/logo.png') ? '/brands/monad/logo-dark.png' : BRAND.logoUrl}
             alt={BRAND.name}
             className="h-8 sm:h-10"
           />
