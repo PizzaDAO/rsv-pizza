@@ -30,6 +30,21 @@
   "notFound": {
     "title": "ページが見つかりません",
     "description": "このページは存在しません。リンクが間違っているか、古い可能性があります。",
-    "goHome": "ホームに戻る"
+    "goHome": "ホームに戻る",
+    "eventTitle": "イベントが見つかりません",
+    "eventDescription": "イベントが見つかりませんでした。リンクが間違っているか、イベントが削除された可能性があります。",
+    "seriesTitle": "シリーズが見つかりません",
+    "seriesDescription": "このアドレスにイベントシリーズはありません。",
+    "browseEvents": "イベントを探す",
+    "createYourOwn": "自分で作成する",
+    "searchPlaceholder": "イベントを検索",
+    "search": "検索",
+    "activeSeries": "開催中のシリーズ"
+  },
+  "banner": {
+    "findCities": "他の都市はこちら:",
+    "pause": "スクロールバナーを一時停止",
+    "play": "スクロールバナーを再開",
+    "dismiss": "閉じる"
   }
 }

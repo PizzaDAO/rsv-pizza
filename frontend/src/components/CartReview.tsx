@@ -110,8 +110,12 @@ export const CartReview: React.FC<CartReviewProps> = ({
   const ceilingOk = !isPhone || (ceilingCents > 0 && (maxCeiling === null || ceilingCents <= maxCeiling));
   const e164 = toE164(phone);
   const pickupIso = zonedLocalToIso(pickupLocal, tz);
+  // The order uses the pickup the cart was BUILT with, not what the field says now: a changed field needs a rebuild
+  // before approving, or the review would show one time and the shop would be given another.
+  const builtPickup = cartState?.cart?.fulfillment?.scheduled_for ?? null;
+  const pickupChanged = !!builtPickup && !!pickupIso && Date.parse(builtPickup) !== Date.parse(pickupIso);
   // basil-14648 P2: the email rules the host can see and fix here: the lead time, and the size of what is left
-  const leadProblem = email ? emailPickupProblem(pickupIso, rules) : null;
+  const leadProblem = email ? emailPickupProblem(pickupChanged ? pickupIso : builtPickup ?? pickupIso, rules) : null;
   const leadText = leadProblem === 'too_soon'
     ? t('aiOrder.email.pickupTooSoon', { minHours: rules.min_lead_hours })
     : leadProblem === 'too_late' ? t('aiOrder.email.pickupTooLate', { maxDays: rules.max_lead_days }) : null;
@@ -121,11 +125,11 @@ export const CartReview: React.FC<CartReviewProps> = ({
       ? t('aiOrder.email.tooFew', { minPizzas: rules.min_pizzas, count: lineCount })
       : lineCount > rules.max_pizzas ? t('aiOrder.email.tooMany', { maxPizzas: rules.max_pizzas, count: lineCount }) : null
     : null;
-  const ready = !!quote && !cartState?.issues.length && ceilingOk && !!e164 && name.trim().length > 0 && !leadProblem && !sizeText;
+  const ready = !!quote && !cartState?.issues.length && ceilingOk && !!e164 && name.trim().length > 0 && !leadProblem && !sizeText && !pickupChanged;
   // say what is missing instead of a silent disabled button
   const missing = !quote
     ? null
-    : leadText ?? sizeText ?? (cartState?.issues.length
+    : leadText ?? sizeText ?? (pickupChanged ? t('aiOrder.cart.missingRebuild') : null) ?? (cartState?.issues.length
       ? t('aiOrder.cart.missingIssues')
       : !ceilingOk
         ? t('aiOrder.cart.missingLimit')
@@ -244,7 +248,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
           ) : (
             <p className="text-sm text-theme-text whitespace-pre-line">{quote.read_back}</p>
           )}
-          {pickupIso && <p className="text-sm text-theme-text-secondary">{t('aiOrder.cart.pickupAt', { time: formatWhen(pickupIso, tz) })}</p>}
+          {(builtPickup ?? pickupIso) && <p className="text-sm text-theme-text-secondary">{t('aiOrder.cart.pickupAt', { time: formatWhen(builtPickup ?? pickupIso, tz) })}</p>}
           {/* basil-14648 P2: say where the estimate comes from when it is the host's own menu */}
           {cartState?.cart?.menu?.provenance === 'host_provided' && (
             <p className="text-sm font-medium text-theme-text">

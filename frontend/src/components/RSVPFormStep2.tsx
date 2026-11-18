@@ -22,6 +22,15 @@ export function RSVPFormStep2({
   const { t } = useTranslation('rsvp');
   const label = submitLabel ?? (isEditing ? t('step2.editSubmit') : t('step2.submit'));
 
+  const hasPrefs =
+    form.dietaryRestrictions.length > 0 ||
+    form.likedToppings.length > 0 ||
+    // 'anchovies' is the untouched default dislike
+    form.dislikedToppings.length !== 1 || form.dislikedToppings[0] !== 'anchovies' ||
+    form.likedBeverages.length > 0 ||
+    form.dislikedBeverages.length > 0 ||
+    form.pizzeriaRankings.length > 0;
+
   // Use host-configured dietary options if non-empty, else fall back to all defaults
   const dietaryOptionsToShow: string[] = form.availableDietaryOptions.length > 0
     ? [
@@ -391,6 +400,17 @@ export function RSVPFormStep2({
       {donationSlot}
 
       {/* Navigation buttons */}
+      {!isEditing && !hasPrefs && (
+        <button
+          type="button"
+          onClick={() => void form.submitRsvp(undefined, { skipProfileSave: true })}
+          disabled={form.submitting || form.prefsPending}
+          className="w-full text-sm text-theme-text-secondary hover:text-theme-text underline disabled:opacity-50"
+          data-testid="rsvp-skip-prefs"
+        >
+          {t('step2.skip')}
+        </button>
+      )}
       <div className="flex gap-3">
         <button
           type="button"

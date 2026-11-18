@@ -7,6 +7,7 @@ import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
 import { getOperationalLimits } from '../lib/privateConfig.js';
+import { sanitizePhotoForPublic } from '../lib/photoPublic.js';
 
 const router = Router();
 
@@ -57,6 +58,15 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
         throw new AppError('Photos are private', 403, 'PHOTOS_PRIVATE');
       }
     }
+
+    // Editors (hosts/cohosts, payment admins, underbosses in scope) get full rows; everyone
+    // else gets a projection without uploader email / guest id / reviewer id.
+    const viewerIsEditor =
+      !!req.userId &&
+      ((await canUserEditParty(partyId, req.userId, req.userEmail)) ||
+        (await canAdminManagePartyPhotos(partyId, req.userEmail)));
+    const cleanRow = <T extends { uploaderEmail?: string | null; uploadedBy?: string | null; reviewedBy?: string | null; guest?: { id?: string; name?: string | null } | null }>(row: T) =>
+      viewerIsEditor ? row : (sanitizePhotoForPublic(row, req.userEmail) as unknown as T);
 
     // Build query filters
     const where: any = { partyId };
@@ -140,7 +150,7 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
       const photosWithVote = photos.map((p) => {
         const { votes, ...rest } = p as typeof p & { votes?: { id: string }[] };
         return {
-          ...rest,
+          ...cleanRow(rest),
           source: 'photo' as const,
           payoutId: null,
           votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
@@ -246,7 +256,7 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
       votedByMe: boolean;
       createdAt: Date;
       updatedAt: Date;
-      guest: { id: string; name: string | null } | null;
+      guest: { id?: string; name: string | null } | null;
       source: 'photo' | 'payout';
       payoutId: string | null;
       // porchetta-58296: surfaced so the payout form can hydrate its role slots.
@@ -262,8 +272,8 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
           guest?: { id: string; name: string | null } | null;
         };
         return {
-          ...rest,
-          guest: guest ?? null,
+          ...cleanRow(rest),
+          guest: guest ? (viewerIsEditor ? guest : { name: guest.name }) as Merged['guest'] : null,
           source: 'photo',
           payoutId: null,
           payoutRole: rest.payoutRole ?? null,
@@ -389,23 +399,25 @@ router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, nex
 
     // provolone-58931: stats always exclude soft-deleted photos (even for
     // super-admins — deleted items shouldn't inflate the displayed counts).
-    const totalPhotos = await prisma.photo.count({ where: { partyId, status: 'approved', deletedAt: null } });
-    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true, status: 'approved', deletedAt: null } });
-    const pendingPhotos = await prisma.photo.count({ where: { partyId, status: 'pending', deletedAt: null } });
+    const [totalPhotos, starredPhotos, pendingPhotos, tagRows, uniqueUploaders] = await Promise.all([
+      prisma.photo.count({ where: { partyId, status: 'approved', deletedAt: null } }),
+      prisma.photo.count({ where: { partyId, starred: true, status: 'approved', deletedAt: null } }),
+      prisma.photo.count({ where: { partyId, status: 'pending', deletedAt: null } }),
+      // Distinct tags computed in the database (no unbounded row fetch).
+      prisma.$queryRaw<{ tag: string }[]>`
+        SELECT DISTINCT unnest(tags) AS tag FROM photos WHERE party_id = ${partyId}::uuid AND deleted_at IS NULL`,
+      // Get unique uploaders count
+      prisma.photo.groupBy({
+        by: ['uploaderEmail'],
+        where: { partyId, uploaderEmail: { not: null }, deletedAt: null },
+      }),
+    ]);
+    const uniqueTags = tagRows.map(r => r.tag).filter(Boolean);
 
-    // Get unique tags
-    const photos = await prisma.photo.findMany({
-      where: { partyId, deletedAt: null },
-      select: { tags: true },
-    });
-    const allTags = photos.flatMap(p => p.tags);
-    const uniqueTags = [...new Set(allTags)];
-
-    // Get unique uploaders count
-    const uniqueUploaders = await prisma.photo.groupBy({
-      by: ['uploaderEmail'],
-      where: { partyId, uploaderEmail: { not: null }, deletedAt: null },
-    });
+    // Public anonymous responses are identical for every caller: let the CDN absorb bursts.
+    if (!req.header('authorization')) {
+      res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
+    }
 
     res.json({
       totalPhotos,
@@ -570,9 +582,16 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
     // above, but be defensive. The original photo keeps its existing
     // starred / status / votes; we do NOT replay host-auto-star or
     // auto-approve on the dedup hit.
-    if (fileSize && mimeType) {
+    // Without a content-hash column we can only dedup conservatively: same uploader (verified
+    // guest, signed-in user, or email) + same size + mime + original filename. Never match
+    // another uploader's photo (different photos can share a byte size) and never return
+    // someone else's row.
+    const dedupUploaderClauses: Prisma.PhotoWhereInput[] = [];
+    if (verifiedGuestId) dedupUploaderClauses.push({ uploadedBy: verifiedGuestId });
+    if (uploaderEmail) dedupUploaderClauses.push({ uploaderEmail: String(uploaderEmail).toLowerCase() });
+    if (fileSize && mimeType && fileName && dedupUploaderClauses.length > 0) {
       const existing = await prisma.photo.findFirst({
-        where: { partyId, fileSize, mimeType, deletedAt: null }, // provolone-58931: a deleted dup shouldn't block a fresh re-upload
+        where: { partyId, fileSize, mimeType, fileName, deletedAt: null, OR: dedupUploaderClauses }, // provolone-58931: a deleted dup shouldn't block a fresh re-upload
         select: { id: true },
       });
       if (existing) {
@@ -709,8 +728,18 @@ router.get('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, r
 
     // provolone-58931: hide soft-deleted photos from everyone except super-admins.
     const viewerIsSuperAdmin = await isSuperAdmin(req.userEmail);
+    // Non-editors only see approved photos and a projection without uploader identity.
+    const viewerIsEditor =
+      !!req.userId &&
+      ((await canUserEditParty(partyId, req.userId, req.userEmail)) ||
+        (await canAdminManagePartyPhotos(partyId, req.userEmail)));
     const photo = await prisma.photo.findFirst({
-      where: { id: photoId, partyId, ...(viewerIsSuperAdmin ? {} : { deletedAt: null }) },
+      where: {
+        id: photoId,
+        partyId,
+        ...(viewerIsSuperAdmin ? {} : { deletedAt: null }),
+        ...(viewerIsEditor ? {} : { status: 'approved' }),
+      },
       include: {
         guest: { select: { id: true, name: true } },
         // salame-58195
@@ -726,7 +755,7 @@ router.get('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, r
 
     const { votes, ...rest } = photo as typeof photo & { votes?: { id: string }[] };
     const photoWithVote = {
-      ...rest,
+      ...(viewerIsEditor ? rest : sanitizePhotoForPublic(rest, req.userEmail)),
       votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
     };
 

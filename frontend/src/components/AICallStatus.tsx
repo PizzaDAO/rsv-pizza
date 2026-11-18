@@ -39,10 +39,24 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
 
   // Poll for status updates
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    let timeIntervalId: NodeJS.Timeout;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+    let timeIntervalId: ReturnType<typeof setInterval> | undefined;
+    let stopped = false;
+    // Exponential backoff while the status is unchanged (3s -> 15s); resets when it changes.
+    const BASE_DELAY = 3000;
+    const MAX_DELAY = 15000;
+    let delay = BASE_DELAY;
+    let lastStatus: string | null = null;
+
+    const schedule = () => {
+      if (stopped) return;
+      pollTimer = setTimeout(fetchStatus, delay);
+    };
 
     const fetchStatus = async () => {
+      if (stopped) return;
+      // Pause while the tab is hidden; the visibilitychange handler resumes immediately.
+      if (document.hidden) return;
       try {
         const token = localStorage.getItem('authToken');
         const response = await fetch(`${BACKEND_URL}/api/ai-phone/${aiPhoneCallId}/status`, {
@@ -61,24 +75,37 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
         }
 
         const data: CallStatusData = await response.json();
+        if (stopped) return;
         setCallData(data);
         setStatus(data.status);
 
         // If call is complete, stop polling
         if (['completed', 'failed', 'no_answer'].includes(data.status)) {
-          clearInterval(intervalId);
+          stopped = true;
           clearInterval(timeIntervalId);
           onComplete(data);
+          return;
         }
+        delay = data.status !== lastStatus ? BASE_DELAY : Math.min(MAX_DELAY, Math.round(delay * 1.5));
+        lastStatus = data.status;
       } catch (err) {
         console.error('Error fetching call status:', err);
         setError(err instanceof Error ? err.message : 'Failed to get call status');
+        delay = Math.min(MAX_DELAY, Math.round(delay * 1.5));
       }
+      schedule();
     };
+
+    const onVisible = () => {
+      if (document.hidden || stopped) return;
+      clearTimeout(pollTimer);
+      delay = BASE_DELAY;
+      fetchStatus();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     // Start polling
     fetchStatus();
-    intervalId = setInterval(fetchStatus, 3000);
 
     // Update elapsed time
     timeIntervalId = setInterval(() => {
@@ -86,8 +113,10 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
     }, 1000);
 
     return () => {
-      clearInterval(intervalId);
+      stopped = true;
+      clearTimeout(pollTimer);
       clearInterval(timeIntervalId);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [aiPhoneCallId, onComplete]);
 

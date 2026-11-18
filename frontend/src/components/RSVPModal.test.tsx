@@ -181,6 +181,7 @@ describe('RSVPModal', () => {
         updated: false,
         waitlisted: false,
         waitlistPosition: null,
+        emailSent: false,
         guestToken: null,
       });
       mockMint.mockResolvedValue({});
@@ -220,6 +221,7 @@ describe('RSVPModal', () => {
       updated: false,
       waitlisted: false,
       waitlistPosition: null,
+      emailSent: false,
     });
     mockMint.mockRejectedValue(Object.assign(new Error('Guest or event not found'), { status: 404 }));
 
@@ -251,6 +253,7 @@ describe('RSVPModal', () => {
       updated: false,
       waitlisted: false,
       waitlistPosition: null,
+      emailSent: false,
     });
     mockMint.mockRejectedValue(Object.assign(new Error('RPC down'), { status: 500 }));
 
@@ -281,6 +284,7 @@ describe('RSVPModal', () => {
       updated: false,
       waitlisted: false,
       waitlistPosition: null,
+      emailSent: false,
     });
     mockMint.mockResolvedValue({ txHash: '0x' + 'f'.repeat(64), tokenId: '9' });
 

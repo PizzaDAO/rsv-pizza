@@ -1014,5 +1014,14 @@
       "rsvpBody": "Scanne den Code, um die Eventseite zu öffnen und zuzusagen.",
       "wifiHeadline": "WLAN"
     }
+  },
+  "nextSteps": {
+    "title": "Nächste Schritte",
+    "subtitle": "Dein Event ist online. Hol die Leute dazu.",
+    "copyLink": "Einladungslink kopieren",
+    "copied": "Link kopiert",
+    "inviteGuests": "Gäste einladen",
+    "orderPizza": "Pizza bestellen",
+    "dismiss": "Nächste Schritte ausblenden"
   }
 }

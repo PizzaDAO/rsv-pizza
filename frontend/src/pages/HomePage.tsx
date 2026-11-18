@@ -3,20 +3,29 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
+import { DismissibleGppBanner } from '../components/DismissibleGppBanner';
 import { EventForm } from '../components/EventForm';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, Loader2, Users, Plus, MapPin, Crown } from 'lucide-react';
+import { Calendar, Loader2, Users, Plus, MapPin, Crown, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { IconInput } from '../components/IconInput';
+import { groupEvents, paginateGroups, formatPartyDate as formatDate } from '../lib/homeEvents';
+import type { UserPartyListItem } from '../lib/api';
 import { fetchMyEvents } from '../lib/api';
 import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { SeriesLandingPage } from './SeriesLandingPage';
 import { fetchPublicSeriesList } from '../lib/seriesApi';
 
+const PAGE_SIZE = 30;
+
 export function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useTranslation('account');
 
   const [eventFilter, setEventFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [query, setQuery] = useState('');
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [tbdOpen, setTbdOpen] = useState(false);
 
   // Fetch all user events in a single API call with React Query caching
   const { data: allUserParties = [], isLoading: allPartiesLoading } = useQuery({
@@ -43,18 +52,7 @@ export function HomePage() {
     : allUserParties;
   const partiesLoading = allPartiesLoading || (IS_SERIES_SCOPED && !!user && seriesLoading);
 
-  // Format party date for display
-  const formatPartyDate = (dateStr: string | null) => {
-    if (!dateStr) return t('home.dateTbd');
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
-  };
+  const formatPartyDate = (dateStr: string | null) => formatDate(dateStr, t('home.dateTbd'));
 
   // Show loading state while auth is loading
   if (authLoading) {
@@ -71,11 +69,7 @@ export function HomePage() {
   if (user && (userParties.length > 0 || partiesLoading)) {
     return (
       <Layout>
-        {!IS_SERIES_SCOPED && (
-          <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
-            {t('home.gppBanner')}
-          </Link>
-        )}
+        {!IS_SERIES_SCOPED && <DismissibleGppBanner message={t('home.gppBanner')} />}
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('home.yourEvents')}</h1>
@@ -87,7 +81,8 @@ export function HomePage() {
             <div className="inline-flex bg-theme-surface border border-theme-stroke rounded-xl p-1">
               <button
                 type="button"
-                onClick={() => setEventFilter('upcoming')}
+                aria-pressed={eventFilter === 'upcoming'}
+                onClick={() => { setEventFilter('upcoming'); setVisible(PAGE_SIZE); }}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   eventFilter === 'upcoming'
                     ? 'bg-white text-black'
@@ -98,7 +93,8 @@ export function HomePage() {
               </button>
               <button
                 type="button"
-                onClick={() => setEventFilter('past')}
+                aria-pressed={eventFilter === 'past'}
+                onClick={() => { setEventFilter('past'); setVisible(PAGE_SIZE); }}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   eventFilter === 'past'
                     ? 'bg-white text-black'
@@ -122,19 +118,26 @@ export function HomePage() {
               <Loader2 size={32} className="animate-spin text-theme-text-secondary" />
             </div>
           ) : (
-            <div className="space-y-3 mb-8">
+            <div className="mb-8">
+              {userParties.length > 5 && (
+                <div className="mb-4">
+                  <IconInput
+                    icon={Search}
+                    type="search"
+                    value={query}
+                    onChange={(e) => { setQuery(e.target.value); setVisible(PAGE_SIZE); }}
+                    placeholder={t('home.searchPlaceholder')}
+                    aria-label={t('home.searchPlaceholder')}
+                    data-testid="home-search"
+                  />
+                </div>
+              )}
               {(() => {
-                const now = new Date();
-                const filteredParties = userParties.filter(party => {
-                  const partyDate = party.date ? new Date(party.date) : null;
-                  if (eventFilter === 'upcoming') {
-                    return !partyDate || partyDate >= now;
-                  } else {
-                    return partyDate && partyDate < now;
-                  }
-                });
+                const groups = groupEvents(userParties, { filter: eventFilter, query });
+                const page = paginateGroups(groups, visible);
+                const shown = page.hosting.length + page.attending.length;
 
-                if (filteredParties.length === 0) {
+                if (page.total === 0 && groups.tbd.length === 0) {
                   return (
                     <div className="text-center py-8 text-theme-text-muted">
                       {t('home.noEvents', { filter: eventFilter === 'upcoming' ? t('home.upcoming').toLowerCase() : t('home.past').toLowerCase() })}
@@ -142,7 +145,7 @@ export function HomePage() {
                   );
                 }
 
-                return filteredParties.map(party => (
+                const renderCard = (party: UserPartyListItem) => (
                 <Link
                   key={party.id}
                   to={party.role === 'host' ? `/host/${party.inviteCode}` : `/${party.inviteCode}`}
@@ -203,7 +206,52 @@ export function HomePage() {
                     </div>
                   </div>
                 </Link>
-              ));
+                );
+
+                return (
+                  <>
+                    {page.hosting.length > 0 && (
+                      <section className="mb-6" aria-label={t('home.hosting')}>
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-theme-text-muted mb-3">
+                          {t('home.hosting')} ({groups.hosting.length})
+                        </h2>
+                        <div className="space-y-3">{page.hosting.map(renderCard)}</div>
+                      </section>
+                    )}
+                    {page.attending.length > 0 && (
+                      <section className="mb-6" aria-label={t('home.attending')}>
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-theme-text-muted mb-3">
+                          {t('home.attending')} ({groups.attending.length})
+                        </h2>
+                        <div className="space-y-3">{page.attending.map(renderCard)}</div>
+                      </section>
+                    )}
+                    {shown < page.total && (
+                      <button
+                        type="button"
+                        onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                        className="btn-secondary w-full mb-6"
+                        data-testid="home-show-more"
+                      >
+                        {t('home.showMore', { count: page.total - shown })}
+                      </button>
+                    )}
+                    {groups.tbd.length > 0 && (
+                      <section aria-label={t('home.dateTbd')}>
+                        <button
+                          type="button"
+                          onClick={() => setTbdOpen((o) => !o)}
+                          aria-expanded={tbdOpen}
+                          className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-theme-text-muted mb-3 hover:text-theme-text"
+                        >
+                          {tbdOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          {t('home.dateTbd')} ({groups.tbd.length})
+                        </button>
+                        {tbdOpen && <div className="space-y-3">{groups.tbd.map(renderCard)}</div>}
+                      </section>
+                    )}
+                  </>
+                );
               })()}
             </div>
           )}
@@ -221,11 +269,10 @@ export function HomePage() {
   // Default: Show event creation form (for non-signed-in users or users with no parties)
   return (
     <Layout>
-      <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
-        Planning a Global Pizza Party? Create it at {`${BRAND.domain}/gpp`}
-      </Link>
+      <DismissibleGppBanner message={`Planning a Global Pizza Party? Create it at ${BRAND.domain}/gpp`} />
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="card p-8">
+          <h1 className="text-2xl font-bold text-theme-text mb-6">{t('eventForm.heading')}</h1>
           <EventForm />
         </div>
 

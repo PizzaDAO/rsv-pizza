@@ -289,6 +289,8 @@ export interface UpdatePartyData {
   targetAttendance?: number | null;
   expectedAttendance?: number | null;
   eventTags?: string[];
+  // scam-flag-private: targeted toggle; the backend adds/removes only 'prepay' on the stored tags.
+  prepay?: boolean;
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
@@ -434,6 +436,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       targetAttendance: data.targetAttendance,
       expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
+      prepay: data.prepay,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
@@ -1163,6 +1166,25 @@ export interface PublicEvent {
   hasHackathon?: boolean;
 }
 
+// Is the signed-in caller a host/co-host (or admin) of this event? The server derives the caller from
+// the Bearer token; unauthenticated callers always get { isHost: false, canEdit: false }.
+export async function checkEventHost(slug: string): Promise<{ isHost: boolean; canEdit: boolean }> {
+  const token = getAuthToken();
+  if (!token) return { isHost: false, canEdit: false };
+  try {
+    const resp = await fetch(`${API_URL}/api/events/${encodeURIComponent(slug)}/check-host`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return { isHost: false, canEdit: false };
+    const data = await resp.json();
+    return { isHost: !!data.isHost, canEdit: !!data.canEdit };
+  } catch (e) {
+    console.warn('Could not check host status:', e);
+    return { isHost: false, canEdit: false };
+  }
+}
+
 // Public Event API (no auth required)
 export async function getEventBySlug(
   slug: string,
@@ -1491,13 +1513,30 @@ export async function restorePhoto(partyId: string, photoId: string): Promise<bo
   }
 }
 
-// Get photo statistics
-export async function getPhotoStats(partyId: string): Promise<PhotoStats | null> {
+// Shares concurrent identical GETs (and optionally keeps the result for ttlMs after it settles) so a
+// page and its child components that ask for the same public data issue one request.
+const sharedGets = new Map<string, { settledAt: number | null; promise: Promise<unknown> }>();
+function sharedGet<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const hit = sharedGets.get(key);
+  if (hit && (hit.settledAt === null || Date.now() - hit.settledAt < ttlMs)) return hit.promise as Promise<T>;
+  const entry: { settledAt: number | null; promise: Promise<unknown> } = { settledAt: null, promise: fn() };
+  sharedGets.set(key, entry);
+  entry.promise.then(
+    () => { entry.settledAt = Date.now(); },
+    () => { if (sharedGets.get(key) === entry) sharedGets.delete(key); },
+  );
+  return entry.promise as Promise<T>;
+}
+
+// Get photo statistics. Cached 10s so the event page and its gallery share one request; pass
+// { fresh: true } after a mutation.
+export async function getPhotoStats(partyId: string, opts?: { fresh?: boolean }): Promise<PhotoStats | null> {
   try {
-    return await apiRequest<PhotoStats>(`/api/parties/${partyId}/photos/stats`, {
+    const run = () => apiRequest<PhotoStats>(`/api/parties/${partyId}/photos/stats`, {
       method: 'GET',
       requireAuth: false,
     });
+    return opts?.fresh ? await run() : await sharedGet(`photo-stats:${partyId}`, 10_000, run);
   } catch (error) {
     console.error('Error fetching photo stats:', error);
     return null;
@@ -1569,10 +1608,10 @@ export async function togglePayoutPhotoVote(
 // Get available photo tags for a party (defaults + confirmed sponsor names)
 export async function getPhotoTags(partyId: string): Promise<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] } | null> {
   try {
-    return await apiRequest<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] }>(`/api/parties/${partyId}/photos/tags`, {
+    return await sharedGet(`photo-tags:${partyId}`, 0, () => apiRequest<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] }>(`/api/parties/${partyId}/photos/tags`, {
       method: 'GET',
       requireAuth: false,
-    });
+    }));
   } catch (error) {
     console.error('Error fetching photo tags:', error);
     return null;
@@ -1698,10 +1737,10 @@ export interface UpdatePerformerData {
 // Get performers for a party (public endpoint)
 export async function getPerformers(partyId: string): Promise<PerformersResponse | null> {
   try {
-    return await apiRequest<PerformersResponse>(`/api/parties/${partyId}/performers`, {
+    return await sharedGet(`performers:${partyId}`, 0, () => apiRequest<PerformersResponse>(`/api/parties/${partyId}/performers`, {
       method: 'GET',
       requireAuth: false,
-    });
+    }));
   } catch (error) {
     console.error('Error fetching performers:', error);
     return null;
@@ -2008,16 +2047,20 @@ export async function markInvoicePaid(
   partyId: string,
   invoiceId: string,
   data: { paymentMethod?: string; paymentRef?: string; paidAmount?: number }
-): Promise<{ invoice: Invoice } | null> {
-  try {
-    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
-      method: 'POST',
-      body: data,
-    });
-  } catch (error) {
-    console.error('Error marking invoice paid:', error);
-    return null;
-  }
+): Promise<{ invoice: Invoice }> {
+  // Throws on failure so the UI can show the server's message.
+  return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
+    method: 'POST',
+    body: data,
+  });
+}
+
+// Reject a pending payment claim (pending_verification -> issued)
+export async function rejectInvoiceClaim(partyId: string, invoiceId: string): Promise<{ invoice: Invoice }> {
+  // Throws on failure so the UI can show the server's message.
+  return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/reject-claim`, {
+    method: 'POST',
+  });
 }
 
 // Get public invoice by view token (no auth required)
@@ -4856,6 +4899,7 @@ interface GPPEventApiResponse {
   id: string;
   name: string;
   city: string;
+  geoCity?: string | null;
   customUrl: string | null;
   inviteCode: string;
   date: string | null;
@@ -4942,6 +4986,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
       region: e.region ?? null,
       rsvpCount: e.guestCount ?? 0,
       eventImageUrl: e.eventImageUrl ?? null,
+      latitude: e.latitude ?? null,
+      longitude: e.longitude ?? null,
     }));
   }
   const data = await apiRequest<GPPEventsApiPayload>(
@@ -4951,7 +4997,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
   return (data.events || []).map((e) => ({
     id: e.id,
     name: e.name,
-    city: e.city,
+    // geoCity = host/geocoded city only; `city` falls back to the event name server-side.
+    city: e.geoCity !== undefined ? e.geoCity ?? '' : e.city,
     slug: e.customUrl || e.inviteCode,
     date: e.date,
     venueName: e.venueName,
@@ -4960,6 +5007,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
     region: e.region ?? null,
     rsvpCount: e.guestCount ?? 0,
     eventImageUrl: e.eventImageUrl ?? null,
+    latitude: e.latitude ?? null,
+    longitude: e.longitude ?? null,
   }));
 }
 

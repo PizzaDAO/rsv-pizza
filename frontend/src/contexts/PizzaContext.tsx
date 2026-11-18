@@ -114,6 +114,11 @@ export function preserveHostOnlyFields(next: Party, prev: Party): void {
   next.hostTelegramLinkToken = prev.hostTelegramLinkToken;
   next.reimbursementCapAppealNote = prev.reimbursementCapAppealNote;
   next.cancelledBy = prev.cancelledBy;
+  // scam-flag-private: a SAFE re-read only carries public_event_tags; keep the raw tags (and the
+  // cap derived from numeric/k tags) the editor loaded from the API.
+  next.eventTags = prev.eventTags;
+  next.rawEventTagsLoaded = prev.rawEventTagsLoaded;
+  next.effectiveReimbursementCapUsd = prev.effectiveReimbursementCapUsd;
 }
 
 // Convert database party to app party
@@ -180,9 +185,12 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     // party. Other internal tags ('go', numeric caps) are deliberately KEPT —
     // HostPage's cap-gating + reimbursementCap math rely on them. The raw
     // dbParty.event_tags is still used directly for the cap computation below.
+    // scam-flag-private: anon rows carry only public_event_tags (aliased to event_tags); for
+    // editors getPartyWithGuests merges the raw list from GET /api/parties/:id first.
     eventTags: (dbParty.event_tags || []).filter((t) => t !== REFUND_TAG),
     eventSeriesId: dbParty.event_series_id || null,
     canEdit: dbParty.can_edit || false,
+    rawEventTagsLoaded: dbParty.raw_event_tags_loaded === true,
     allowedTabs: dbParty.allowed_tabs,
     hiddenGppPhotos: (dbParty.hidden_gpp_photos as string[]) || [],
     extraGppPhotos: (dbParty.extra_gpp_photos as string[]) || [],

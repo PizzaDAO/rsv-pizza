@@ -14,6 +14,13 @@ import { next } from '@vercel/edge';
  * (401). The form POSTs to /__gate; a correct password sets an HttpOnly,
  * Secure, SameSite=Lax cookie that holds an HMAC of the password (never the
  * raw value) and redirects back. Remove the gate by unsetting SITE_PASSWORD.
+ *
+ * Automation bypass: when the server-only env var SITE_GATE_BYPASS is set AND
+ * is at least 32 chars, a request carrying an `x-site-gate-bypass` header equal
+ * to it (constant-time compare) skips the gate as if it had a valid cookie. No
+ * cookie is set, and query params are never accepted (header only, so the
+ * secret stays out of URLs/logs). Unset or shorter = no bypass; a wrong header
+ * falls through to the normal gate with no distinct error.
  * Uses only Web Crypto, so it runs in the Vercel Edge runtime.
  */
 
@@ -21,6 +28,8 @@ export const GATE_PATH = '/__gate';
 export const GATE_COOKIE = 'site_gate';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const HMAC_MESSAGE = 'site-gate-v1';
+export const BYPASS_HEADER = 'x-site-gate-bypass';
+const BYPASS_MIN_LENGTH = 32;
 
 /**
  * Real public files (frontend/public) that may load before login, e.g. on the
@@ -132,8 +141,20 @@ function formPage(next: string, failed: boolean): Response {
  * Returns a Response to short-circuit the request (form / redirect), or null
  * when the request may proceed (gate disabled, open asset, or valid cookie).
  */
-export async function siteGate(request: Request, password: string | undefined): Promise<Response | null> {
+export async function siteGate(
+  request: Request,
+  password: string | undefined,
+  bypassSecret?: string
+): Promise<Response | null> {
   if (!password) return null;
+
+  // Automation bypass: header only, secret >= 32 chars. Compare HMACs so length is not leaked.
+  const presented = request.headers.get(BYPASS_HEADER);
+  if (bypassSecret && bypassSecret.length >= BYPASS_MIN_LENGTH && presented) {
+    const a = await hmacHex(bypassSecret, 'site-gate-bypass-v1|' + presented);
+    const b = await hmacHex(bypassSecret, 'site-gate-bypass-v1|' + bypassSecret);
+    if (timingSafeEqual(a, b)) return null;
+  }
 
   const url = new URL(request.url);
   const expected = await hmacHex(password, HMAC_MESSAGE);
@@ -399,7 +420,7 @@ export default async function middleware(request: Request) {
   // Optional password gate (white-label previews). Inert unless SITE_PASSWORD is set.
   const sitePassword = process.env.SITE_PASSWORD;
   if (sitePassword) {
-    const gated = await siteGate(request, sitePassword);
+    const gated = await siteGate(request, sitePassword, process.env.SITE_GATE_BYPASS);
     if (gated) return gated;
   }
 

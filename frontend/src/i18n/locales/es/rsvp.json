@@ -38,7 +38,9 @@
     "submit": "Confirmar Asistencia",
     "editSubmit": "Editar RSVP",
     "submitting": "Enviando...",
-    "saving": "Guardando..."
+    "saving": "Guardando...",
+    "skip": "Omitir: como de todo",
+    "optionalHint": "Opcional: añade preferencias u omite para terminar tu RSVP."
   },
   "success": {
     "seeYou": "¡Nos vemos en {{eventName}}!",
@@ -50,7 +52,13 @@
     "preferenceSaved": "Tus preferencias han sido guardadas.",
     "waitlisted": "¡Estás en la Lista de Espera!",
     "waitlistedDesc": "¡Este evento está actualmente lleno, pero eres #{{position}} en la lista de espera! Te notificaremos si se abre un lugar.",
-    "backToEvent": "Volver al Evento"
+    "backToEvent": "Volver al Evento",
+    "alreadyOnList": "Ya estás en la lista",
+    "alreadyOnListDesc": "Este correo ya está registrado para este evento, así que no se cambió nada.",
+    "confirmationSent": "Confirmación enviada a {{email}}",
+    "addToCalendar": "Añadir al calendario",
+    "calendar": "Calendario",
+    "changeRsvpHint": "¿Quieres cambiar algo? Puedes editar tu RSVP desde la página del evento."
   },
   "password": {
     "title": "Contraseña Requerida",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "Comprar Pizza para {{recipient}}",
     "buyPizzaForEvent": "Comprar Pizza para este evento",
     "buyPizzaForEventName": "Comprar Pizza para {{eventName}}",
-    "thanksForSupport": "¡Gracias por tu apoyo!"
+    "thanksForSupport": "¡Gracias por tu apoyo!",
+    "buyPizzaForPrefix": "Comprar pizza para"
   },
   "nft": {
     "minting": "Acuñando tu NFT...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "¡NFT Ya Reclamado!",
     "viewOnOpenSea": "Ver en OpenSea",
     "viewTransaction": "Ver Transacción",
-    "mintFailed": "La acuñación del NFT falló"
+    "mintFailed": "La acuñación del NFT falló",
+    "afterApproval": "Recibirás tu NFT cuando el anfitrión te apruebe."
   },
   "share": {
     "tellFriends": "¡Cuéntale a tus amigos sobre la fiesta!",
@@ -137,5 +147,6 @@
     "Plain": "Simple",
     "Gluten-Free": "Sin Gluten",
     "Dairy-Free": "Sin Lácteos"
-  }
+  },
+  "close": "Cerrar"
 }

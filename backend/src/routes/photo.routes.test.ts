@@ -20,6 +20,7 @@ const mockPrisma = vi.hoisted(() => ({
     count: vi.fn(() => Promise.resolve(0)),
   },
   guest: { findFirst: vi.fn() },
+  $queryRaw: vi.fn(() => Promise.resolve([])),
   // marinara-71630 P8: the upload handler now resolves its per-user photo cap
   // from getOperationalLimits(), which reads app_config. Default to no row so
   // the loader falls back to the current real value (30) — the behavior the
@@ -269,7 +270,7 @@ describe('Photo Routes - Moderation', () => {
         .mockResolvedValueOnce(10) // totalPhotos
         .mockResolvedValueOnce(3)  // starredPhotos
         .mockResolvedValueOnce(2); // pendingPhotos
-      mockPrisma.photo.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
       mockPrisma.photo.groupBy.mockResolvedValue([]);
 
       const res = await request(app).get(`/api/parties/${PARTY_ID}/photos/stats`);

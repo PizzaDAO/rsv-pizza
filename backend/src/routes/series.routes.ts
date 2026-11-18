@@ -12,6 +12,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isTestParty } from '../lib/testParty.js';
 
 const router = Router();
 
@@ -69,6 +70,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
       orderBy: [{ createdAt: 'asc' }],
       select: PUBLIC_SELECT,
     });
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
     res.json({ series: rows.map(toPublic) });
   } catch (error) {
     next(error);
@@ -85,6 +87,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       select: PUBLIC_SELECT,
     });
     if (!row) throw new AppError('Series not found', 404, 'NOT_FOUND');
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
     res.json({ series: toPublic(row) });
   } catch (error) {
     next(error);
@@ -109,6 +112,7 @@ router.get('/:slug/cities/:city/count', async (req: Request, res: Response, next
         AND cancelled_at IS NULL
         AND underboss_status IN ('pending', 'approved', 'listed')`;
     const count = Number(rows[0]?.n ?? 0);
+    res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
     res.json({ city, count });
   } catch (error) {
     next(error);
@@ -148,7 +152,7 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
       take: 2000,
     });
 
-    const events = rows.map((e) => ({
+    const events = rows.filter((e) => !isTestParty(e.name)).map((e) => ({
       id: e.id,
       name: e.name,
       city: e.city,
@@ -167,6 +171,7 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
         guestCount: (e as any).hideGuests ? null : ((e as any)._count?.guests ?? 0),
       } : {}),
     }));
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
     res.json({ events });
   } catch (error) {
     next(error);

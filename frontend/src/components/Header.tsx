@@ -62,7 +62,10 @@ export const Header: React.FC<HeaderProps> = ({
           <img
             src={BRAND.themeClass === 'monad-theme' && BRAND.logoUrl === '/brands/monad/logo.png' ? '/brands/monad/logo-dark.png' : BRAND.logoUrl}
             alt={BRAND.name}
-            className="h-8 sm:h-10"
+            width={40}
+            height={40}
+            {...{ fetchpriority: "high" }}
+            className="h-8 sm:h-10 w-auto"
           />
           {showBrandText && !HIDE_HEADER_NAME && (
             <span

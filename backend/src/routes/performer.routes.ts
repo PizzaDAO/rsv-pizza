@@ -41,6 +41,13 @@ router.get('/:partyId/performers', optionalAuth, async (req: AuthRequest, res: R
       updatedAt: p.updatedAt,
     }));
 
+    // Only the anonymous response is caller-independent; hosts get extra fields.
+    res.vary('Authorization');
+    if (!req.headers.authorization) {
+      res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
+    } else {
+      res.set('Cache-Control', 'private, no-store');
+    }
     res.json({
       performers: safePerformers,
       musicEnabled: party.musicEnabled,

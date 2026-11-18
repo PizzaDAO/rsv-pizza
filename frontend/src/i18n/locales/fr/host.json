@@ -1016,5 +1016,14 @@
       "rsvpBody": "Scannez le code pour voir la page de l'événement et répondre.",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "Prochaines étapes",
+    "subtitle": "Votre événement est en ligne. Invitez du monde.",
+    "copyLink": "Copier le lien d'invitation",
+    "copied": "Lien copié",
+    "inviteGuests": "Inviter des invités",
+    "orderPizza": "Commander des pizzas",
+    "dismiss": "Masquer les prochaines étapes"
   }
 }

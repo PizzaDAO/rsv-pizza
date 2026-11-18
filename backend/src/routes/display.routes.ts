@@ -19,6 +19,31 @@ function generateSlug(name: string): string {
 
 const router = Router();
 
+// Public display feeds: only approved photos (pending/rejected never show, whether or not
+// moderation is on), and an explicit select so uploader email / guest id / reviewer never leak.
+export const DISPLAY_PHOTO_SELECT = {
+  id: true,
+  partyId: true,
+  url: true,
+  thumbnailUrl: true,
+  fileName: true,
+  fileSize: true,
+  mimeType: true,
+  width: true,
+  height: true,
+  uploaderName: true,
+  caption: true,
+  tags: true,
+  photoYear: true,
+  starred: true,
+  starredAt: true,
+  status: true,
+  duration: true,
+  voteCount: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export const VALID_CONTENT_TYPES = ['slideshow', 'qr_code', 'event_info', 'photos', 'upload', 'custom', 'hackathon'];
 
 /**
@@ -356,10 +381,12 @@ router.get('/view/:partyId/:slug', async (req: AuthRequest, res: Response, next:
         where: {
           partyId: display.partyId,
           deletedAt: null, // provolone-58931: never show soft-deleted photos
+          status: 'approved',
           ...(config?.filter === 'starred' && { starred: true }),
         },
         orderBy: { createdAt: 'desc' },
         take: config?.limit || 50,
+        select: DISPLAY_PHOTO_SELECT,
       });
     }
 
@@ -395,6 +422,14 @@ router.get('/view/:partyId/:slug/photos', async (req: AuthRequest, res: Response
     const { partyId, slug } = req.params;
     const { since } = req.query;
 
+    let sinceDate: Date | null = null;
+    if (since !== undefined) {
+      sinceDate = typeof since === 'string' ? new Date(since) : null;
+      if (!sinceDate || Number.isNaN(sinceDate.getTime())) {
+        throw new AppError('Invalid since timestamp', 400, 'VALIDATION_ERROR');
+      }
+    }
+
     const display = await prisma.display.findUnique({
       where: { partyId_slug: { partyId, slug } },
     });
@@ -407,18 +442,20 @@ router.get('/view/:partyId/:slug/photos', async (req: AuthRequest, res: Response
     const where: any = {
       partyId: display.partyId,
       deletedAt: null, // provolone-58931: never show soft-deleted photos
+      status: 'approved',
       ...(config?.filter === 'starred' && { starred: true }),
     };
 
     // If since timestamp provided, only get newer photos
-    if (since) {
-      where.createdAt = { gt: new Date(since as string) };
+    if (sinceDate) {
+      where.createdAt = { gt: sinceDate };
     }
 
     const photos = await prisma.photo.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: config?.limit || 50,
+      select: DISPLAY_PHOTO_SELECT,
     });
 
     res.json({ photos });

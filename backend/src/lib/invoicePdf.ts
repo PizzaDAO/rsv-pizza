@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, PageSizes, PDFString, PDFName } from 'pdf-lib';
-import sharp from 'sharp';
+import { loadSharp } from './lazySharp.js';
 import { PIZZADAO_LOGO_SVG } from '../assets/pizzadaoLogoSvg.js';
 
 // ── Issuer constants ──────────────────────────────────────────────────────────
@@ -16,6 +16,7 @@ let _logoPng: Buffer | null = null;
 async function getLogoPng(): Promise<Buffer> {
   if (_logoPng) return _logoPng;
   const blackSvg = PIZZADAO_LOGO_SVG.replace(/fill="white"/g, 'fill="black"');
+  const sharp = await loadSharp();
   _logoPng = await sharp(Buffer.from(blackSvg)).resize({ width: 760 }).png().toBuffer();
   return _logoPng;
 }
@@ -152,6 +153,7 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   try {
     const logoPngBuf = await getLogoPng();
     // Sanity-check: mean brightness < 250 means it has dark content
+    const sharp = await loadSharp();
     const stats = await sharp(logoPngBuf).stats();
     const mean = stats.channels.reduce((s, c) => s + c.mean, 0) / stats.channels.length;
     if (mean < 250) {

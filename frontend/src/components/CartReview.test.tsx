@@ -138,4 +138,24 @@ describe('CartReview', () => {
     await userEvent.click(screen.getByRole('button', { name: /Approve and have the AI call/ }));
     expect(onApprove).not.toHaveBeenCalled();
   });
+
+  it('basil-14648 fixes: a pickup changed after the build blocks approval until the order is rebuilt', async () => {
+    const onApprove = vi.fn();
+    const built = '2030-06-01T18:00:00.000Z';
+    const state: CartResponse = { ...base, cart: { ...base.cart!, fulfillment: { scheduled_for: built } } };
+    render(<CartReview {...props({ cartState: state, onApprove, timeZone: 'UTC' })} />);
+    await userEvent.type(screen.getByPlaceholderText(/Your mobile number/), '(617) 555-0123');
+    const field = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    expect(field).toBeTruthy();
+    // the field starts from the host's default, not the built time: set it to the built time first, then change it
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(field, { target: { value: '2030-06-01T18:00' } });
+    expect(screen.queryByText(/Tap Rebuild order/)).toBeNull();
+    fireEvent.change(field, { target: { value: '2030-06-01T19:30' } });
+    expect(screen.getByText(/You changed the pickup time/)).toBeTruthy();
+    // the review still names the time the shop will be given
+    expect(document.body.textContent).toMatch(/6:00/);
+    await userEvent.click(screen.getByRole('button', { name: /Approve and have the AI call/ }));
+    expect(onApprove).not.toHaveBeenCalled();
+  });
 });

@@ -5,10 +5,11 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import { markdownRemarkPlugins } from '../lib/safeMarkdown';
 import { MarkdownBoundary } from '../components/ErrorBoundary';
-import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
+import { MapPin, Users, Pizza, Loader2, Lock, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
+import { NotFoundView } from '../components/NotFoundView';
 import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, getMyGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats, checkEventHost } from '../lib/api';
 import { IconInput } from '../components/IconInput';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
@@ -82,7 +83,7 @@ export function EventPage() {
   // soppressata-50927: optional ?year=YYYY threaded to the year-aware resolver.
   const yearParam = searchParams.get('year');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { t, i18n } = useTranslation('event');
   // invite-verify: a host invite link carries the invitee's token as ?t=; keep it for the
   // RSVP submit and take it out of the address bar.
@@ -158,120 +159,131 @@ export function EventPage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, [event, isAuthenticated]);
 
+  // 1) Event + public stats. Depends only on [slug, yearParam] so it does NOT re-run when auth resolves.
+  const viewTrackedFor = useRef<string | null>(null);
+  // A failed fetch (not found / gated, e.g. a pre-launch event only admins can see) is retried once the
+  // signed-in user changes, since the request carries the caller's token.
+  const failedForUserRef = useRef<string | null | undefined>(undefined);
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+  userIdRef.current = user?.id ?? null;
+  const [retryTick, setRetryTick] = useState(0);
   useEffect(() => {
-    async function loadEvent() {
-      if (slug) {
-        const result = await getEventBySlug(slug, yearParam);
-
-        // Handle redirect from old slug alias
-        if (result && 'redirect' in result) {
-          navigate(`/${result.slug}`, { replace: true });
-          return;
-        }
-
-        // White-label (D8): donations + NFT minting are hidden on branded builds.
-        const foundEvent = result && BRAND.isBranded
-          ? { ...result, donationEnabled: false, nftEnabled: false }
-          : result;
-        // White-label: an event outside this build's series belongs on its own site (series
-        // siteUrl, or the default site for GPP / series-less events), not under this chrome.
-        if (foundEvent && (await redirectForeignEvent(foundEvent.eventSeriesId, slug))) return;
-        if (foundEvent) {
-          setEvent(foundEvent);
-          setCanEditAsCoHost(false);
-
-          // Check if logged-in user has already RSVP'd and fetch their data
-          let hasRSVPd = false;
-          if (user?.email) {
-            const guestData = await getMyGuest(foundEvent.id);
-            hasRSVPd = !!guestData;
-            setUserHasRSVPd(hasRSVPd);
-            if (guestData) setExistingGuestData(guestData);
-          }
-
-          // Check if current user is a host (primary or co-host)
-          let isHost = user?.id === foundEvent.userId;
-          if (!isHost && user?.email) {
-            try {
-              const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-              const resp = await fetch(`${apiUrl}/api/events/${slug}/check-host`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: user.email }),
-              });
-              if (resp.ok) {
-                const data = await resp.json();
-                isHost = data.isHost;
-                setCanEditAsCoHost(data.canEdit || false);
-              }
-            } catch (e) {
-              console.warn('Could not check host status:', e);
-            }
-          }
-
-          // Store host status for check-in button
-          setIsHostUser(isHost);
-
-          // Skip password for hosts and already-RSVP'd guests
-          if (isHost || hasRSVPd) {
-            setIsAuthenticated(true);
-          } else if (foundEvent.hasPassword) {
-            // Check if already authenticated in this session
-            // Use inviteCode as key to be consistent with RSVPPage
-            const authKey = `rsvpizza_auth_${foundEvent.inviteCode}`;
-            const storedAuth = sessionStorage.getItem(authKey);
-
-            if (storedAuth) {
-              const isValid = await verifyPartyPassword(slug!, storedAuth);
-              if (isValid) {
-                setIsAuthenticated(true);
-              }
-            }
-          } else {
-            // No password, automatically authenticated
-            setIsAuthenticated(true);
-          }
-
-          // Fire-and-forget page view tracking
-          const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-          fetch(`${apiUrl}/api/events/${slug}/view`, {
-            method: 'POST',
-            keepalive: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ referrer: document.referrer || null }),
-          }).catch(() => {});
-
-          // Load photo stats to see if photos are enabled and have content
-          const stats = await getPhotoStats(foundEvent.id);
-          if (stats) {
-            setPhotoStats(stats);
-            // Auto-expand the gallery if there are existing photos — visitors expect
-            // photos inline, not behind a "View N photos" button (parmigiano-71294).
-            if (stats.totalPhotos && stats.totalPhotos > 0) {
-              setShowPhotos(true);
-            }
-          }
-
-          // Load public donor stats for the "Supporters" highlight.
-          if (foundEvent.donationEnabled) {
-            const dStats = await getDonationStats(foundEvent.id);
-            // Guard for the { enabled: false } shape.
-            if (dStats && dStats.enabled) {
-              setDonationStats(dStats);
-            } else {
-              setDonationStats(null);
-            }
-          } else {
-            setDonationStats(null);
-          }
-        } else {
-          setError('Event not found. The link may be invalid or expired.');
-        }
-      }
-      setLoading(false);
+    if (error && !authLoading && failedForUserRef.current !== (user?.id ?? null)) {
+      failedForUserRef.current = user?.id ?? null;
+      setLoading(true);
+      setRetryTick((n) => n + 1);
     }
-    loadEvent();
-  }, [slug, user?.email, yearParam]);
+  }, [error, user?.id, authLoading]);
+  useEffect(() => {
+    if (!slug) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const result = await getEventBySlug(slug, yearParam);
+      if (cancelled) return;
+
+      // Handle redirect from old slug alias
+      if (result && 'redirect' in result) {
+        navigate(`/${result.slug}`, { replace: true });
+        return;
+      }
+
+      // White-label (D8): donations + NFT minting are hidden on branded builds.
+      const foundEvent = result && BRAND.isBranded
+        ? { ...result, donationEnabled: false, nftEnabled: false }
+        : result;
+      // White-label: an event outside this build's series belongs on its own site (series
+      // siteUrl, or the default site for GPP / series-less events), not under this chrome.
+      if (foundEvent && (await redirectForeignEvent(foundEvent.eventSeriesId, slug))) return;
+      if (cancelled) return;
+      if (!foundEvent) {
+        setError('Event not found. The link may be invalid or expired.');
+        failedForUserRef.current = userIdRef.current;
+        setLoading(false);
+        return;
+      }
+
+      setError(null);
+      setEvent(foundEvent);
+      setCanEditAsCoHost(false);
+
+      // Fire-and-forget page view tracking, once per slug (not per auth change / StrictMode remount).
+      if (viewTrackedFor.current !== slug) {
+        viewTrackedFor.current = slug;
+        const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+        fetch(`${apiUrl}/api/events/${slug}/view`, {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referrer: document.referrer || null }),
+        }).catch(() => {});
+      }
+
+      // Photo stats and donor stats are independent: fetch them in parallel, without blocking the page.
+      getPhotoStats(foundEvent.id).then((stats) => {
+        if (cancelled || !stats) return;
+        setPhotoStats(stats);
+        // Auto-expand the gallery if there are existing photos — visitors expect
+        // photos inline, not behind a "View N photos" button (parmigiano-71294).
+        if (stats.totalPhotos && stats.totalPhotos > 0) setShowPhotos(true);
+      });
+      if (foundEvent.donationEnabled) {
+        getDonationStats(foundEvent.id).then((dStats) => {
+          if (cancelled) return;
+          // Guard for the { enabled: false } shape.
+          setDonationStats(dStats && dStats.enabled ? dStats : null);
+        });
+      } else {
+        setDonationStats(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [slug, yearParam, retryTick]);
+
+  // 2) User-specific access (RSVP'd? host? password) runs when the event loads or the user changes,
+  // with the two network calls in parallel. This never refetches the event.
+  useEffect(() => {
+    if (!event || authLoading) return;
+    let cancelled = false;
+    (async () => {
+      const email = user?.email;
+      const [guestData, hostCheck] = await Promise.all([
+        email ? getMyGuest(event.id) : Promise.resolve(null),
+        email && user?.id !== event.userId
+          ? checkEventHost(event.inviteCode || slug!)
+          : Promise.resolve({ isHost: false, canEdit: false }),
+      ]);
+      if (cancelled) return;
+
+      const hasRSVPd = !!guestData;
+      setUserHasRSVPd(hasRSVPd);
+      if (guestData) setExistingGuestData(guestData);
+      setCanEditAsCoHost(hostCheck.canEdit);
+
+      const isHost = (!!user?.id && user.id === event.userId) || hostCheck.isHost;
+      // Store host status for check-in button
+      setIsHostUser(isHost);
+
+      // Skip password for hosts and already-RSVP'd guests
+      if (isHost || hasRSVPd) {
+        setIsAuthenticated(true);
+      } else if (event.hasPassword) {
+        // Check if already authenticated in this session
+        // Use inviteCode as key to be consistent with RSVPPage
+        const storedAuth = sessionStorage.getItem(`rsvpizza_auth_${event.inviteCode}`);
+        if (storedAuth && (await verifyPartyPassword(slug!, storedAuth))) {
+          if (!cancelled) setIsAuthenticated(true);
+        }
+      } else {
+        // No password, automatically authenticated
+        setIsAuthenticated(true);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [event, user?.id, user?.email, authLoading]);
 
   // Easter eggs: Press 'p' for Pizza Chef, Enter for PizzaDAO
   useEffect(() => {
@@ -427,18 +439,7 @@ export function EventPage() {
   }
 
   if (error || !event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="card p-8 max-w-md text-center">
-          <AlertCircle className="w-16 h-16 text-[#ff393a] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-theme-text mb-2">{t('notFound.title')}</h1>
-          <p className="text-theme-text-secondary mb-6">{error}</p>
-          <Link to="/" className="btn-primary inline-block">
-            {t('notFound.goHome')}
-          </Link>
-        </div>
-      </div>
-    );
+    return <NotFoundView kind="event" />;
   }
 
   // Show password prompt if event is password-protected and not authenticated
@@ -898,6 +899,10 @@ export function EventPage() {
                   <img
                     src={event.eventImageUrl}
                     alt={event.name}
+                    width={800}
+                    height={800}
+                    {...{ fetchpriority: "high" }}
+                    decoding="async"
                     className="w-full h-full object-contain"
                   />
                 </div>
@@ -1006,6 +1011,10 @@ export function EventPage() {
                     <img
                       src={event.eventImageUrl}
                       alt={event.name}
+                      width={800}
+                      height={800}
+                      {...{ fetchpriority: "high" }}
+                      decoding="async"
                       className="w-full h-full object-cover"
                     />
                   </div>

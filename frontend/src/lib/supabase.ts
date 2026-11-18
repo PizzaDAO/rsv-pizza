@@ -986,6 +986,8 @@ export interface DbParty {
   rollup_generated_at?: string | null;
   can_edit?: boolean;
   allowed_tabs?: string[];
+  // scam-flag-private: client-only flag, true once the raw event_tags were merged from the API.
+  raw_event_tags_loaded?: boolean;
   hidden_gpp_photos?: string[];
   extra_gpp_photos?: string[];
   // External event links
@@ -1066,6 +1068,11 @@ export interface DbGuest {
 // selected here but not granted makes EVERY party read fail with 42501. Host-only fields
 // (host_telegram_*, cancelled_by, reimbursement_cap_appeal_note) are merged in from
 // GET /api/parties/:id in getPartyWithGuests. `password` is deliberately never sent to the client.
+// scam-flag-private: `event_tags` is aliased to the generated `public_event_tags` column (internal
+// tags like 'possible-scam', payout state and caps stripped in SQL by strip_internal_event_tags), so
+// rows keep the `event_tags` key. Editors get the raw list merged in from GET /api/parties/:id.
+// Entries may be `alias:column`; the GRANT allowlist lists the real column (see
+// partyColumnNames).
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, available_dietary_options, show_toppings_on_rsvp, max_guests, expected_guests, estimated_attendance, target_attendance, expected_attendance, hide_guests,
@@ -1075,7 +1082,7 @@ export const SAFE_PARTY_COLUMNS = `
   donation_recipient_url, donation_eth_address, donation_amounts_public, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
   photos_enabled, photos_public, photo_moderation,
-  event_type, event_tags, event_series_id, budget_total, budget_enabled,
+  event_type, event_tags:public_event_tags, event_series_id, budget_total, budget_enabled,
   music_enabled, music_notes,
   kit_enabled, kit_deadline,
   fundraising_goal, report_recap, report_video_url, report_photos_url,
@@ -1104,6 +1111,18 @@ export const SAFE_PARTY_COLUMNS = `
   cancelled_at, cancellation_reason,
   has_password
 `;
+
+/**
+ * Real column names in a PostgREST select list (`alias:column` -> `column`). These are the
+ * columns anon must be GRANTed (scripts/parties-anon-columns.json).
+ */
+export function partyColumnNames(select: string = SAFE_PARTY_COLUMNS): string[] {
+  return select
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => (c.includes(':') ? c.split(':').pop()!.trim() : c));
+}
 
 /**
  * Columns that anon/authenticated must NEVER be able to read from `parties`.
@@ -1577,6 +1596,13 @@ export function mergeHostOnlyPartyFields(party: DbParty, apiParty: any): void {
     if ('hostTelegramLinkToken' in apiParty) party.host_telegram_link_token = apiParty.hostTelegramLinkToken ?? null;
     if ('reimbursementCapAppealNote' in apiParty) party.reimbursement_cap_appeal_note = apiParty.reimbursementCapAppealNote ?? null;
     if ('cancelledBy' in apiParty) party.cancelled_by = apiParty.cancelledBy ?? null;
+    // scam-flag-private: anon rows carry only the public tags (event_tags:public_event_tags).
+    // Host flows need the raw list (prepay checkbox, 'go' gate, nonhub, numeric/k caps), and a
+    // privileged PATCH of a stripped list would wipe internal tags, so editors get it from the API.
+    if (Array.isArray(apiParty.eventTags)) {
+      party.event_tags = apiParty.eventTags;
+      party.raw_event_tags_loaded = true;
+    }
   }
 }
 
@@ -1788,7 +1814,7 @@ export async function addGuestToParty(
   ethconfOptIn?: boolean,
   optinAbVariant?: 'control' | 'variant' | null,
   visitorSessionId?: string,
-): Promise<{ guest: DbGuest; guestToken: string | null; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
+): Promise<{ guest: DbGuest; guestToken: string | null; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null; emailSent: boolean }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     throw new Error('Invite code is required to submit RSVP');
@@ -1912,6 +1938,7 @@ export async function addGuestToParty(
       updated: data.updated || false,
       waitlisted: data.waitlisted || false,
       waitlistPosition: data.waitlistPosition || null,
+      emailSent: data.emailSent === true,
     };
   } catch (error) {
     console.error('Error adding guest:', error);

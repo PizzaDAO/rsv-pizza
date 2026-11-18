@@ -8,6 +8,7 @@ import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { claimStateForGuest } from '../lib/nftClaim.js';
 import { signGuestToken } from '../lib/guestToken.js';
 import { triggerWebhook } from '../services/webhook.service.js';
+import { coHostEscalation, underbossMayWriteCap } from '../lib/coHostGuard.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
@@ -26,7 +27,7 @@ import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { siteForParty, brandedSeriesBySlug, brandedSiteForParty, seriesSlugForOrigin } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
-import { changesGuardedTags, changesGoTag, canonicalizeEventTags, mergeHostEventTags } from '../lib/eventTags.js';
+import { changesGuardedTags, changesGoTag, canonicalizeEventTags, mergeHostEventTags, withPrepay } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
 import { notifyAdminsOfBrandEvent } from '../services/brandEventAdminNotify.js';
@@ -81,6 +82,21 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
 }
 
 const router = Router();
+
+/**
+ * webhook-owner: webhooks are keyed by the PARTY OWNER's integrations (triggerWebhook filters by
+ * userId, as rsvp.routes already does). Passing the acting user (a co-host, an admin) made the
+ * owner's integrations miss events and delivered guest data to the actor's own webhooks. Falls
+ * back to the acting user only when the party has no owner row.
+ */
+export async function webhookOwnerId(partyId: string, actingUserId: string): Promise<string> {
+  try {
+    const owner = await prisma.party.findUnique({ where: { id: partyId }, select: { userId: true } });
+    return owner?.userId || actingUserId;
+  } catch {
+    return actingUserId;
+  }
+}
 
 // All party routes require authentication
 router.use(requireAuth);
@@ -455,7 +471,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     if (brandedSeries) void notifyAdminsOfBrandEvent(party.id);
 
     // Trigger webhook for party creation
-    await triggerWebhook('party.created', party, req.userId!);
+    await triggerWebhook('party.created', party, await webhookOwnerId(party.id, req.userId!));
 
     // prosciutto-58472: fire-and-forget auto-populate of selected_pizzerias.
     // Helper is idempotent + race-safe + never throws; we still wrap in .catch()
@@ -719,6 +735,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       expectedGuests,
       estimatedAttendance,
       eventTags,
+      // scam-flag-private: targeted 'prepay' toggle (PrepayCheckbox). Applied server-side to the
+      // stored tags, so the client never has to send (and can't wipe) the full tag list.
+      prepay,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
       donationRecipientUrl, donationEthAddress, donationAmountsPublic, shareToUnlock, shareTweetText, fundraisingGoal,
       musicEnabled, musicNotes, photoModeration,
@@ -856,6 +875,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // scam-flag-private: `prepay: boolean` toggles ONLY 'prepay' on the stored tags (or on the
+    // tags this request is already writing). Any editor may toggle it (it is HOST_WRITABLE).
+    if (prepay !== undefined) {
+      if (typeof prepay !== 'boolean') {
+        throw new AppError('prepay must be a boolean', 400, 'VALIDATION_ERROR');
+      }
+      const base =
+        eventTagsToWrite ??
+        (await prisma.party.findUnique({ where: { id }, select: { eventTags: true } }))?.eventTags ??
+        [];
+      const next = withPrepay(base, prepay);
+      const changed = next.length !== base.length || next.some((t, i) => t !== base[i]);
+      if (changed || eventTagsToWrite !== undefined) eventTagsToWrite = next;
+    }
+
     // Validate externalLinks if provided
     if (externalLinks !== undefined && externalLinks !== null) {
       if (!Array.isArray(externalLinks)) {
@@ -877,9 +911,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (coHosts !== undefined) {
       const existingParty = await prisma.party.findUnique({
         where: { id },
-        select: { coHosts: true },
+        select: { coHosts: true, userId: true, region: true, city: true },
       });
       const existingCoHosts = (existingParty?.coHosts as any[]) || [];
+      // cohost-escalation: the owner, admins and in-scope underbosses may change the list freely.
+      // Other editors (co-hosts) may save it but not escalate permissions (canEdit/allowedTabs).
+      let mayEditCoHosts =
+        (!!req.userId && existingParty?.userId === req.userId) ||
+        (await isSuperAdmin(req.userEmail)) ||
+        (await isAdmin(req.userEmail));
+      if (!mayEditCoHosts && existingParty && (await isUnderboss(req.userEmail))) {
+        mayEditCoHosts = partyMatchesScope(existingParty as any, await getUnderbossScope(req.userEmail));
+      }
+      if (!mayEditCoHosts && (!Array.isArray(coHosts) || coHostEscalation(existingCoHosts, coHosts))) {
+        throw new AppError('Only the event owner or an admin can change co-host permissions', 403, 'FORBIDDEN_COHOSTS');
+      }
       // Extract protected entries (underboss + partner) from existing data
       const protectedEntries = existingCoHosts.filter(
         (h: any) => h.isUnderboss === true || h.isPartner === true
@@ -922,9 +968,22 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // the update (rather than 403'd) so the rest of their save still succeeds.
     let reimbursementCapUsdToWrite: number | null | undefined = undefined;
     if (reimbursementCapUsd !== undefined) {
-      const allowed = (await isSuperAdmin(req.userEmail))
-        || (await isAdmin(req.userEmail))
-        || (await isUnderboss(req.userEmail));
+      let allowed = (await isSuperAdmin(req.userEmail))
+        || (await isAdmin(req.userEmail));
+      if (!allowed && (await isUnderboss(req.userEmail))) {
+        // cap-scope: an underboss only sets caps inside their own city/region scope, and never
+        // on an event they own or co-host (no self-service cap raise).
+        const capParty = await prisma.party.findUnique({
+          where: { id },
+          select: { region: true, city: true, userId: true, coHosts: true },
+        });
+        allowed = !!capParty
+          && underbossMayWriteCap(
+            capParty,
+            { userId: req.userId, email: req.userEmail },
+            partyMatchesScope(capParty as any, await getUnderbossScope(req.userEmail)),
+          );
+      }
       if (allowed) {
         if (reimbursementCapUsd === null || reimbursementCapUsd === '') {
           reimbursementCapUsdToWrite = null;
@@ -1224,7 +1283,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     }
 
     // Trigger webhook for party update
-    await triggerWebhook('party.updated', party, req.userId!);
+    await triggerWebhook('party.updated', party, await webhookOwnerId(id, req.userId!));
 
     // prosciutto-58472: fire-and-forget auto-populate of selected_pizzerias
     // when the host changed the address AND hasn't preselected pizzerias
@@ -1377,8 +1436,8 @@ router.post('/:id/cancel', async (req: AuthRequest, res: Response, next: NextFun
     });
 
     // New event for new consumers + legacy `party.deleted` for back-compat.
-    await triggerWebhook('party.cancelled', party, req.userId!);
-    await triggerWebhook('party.deleted', { id }, req.userId!);
+    await triggerWebhook('party.cancelled', party, await webhookOwnerId(id, req.userId!));
+    await triggerWebhook('party.deleted', { id }, await webhookOwnerId(id, req.userId!));
 
     res.json({ success: true, party: redactPartySecrets(party) });
   } catch (error) {
@@ -1415,7 +1474,7 @@ router.post('/:id/reinstate', async (req: AuthRequest, res: Response, next: Next
       actorEmail: req.userEmail || 'unknown',
     });
 
-    await triggerWebhook('party.reinstated', party, req.userId!);
+    await triggerWebhook('party.reinstated', party, await webhookOwnerId(id, req.userId!));
 
     res.json({ success: true, party: redactPartySecrets(party) });
   } catch (error) {
@@ -1447,8 +1506,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
       actorEmail: req.userEmail || 'unknown',
     });
 
-    await triggerWebhook('party.cancelled', party, req.userId!);
-    await triggerWebhook('party.deleted', { id }, req.userId!);
+    await triggerWebhook('party.cancelled', party, await webhookOwnerId(id, req.userId!));
+    await triggerWebhook('party.deleted', { id }, await webhookOwnerId(id, req.userId!));
 
     res.json({ success: true });
   } catch (error) {
@@ -1560,7 +1619,7 @@ router.post('/:id/close-rsvp', async (req: AuthRequest, res: Response, next: Nex
     });
 
     // Trigger webhook for RSVP closed
-    await triggerWebhook('party.rsvp_closed', party, req.userId!);
+    await triggerWebhook('party.rsvp_closed', party, await webhookOwnerId(id, req.userId!));
 
     res.json({ success: true, message: 'RSVPs closed' });
   } catch (error) {
@@ -1600,7 +1659,7 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
     });
 
     // Trigger webhook for RSVP reopened
-    await triggerWebhook('party.rsvp_opened', party, req.userId!);
+    await triggerWebhook('party.rsvp_opened', party, await webhookOwnerId(id, req.userId!));
 
     res.json({ success: true, message: 'RSVPs reopened' });
   } catch (error) {
@@ -1909,7 +1968,7 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
     });
 
     // Trigger webhook for guest registration
-    await triggerWebhook('guest.registered', { guest, partyId: id }, req.userId!);
+    await triggerWebhook('guest.registered', { guest, partyId: id }, await webhookOwnerId(id, req.userId!));
 
     res.status(201).json({ guest });
   } catch (error) {
@@ -2087,7 +2146,7 @@ router.post('/:id/guests/import', async (req: AuthRequest, res: Response, next: 
     await triggerWebhook(
       'guest.imported',
       { partyId: id, count: createdGuestIds.length, source: sourcePlatform },
-      req.userId!
+      await webhookOwnerId(id, req.userId!)
     );
 
     res.status(200).json({
@@ -2126,7 +2185,7 @@ router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Respons
     });
 
     // Trigger webhook for guest removal
-    await triggerWebhook('guest.removed', { guestId, partyId }, req.userId!);
+    await triggerWebhook('guest.removed', { guestId, partyId }, await webhookOwnerId(partyId, req.userId!));
 
     res.json({ success: true });
   } catch (error) {
@@ -2176,7 +2235,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
     // is neither an approval nor a decline).
     if (approved !== null) {
       const event = approved ? 'guest.approved' : 'guest.declined';
-      await triggerWebhook(event, { guest, partyId }, req.userId!);
+      await triggerWebhook(event, { guest, partyId }, await webhookOwnerId(partyId, req.userId!));
     }
 
     // Send approval email with QR code if guest is approved and has an email
@@ -2322,7 +2381,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
     }
 
     // Trigger webhook for guest promotion
-    await triggerWebhook('guest.promoted', { guest: updatedGuest, partyId }, req.userId!);
+    await triggerWebhook('guest.promoted', { guest: updatedGuest, partyId }, await webhookOwnerId(partyId, req.userId!));
 
     // Send promotion email if guest has email
     if (guest.email) {
@@ -2432,7 +2491,7 @@ router.post('/:partyId/guests/walk-in', async (req: AuthRequest, res: Response, 
       },
     });
 
-    await triggerWebhook('guest.registered', { guest, partyId }, req.userId!);
+    await triggerWebhook('guest.registered', { guest, partyId }, await webhookOwnerId(partyId, req.userId!));
 
     res.status(201).json({ guest });
   } catch (error) {

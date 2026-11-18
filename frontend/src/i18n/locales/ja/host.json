@@ -1013,5 +1013,14 @@
       "rsvpBody": "コードをスキャンしてイベントページを開き、出欠を登録してください。",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "次のステップ",
+    "subtitle": "イベントが公開されました。ゲストを招待しましょう。",
+    "copyLink": "招待リンクをコピー",
+    "copied": "リンクをコピーしました",
+    "inviteGuests": "ゲストを招待",
+    "orderPizza": "ピザを注文",
+    "dismiss": "次のステップを閉じる"
   }
 }

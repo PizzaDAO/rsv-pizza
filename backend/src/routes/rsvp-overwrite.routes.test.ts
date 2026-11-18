@@ -15,6 +15,9 @@ const savedSecret = process.env.JWT_SECRET;
 process.env.JWT_SECRET = JWT_SECRET;
 
 const mockPrisma = vi.hoisted(() => ({
+  // capacity-lock: withPartyLock runs the create inside prisma.$transaction (advisory lock via $executeRaw)
+  $executeRaw: () => Promise.resolve(1),
+  $transaction(fn: any) { return fn(this); },
   party: { findUnique: vi.fn() },
   slugAlias: { findUnique: vi.fn(() => Promise.resolve(null)) },
   admin: { findUnique: vi.fn(() => Promise.resolve(null)) },
@@ -399,7 +402,7 @@ describe('guest-scoped endpoints need the guest token or a login as the guest', 
       process.env.RESEND_API_KEY = 're_test';
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 'msg_1' }) });
       mockPrisma.party.findUnique.mockResolvedValue(PARTY);
-      mockPrisma.guest.findFirst.mockResolvedValue({ id: EXISTING_ID, name: 'Alice', email: 'alice@example.com' });
+      mockPrisma.guest.findFirst.mockResolvedValue({ id: EXISTING_ID, name: 'Alice', email: 'alice@example.com', status: 'CONFIRMED', approved: true, waitlistPosition: null });
     });
 
     it('refuses without a token or login, and sends nothing', async () => {

@@ -31,7 +31,7 @@ export const ArtDisplay: React.FC<ArtDisplayProps> = ({ partyId, intervalMs = 80
       setLoading(false);
     };
     load();
-    const handle = setInterval(load, 60_000);
+    const handle = setInterval(() => { if (!document.hidden) load(); }, 60_000);
     return () => {
       cancelled = true;
       clearInterval(handle);
@@ -42,6 +42,7 @@ export const ArtDisplay: React.FC<ArtDisplayProps> = ({ partyId, intervalMs = 80
   useEffect(() => {
     if (photos.length <= 1) return;
     const handle = setInterval(() => {
+      if (document.hidden) return;
       setIndex((i) => (i + 1) % photos.length);
     }, intervalMs);
     return () => clearInterval(handle);

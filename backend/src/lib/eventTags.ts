@@ -148,6 +148,16 @@ export function isHostWritableTag(tag: unknown): boolean {
 }
 
 /**
+ * scam-flag-private: targeted prepay toggle. Adds/removes ONLY the canonical 'prepay' tag on the
+ * STORED list, so a client that only holds the public (stripped) tags can never wipe internal
+ * tags ('possible-scam', 'paid', 'go', caps) by sending its whole array back.
+ */
+export function withPrepay(tags: string[] | null | undefined, on: boolean): string[] {
+  const without = (tags ?? []).filter((t) => !(typeof t === 'string' && t.trim().toLowerCase() === 'prepay'));
+  return on ? [...without, 'prepay'] : without;
+}
+
+/**
  * Merge a non-privileged caller's requested tag array into the stored one.
  * Only adds/removes of HOST_WRITABLE tags are honoured; all other differences
  * are ignored (stored tags kept, requested extras dropped). Returns the tag

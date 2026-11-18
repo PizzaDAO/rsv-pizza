@@ -1180,6 +1180,7 @@
       "missingLimit": "Enter the most you'll pay to continue.",
       "missingName": "Add a pickup name to continue.",
       "missingPhone": "Add your mobile number to continue.",
+      "missingRebuild": "You changed the pickup time. Tap Rebuild order so the order uses it.",
       "approve": "Approve and have the AI call",
       "continuePayment": "Continue to payment",
       "nextPhone": "Next: a new tab opens. We'll email you a 6-digit code from Open Pizza; enter it there within 10 minutes. We don't call {{shop}} until you do.",
@@ -1518,5 +1519,14 @@
       "rsvpBody": "Scan the code to see the event page and RSVP.",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "Next steps",
+    "subtitle": "Your event is live. Get people in the door.",
+    "copyLink": "Copy invite link",
+    "copied": "Link copied",
+    "inviteGuests": "Invite guests",
+    "orderPizza": "Order pizza",
+    "dismiss": "Dismiss next steps"
   }
 }

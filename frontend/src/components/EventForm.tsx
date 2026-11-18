@@ -6,7 +6,7 @@ import { TimezonePickerInput } from './TimezonePickerInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { LoginModal } from './LoginModal';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Play } from 'lucide-react';
+import { Loader2, Users, Lock, Image, FileText, Upload, Trash2, ChevronDown, ChevronUp, Square as SquareIcon, CheckSquare2, Calendar, PartyPopper } from 'lucide-react';
 import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase';
 import { CustomUrlInput } from './CustomUrlInput';
 import { resolveSchedule, type ScheduleError, nextEndDate, DEFAULT_START_TIME, DEFAULT_END_TIME } from '../utils/eventSchedule';
@@ -15,12 +15,14 @@ import { useTranslation } from 'react-i18next';
 import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries } from '../lib/api';
+import { IconInput } from './IconInput';
+import { saveEventDraft, loadEventDraftFor, clearEventDraft } from '../lib/eventDraft';
 import { prepareSquareImage, SquareImageError } from '../lib/squareImage';
 
 export function EventForm() {
   const { t } = useTranslation('account');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,7 +49,15 @@ export function EventForm() {
   const [processingImage, setProcessingImage] = useState(false);
   const imageRequestRef = useRef(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
+  // One top-level form error; `field` says which control to focus so the host can fix it.
+  const [formError, setFormErrorState] = useState<{ message: string; field?: 'name' | 'date' | 'url' | 'image' } | null>(null);
+  const setFormError = (message: string | null, field?: 'name' | 'date' | 'url' | 'image') =>
+    setFormErrorState(message ? { message, field } : null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const formErrorRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const customUrlWrapRef = useRef<HTMLDivElement>(null);
+  const imageSectionRef = useRef<HTMLDivElement>(null);
   const [eventDescription, setEventDescription] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   const [customUrlValid, setCustomUrlValid] = useState(true);
@@ -90,82 +100,52 @@ export function EventForm() {
     return () => { cancelled = true; };
   }, []);
 
-  // Check for pending party form data after auth redirect
-  const pendingFormProcessed = useRef(false);
+  // Restore a draft saved before the email-code login (persisted in localStorage so it survives
+  // the code / magic link opening in another tab). Never auto-submits: the host reviews first.
+  const draftChecked = useRef(false);
   useEffect(() => {
-    if (!user || pendingFormProcessed.current) return;
+    if (draftChecked.current || authLoading) return;
+    draftChecked.current = true;
+    const d = loadEventDraftFor(user?.email) as Record<string, any> | null;
+    if (!d) return;
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
+    setPartyName(str(d.partyName));
+    setStartDate(str(d.startDate));
+    setStartTime(str(d.startTime));
+    setEndDate(str(d.endDate));
+    setEndTime(str(d.endTime));
+    if (str(d.timezone)) setTimezone(str(d.timezone));
+    setExpectedGuests(str(d.expectedGuests));
+    setPartyAddress(str(d.partyAddress));
+    setPartyPlaceId((d.partyPlaceId as string) || null);
+    setPartyVenueName((d.partyVenueName as string) || null);
+    setPartyCity((d.partyCity as string) || null);
+    setPartyCountry((d.partyCountry as string) ?? null);
+    setPartyLat(typeof d.partyLat === 'number' ? d.partyLat : null);
+    setPartyLng(typeof d.partyLng === 'number' ? d.partyLng : null);
+    setPartyPassword(str(d.partyPassword));
+    setEventImageUrl(str(d.eventImageUrl));
+    setEventDescription(str(d.eventDescription));
+    setCustomUrl(str(d.customUrl));
+    setRequireApproval(!!d.requireApproval);
+    setLimitGuests(!!d.limitGuests);
+    setHideGuests(!!d.hideGuests);
+    if (d.partyPassword || d.limitGuests || d.requireApproval || d.hideGuests) setShowOptionalFields(true);
+    setDraftRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading]);
 
-    const savedForm = sessionStorage.getItem('pendingPartyForm');
-    if (savedForm) {
-      pendingFormProcessed.current = true;
-      sessionStorage.removeItem('pendingPartyForm');
-
-      try {
-        const formData = JSON.parse(savedForm);
-        createPartyFromSavedData(formData);
-      } catch (err) {
-        console.error('Failed to restore form data:', err);
-      }
-    }
-  }, [user]);
-
-  const createPartyFromSavedData = async (formData: any) => {
-    setCreating(true);
-
-    try {
-      const guestCount = formData.expectedGuests ? parseInt(formData.expectedGuests, 10) : undefined;
-      const password = formData.partyPassword?.trim() || undefined;
-      const description = formData.eventDescription?.trim() || undefined;
-      const urlSlug = formData.customUrl?.trim() || undefined;
-
-      // Use the event's timezone when parsing the entered date/time
-      const tz = formData.timezone || 'UTC';
-      const schedule = resolveSchedule({
-        startDate: formData.startDate || '', startTime: formData.startTime || '',
-        endDate: formData.endDate || '', endTime: formData.endTime || '', timezone: tz,
-      });
-      if (schedule.error) {
-        setImageError(scheduleErrorMessage(schedule.error));
-        setCreating(false);
-        return;
-      }
-      const { startDateTime, duration } = schedule;
-
-      const imageUrl = formData.eventImageUrl?.trim() || undefined;
-
-      const party = await createPartyAPI({
-        name: formData.partyName?.trim() || undefined,
-        hostName: user?.name || undefined,
-        date: startDateTime,
-        pizzaStyle: 'new-york',
-        expectedGuests: guestCount,
-        address: formData.partyAddress?.trim() || undefined,
-        availableBeverages: [],
-        duration,
-        password,
-        eventImageUrl: imageUrl,
-        description,
-        customUrl: urlSlug,
-        timezone: formData.timezone || undefined,
-        hideGuests: formData.hideGuests || false,
-        placeId: formData.partyPlaceId || undefined,
-        venueName: formData.partyVenueName || undefined,
-        city: formData.partyCity || undefined,
-        country: formData.partyCountry ?? null,
-        latitude: formData.partyLat ?? null,
-        longitude: formData.partyLng ?? null,
-      });
-
-      setCreating(false);
-
-      if (party?.invite_code) {
-        navigate(`/host/${party.invite_code}`);
-      }
-    } catch (error) {
-      console.error('Error creating party:', error);
-      setCreating(false);
-    }
-  };
+  // Surface errors: scroll the banner into view and focus the offending field.
+  useEffect(() => {
+    if (!formError) return;
+    formErrorRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    const target =
+      formError.field === 'name' ? nameInputRef.current
+      : formError.field === 'date' ? (startDateInputRef.current && startDateInputRef.current.offsetParent ? startDateInputRef.current : null)
+      : formError.field === 'url' ? customUrlWrapRef.current?.querySelector('input') ?? null
+      : null;
+    (target as HTMLElement | null)?.focus?.({ preventScroll: true });
+  }, [formError]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
@@ -176,7 +156,7 @@ export function EventForm() {
       URL.revokeObjectURL(imagePreview);
     }
 
-    setImageError(null);
+    setFormErrorState((cur) => (cur?.field === 'image' ? null : cur));
     const token = ++imageRequestRef.current;
     setProcessingImage(true);
 
@@ -196,7 +176,7 @@ export function EventForm() {
         LOAD_FAILED: 'eventForm.imageLoadError',
       };
       const key = err instanceof SquareImageError ? codeKey[err.code] : undefined;
-      setImageError(t(key ?? 'eventForm.imageLoadError'));
+      setFormError(t(key ?? 'eventForm.imageLoadError'), 'image');
     } finally {
       if (token === imageRequestRef.current) setProcessingImage(false);
       // allow re-picking the same file
@@ -212,7 +192,7 @@ export function EventForm() {
     }
     setEventImageFile(null);
     setImagePreview(null);
-    setImageError(null);
+    setFormErrorState((cur) => (cur?.field === 'image' ? null : cur));
     setEventImageUrl('');
   };
 
@@ -237,12 +217,13 @@ export function EventForm() {
         partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests, hideGuests
       };
-      sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
-      sessionStorage.setItem('authReturnUrl', window.location.pathname);
+      saveEventDraft(formData);
+      try { sessionStorage.setItem('authReturnUrl', '/new'); } catch { /* ignore */ }
       setShowLoginModal(true);
       return;
     }
 
+    setFormError(null);
     setCreating(true);
 
     try {
@@ -253,7 +234,7 @@ export function EventForm() {
 
       // Check if custom URL is valid (already validated by CustomUrlInput)
       if (urlSlug && !customUrlValid) {
-        setImageError(customUrlError || 'Invalid custom URL');
+        setFormError(customUrlError || t('eventForm.invalidCustomUrl'), 'url');
         setCreating(false);
         return;
       }
@@ -262,7 +243,7 @@ export function EventForm() {
       const tz = timezone || 'UTC';
       const schedule = resolveSchedule({ startDate, startTime, endDate, endTime, timezone: tz });
       if (schedule.error) {
-        setImageError(scheduleErrorMessage(schedule.error));
+        setFormError(scheduleErrorMessage(schedule.error), 'date');
         setCreating(false);
         return;
       }
@@ -273,7 +254,7 @@ export function EventForm() {
         try {
           imageUrl = await uploadEventImage(eventImageFile);
         } catch (err) {
-          setImageError(err instanceof Error ? err.message : t('eventForm.imageUploadFailed'));
+          setFormError(err instanceof Error ? err.message : t('eventForm.imageUploadFailed'), 'image');
           setCreating(false);
           return;
         }
@@ -305,31 +286,49 @@ export function EventForm() {
       setCreating(false);
 
       if (party?.invite_code) {
+        clearEventDraft();
         navigate(`/host/${party.invite_code}`);
       } else {
-        setImageError(t('eventForm.createFailed'));
+        setFormError(t('eventForm.createFailed'));
       }
     } catch (error) {
       console.error('Error creating party:', error);
-      setImageError('Failed to create party. Please try again.');
+      setFormError(t('eventForm.createFailed'));
       setCreating(false);
     }
   };
 
   return (
     <>
-      <form onSubmit={handleCreate} className="space-y-3">
-        <div>
-          <input
-            type="text"
-            value={partyName}
-            onChange={(e) => setPartyName(e.target.value)}
-            placeholder={t('eventForm.partyName')}
-            className="w-full pl-3"
-            autoFocus
-            data-testid="event-form-name"
-          />
-        </div>
+      <form onSubmit={handleCreate} className="space-y-3" noValidate>
+        {draftRestored && (
+          <div className="rounded-xl border border-[#39d98a]/30 bg-[#39d98a]/10 px-4 py-3 text-sm text-theme-text" role="status" data-testid="event-form-draft-restored">
+            {t('eventForm.draftRestored')}
+          </div>
+        )}
+        {formError && (
+          <div
+            ref={formErrorRef}
+            role="alert"
+            tabIndex={-1}
+            className="rounded-xl border border-[#ff393a]/40 bg-[#ff393a]/10 px-4 py-3 text-sm text-[#ff393a]"
+            data-testid="event-form-error"
+          >
+            {formError.message}
+          </div>
+        )}
+        <IconInput
+          ref={nameInputRef}
+          icon={PartyPopper}
+          type="text"
+          value={partyName}
+          onChange={(e) => setPartyName(e.target.value)}
+          placeholder={t('eventForm.partyName')}
+          aria-label={t('eventForm.partyName')}
+          aria-invalid={formError?.field === 'name' || undefined}
+          autoFocus
+          data-testid="event-form-name"
+        />
 
         <LocationAutocomplete
           value={partyAddress}
@@ -368,7 +367,7 @@ export function EventForm() {
           className="md:hidden w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
         >
           <div className="flex items-center gap-3">
-            <Play size={18} className="text-theme-text-muted flex-shrink-0" />
+            <Calendar size={18} className="text-theme-text-muted flex-shrink-0" aria-hidden="true" />
             {startDate && startTime && endDate && endTime ? (
               <div>
                 <div className="text-theme-text font-medium">
@@ -396,18 +395,21 @@ export function EventForm() {
                   className="relative flex-1 cursor-pointer"
                   onClick={() => startDateInputRef.current?.showPicker?.()}
                 >
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <Play size={21} className="text-theme-text-muted" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-2 text-theme-text-muted">
+                    <Calendar size={18} aria-hidden="true" />
+                    <span className="text-xs w-12">{t('eventForm.starts')}</span>
                   </div>
                   <input
                     ref={startDateInputRef}
                     type="date"
+                    aria-label={t('eventForm.startDate')}
                     value={startDate}
                     onChange={(e) => {
                       setEndDate(nextEndDate(startDate, e.target.value, endDate));
                       setStartDate(e.target.value);
+                      setFormErrorState((cur) => (cur?.field === 'date' ? null : cur));
                     }}
-                    className="w-full bg-transparent border-none text-theme-text text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                    className="w-full bg-transparent border-none text-theme-text text-sm text-left focus:outline-none focus:ring-0 p-0 pl-24 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
@@ -423,15 +425,17 @@ export function EventForm() {
                   className="relative flex-1 cursor-pointer"
                   onClick={() => endDateInputRef.current?.showPicker?.()}
                 >
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <SquareIcon size={17} className="text-theme-text-muted" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-2 text-theme-text-muted">
+                    <Calendar size={18} aria-hidden="true" />
+                    <span className="text-xs w-12">{t('eventForm.ends')}</span>
                   </div>
                   <input
                     ref={endDateInputRef}
                     type="date"
+                    aria-label={t('eventForm.endDate')}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-transparent border-none text-theme-text text-sm text-right focus:outline-none focus:ring-0 p-0 pl-12 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                    className="w-full bg-transparent border-none text-theme-text text-sm text-left focus:outline-none focus:ring-0 p-0 pl-24 pr-2 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                     style={{ colorScheme: 'dark' }}
                   />
                 </div>
@@ -462,7 +466,7 @@ export function EventForm() {
         </div>
 
 
-        <div>
+        <div ref={imageSectionRef}>
           {imagePreview ? (
             <div className="space-y-3 mb-3">
               <div className="relative w-full max-w-xs mx-auto">
@@ -519,7 +523,7 @@ export function EventForm() {
                 if (e.target.value.trim()) {
                   setEventImageFile(null);
                   setImagePreview(null);
-                  setImageError(null);
+                  setFormErrorState((cur) => (cur?.field === 'image' ? null : cur));
                 }
               }}
               placeholder={t('eventForm.imageUrl')}
@@ -534,9 +538,18 @@ export function EventForm() {
             </p>
           )}
 
-          {imageError && (
-            <p className="text-xs text-red-400 mt-2">{imageError}</p>
-          )}
+        </div>
+
+        {/* Custom URL: a primary field, not buried in Options */}
+        <div ref={customUrlWrapRef}>
+          <CustomUrlInput
+            value={customUrl}
+            onChange={setCustomUrl}
+            onValidationChange={(isValid, error) => {
+              setCustomUrlValid(isValid);
+              setCustomUrlError(error);
+            }}
+          />
         </div>
 
         {/* Options Toggle */}
@@ -627,18 +640,14 @@ export function EventForm() {
                 className="w-full !pl-14"
               />
             </div>
-
-            <CustomUrlInput
-              value={customUrl}
-              onChange={setCustomUrl}
-              onValidationChange={(isValid, error) => {
-                setCustomUrlValid(isValid);
-                setCustomUrlError(error);
-              }}
-            />
           </div>
         )}
 
+        {!user && (
+          <p className="text-xs text-theme-text-muted text-center" data-testid="event-form-confirm-email-note">
+            {t('eventForm.confirmEmailNote')}
+          </p>
+        )}
         <button
           type="submit"
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4"
@@ -666,7 +675,7 @@ export function EventForm() {
               {/* Start Date */}
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Play size={14} className="text-theme-text-muted" />
+                  <Calendar size={14} className="text-theme-text-muted" aria-hidden="true" />
                   <span className="text-xs text-theme-text-muted">{t('eventForm.startDate')}</span>
                 </div>
                 <input
@@ -696,7 +705,7 @@ export function EventForm() {
               {/* End Date */}
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <SquareIcon size={12} className="text-theme-text-muted" />
+                  <Calendar size={14} className="text-theme-text-muted" aria-hidden="true" />
                   <span className="text-xs text-theme-text-muted">{t('eventForm.endDate')}</span>
                 </div>
                 <input

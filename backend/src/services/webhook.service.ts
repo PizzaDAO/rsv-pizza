@@ -1,6 +1,11 @@
 import { prisma } from '../config/database.js';
 import { createWebhookSignature } from '../middleware/apiKey.js';
 import { redactPartySecrets } from '../lib/secretHash.js';
+import { assertPublicWebhookUrl, readTruncatedBody, BlockedWebhookUrlError } from '../lib/webhookUrlGuard.js';
+
+// Stored/returned response bodies are capped: a webhook target must not be able to stuff the DB
+// or use the delivery log as a read channel.
+const MAX_RESPONSE_BODY_CHARS = 500;
 
 // Webhook event types
 export const WEBHOOK_EVENTS = [
@@ -45,7 +50,12 @@ interface WebhookPayload {
  * Trigger webhooks for a specific event
  * This is synchronous - it delivers webhooks immediately
  */
-export async function triggerWebhook(event: WebhookEvent, data: any, userId: string): Promise<void> {
+export interface TriggerWebhookOptions {
+  /** One attempt, no retries (used when delivery runs inline in a request, see lib/background.ts). */
+  singleAttempt?: boolean;
+}
+
+export async function triggerWebhook(event: WebhookEvent, data: any, userId: string, opts: TriggerWebhookOptions = {}): Promise<void> {
   try {
     // Find all active webhooks for this user that subscribe to this event
     const apiKeys = await prisma.apiKey.findMany({
@@ -82,7 +92,7 @@ export async function triggerWebhook(event: WebhookEvent, data: any, userId: str
     const payloadString = JSON.stringify(payload);
 
     // Deliver to each webhook (synchronously, but in parallel)
-    await Promise.all(webhooks.map(webhook => deliverWebhook(webhook, payloadString)));
+    await Promise.all(webhooks.map(webhook => deliverWebhook(webhook, payloadString, opts)));
   } catch (error) {
     console.error('Error triggering webhooks:', error);
     // Don't throw - webhook failures shouldn't break the main operation
@@ -94,7 +104,8 @@ export async function triggerWebhook(event: WebhookEvent, data: any, userId: str
  */
 async function deliverWebhook(
   webhook: { id: string; url: string; secret: string; failCount: number },
-  payloadString: string
+  payloadString: string,
+  opts: TriggerWebhookOptions = {}
 ): Promise<void> {
   // Create signature
   const signature = createWebhookSignature(payloadString, webhook.secret);
@@ -114,12 +125,18 @@ async function deliverWebhook(
   let lastResponseBody: string | null = null;
 
   // Try delivery with retries
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+  const maxRetries = opts.singleAttempt ? 0 : RETRY_DELAYS.length;
+  let attemptsMade = 0;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    attemptsMade = attempt + 1;
     try {
+      // SSRF guard: public http(s) targets only, re-resolved on every attempt.
+      await assertPublicWebhookUrl(webhook.url);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
       const response = await fetch(webhook.url, {
+        redirect: 'manual',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +151,7 @@ async function deliverWebhook(
       clearTimeout(timeout);
 
       lastStatusCode = response.status;
-      lastResponseBody = await response.text().catch(() => null);
+      lastResponseBody = await readTruncatedBody(response, MAX_RESPONSE_BODY_CHARS);
 
       if (response.ok) {
         // Success - update delivery and reset fail count
@@ -161,13 +178,16 @@ async function deliverWebhook(
       lastError = new Error(`HTTP ${response.status}: ${lastResponseBody}`);
     } catch (error: any) {
       lastError = error;
+      if (error instanceof BlockedWebhookUrlError) {
+        break; // never retry a blocked target
+      }
       if (error.name === 'AbortError') {
         lastError = new Error('Request timeout');
       }
     }
 
     // Wait before retry (if not last attempt)
-    if (attempt < RETRY_DELAYS.length) {
+    if (attempt < maxRetries) {
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]));
     }
   }
@@ -182,8 +202,8 @@ async function deliverWebhook(
       data: {
         status: 'failed',
         statusCode: lastStatusCode,
-        responseBody: lastResponseBody || lastError?.message,
-        attempts: RETRY_DELAYS.length + 1,
+        responseBody: (lastResponseBody || lastError?.message || '').slice(0, MAX_RESPONSE_BODY_CHARS) || null,
+        attempts: attemptsMade,
         lastAttempt: new Date(),
       },
     }),
@@ -226,10 +246,12 @@ export async function sendTestWebhook(webhookId: string): Promise<{ success: boo
   const signature = createWebhookSignature(payloadString, webhook.secret);
 
   try {
+    await assertPublicWebhookUrl(webhook.url);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(webhook.url, {
+      redirect: 'manual',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -247,7 +269,7 @@ export async function sendTestWebhook(webhookId: string): Promise<{ success: boo
       return { success: true };
     }
 
-    const body = await response.text().catch(() => '');
+    const body = await readTruncatedBody(response, MAX_RESPONSE_BODY_CHARS);
     return { success: false, error: `HTTP ${response.status}: ${body}` };
   } catch (error: any) {
     if (error.name === 'AbortError') {

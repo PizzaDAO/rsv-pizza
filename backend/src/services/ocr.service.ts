@@ -14,7 +14,7 @@
  * prices by country/city. Stored on `payout_documents.ocr_line_items` JSONB.
  */
 
-import sharp from 'sharp';
+import { loadSharp } from '../lib/lazySharp.js';
 import { getOpenAI } from '../lib/openai.js';
 import { getCountryCode } from '../lib/countryCode.js';
 import { getLlmModels } from '../lib/privateConfig.js';
@@ -264,6 +264,7 @@ export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string>
   // failure here MUST fall back to the ORIGINAL bytes + content-type so OCR
   // still runs — preprocessing must never break extraction.
   try {
+    const sharp = await loadSharp();
     const processed = await sharp(originalBuf)
       .rotate()
       .resize({

@@ -9,13 +9,13 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SAFE_PARTY_COLUMNS, SENSITIVE_PARTY_COLUMNS, mergeHostOnlyPartyFields, DbParty } from '../lib/supabase';
+import { SAFE_PARTY_COLUMNS, SENSITIVE_PARTY_COLUMNS, mergeHostOnlyPartyFields, partyColumnNames, DbParty } from '../lib/supabase';
 import { preserveHostOnlyFields } from '../contexts/PizzaContext';
 import type { Party } from '../types';
 
 const REPO = path.resolve(__dirname, '../../..');
 const read = (p: string) => fs.readFileSync(path.join(REPO, p), 'utf8');
-const safe = SAFE_PARTY_COLUMNS.split(',').map((c) => c.trim()).filter(Boolean);
+const safe = partyColumnNames(SAFE_PARTY_COLUMNS);
 
 describe('parties anon column allowlist', () => {
   it('scripts/parties-anon-columns.json equals SAFE_PARTY_COLUMNS', () => {
@@ -51,6 +51,19 @@ describe('parties anon column allowlist', () => {
     const allow: string[] = JSON.parse(read('scripts/parties-anon-columns.json'));
     expect(allow.length).toBe(safe.length);
     expect(new Set(allow)).toEqual(new Set(safe));
+  });
+
+  it('scam-flag-private: raw event_tags is never selected/granted; the stripped public_event_tags is aliased to event_tags', () => {
+    expect(safe).not.toContain('event_tags');
+    expect(safe).toContain('public_event_tags');
+    expect(SAFE_PARTY_COLUMNS).toMatch(/\bevent_tags:public_event_tags\b/);
+    const allow: string[] = JSON.parse(read('scripts/parties-anon-columns.json'));
+    expect(allow).not.toContain('event_tags');
+    expect(allow).toContain('public_event_tags');
+  });
+
+  it('partyColumnNames maps alias:column to the column', () => {
+    expect(partyColumnNames('id, event_tags:public_event_tags ,name')).toEqual(['id', 'public_event_tags', 'name']);
   });
 
   it('the CI check script parses SAFE_PARTY_COLUMNS from supabase.ts', () => {
@@ -131,6 +144,29 @@ describe('mergeHostOnlyPartyFields', () => {
     expect((p as unknown as Record<string, unknown>).password).toBeUndefined();
   });
 
+  it('scam-flag-private: editors get the raw event_tags from the API (anon rows only carry public tags)', () => {
+    const p = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
+    mergeHostOnlyPartyFields(p, { canEdit: true, eventTags: ['swc', 'prepay', 'go', '500'] });
+    expect(p.event_tags).toEqual(['swc', 'prepay', 'go', '500']);
+    expect(p.raw_event_tags_loaded).toBe(true);
+  });
+
+  it('scam-flag-private: raw_event_tags_loaded stays unset when the API omits eventTags or enrich failed', () => {
+    const p = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
+    mergeHostOnlyPartyFields(p, { canEdit: true });
+    expect(p.raw_event_tags_loaded).toBeUndefined();
+    const q = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
+    mergeHostOnlyPartyFields(q, undefined);
+    expect(q.raw_event_tags_loaded).toBeUndefined();
+  });
+
+  it('scam-flag-private: non-editors never get raw event_tags merged in', () => {
+    const p = { ...base(), event_tags: ['swc'] } as unknown as DbParty;
+    mergeHostOnlyPartyFields(p, { canEdit: false, eventTags: ['swc', 'possible-scam'] });
+    expect(p.event_tags).toEqual(['swc']);
+    expect(p.raw_event_tags_loaded).toBeUndefined();
+  });
+
   it('does not merge host-only fields when canEdit is not true', () => {
     const p = base();
     mergeHostOnlyPartyFields(p, { canEdit: false, hostTelegramChatId: '1', reimbursementCapAppealNote: 'n' });
@@ -155,5 +191,14 @@ describe('preserveHostOnlyFields', () => {
     expect(next.hostTelegramLinkToken).toBe('t');
     expect(next.reimbursementCapAppealNote).toBe('n');
     expect(next.cancelledBy).toBe('e');
+  });
+
+  it('scam-flag-private: keeps the raw event tags and derived cap across a SAFE re-read', () => {
+    const prev = { eventTags: ['swc', 'prepay', 'k40'], effectiveReimbursementCapUsd: 40, rawEventTagsLoaded: true } as Party;
+    const next = { eventTags: ['swc'], effectiveReimbursementCapUsd: null, rawEventTagsLoaded: false } as Party;
+    preserveHostOnlyFields(next, prev);
+    expect(next.rawEventTagsLoaded).toBe(true);
+    expect(next.eventTags).toEqual(['swc', 'prepay', 'k40']);
+    expect(next.effectiveReimbursementCapUsd).toBe(40);
   });
 });
