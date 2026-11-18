@@ -36,6 +36,8 @@ function parseSafeColumns(columnsStr: string): Set<string> {
       .split(',')
       .map(s => s.trim())
       .filter(s => s.length > 0)
+      // `alias:column` -> the row key the client sees (the alias), e.g. event_tags:public_event_tags
+      .map(s => s.split(':')[0].trim())
   );
 }
 
