@@ -162,10 +162,12 @@ router.post('/setup-intent', requireAuth, async (req: AuthRequest, res: Response
       console.warn('Stripe customer search failed, creating a new customer', (err as Error).message);
     }
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: req.userEmail,
-        metadata: { source: 'rsvpizza', rsvpizzaUserId: userId },
-      });
+      // Search is eventually consistent, so two quick requests could both miss; the idempotency key
+      // (per user; Stripe keeps keys for 24 h) makes them return the same customer.
+      const customer = await stripe.customers.create(
+        { email: req.userEmail, metadata: { source: 'rsvpizza', rsvpizzaUserId: userId } },
+        { idempotencyKey: `rsvpizza-customer-${userId}` }
+      );
       customerId = customer.id;
     }
 

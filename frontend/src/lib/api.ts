@@ -289,6 +289,8 @@ export interface UpdatePartyData {
   targetAttendance?: number | null;
   expectedAttendance?: number | null;
   eventTags?: string[];
+  // scam-flag-private: targeted toggle; the backend adds/removes only 'prepay' on the stored tags.
+  prepay?: boolean;
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
@@ -434,6 +436,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       targetAttendance: data.targetAttendance,
       expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
+      prepay: data.prepay,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
@@ -2008,16 +2011,20 @@ export async function markInvoicePaid(
   partyId: string,
   invoiceId: string,
   data: { paymentMethod?: string; paymentRef?: string; paidAmount?: number }
-): Promise<{ invoice: Invoice } | null> {
-  try {
-    return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
-      method: 'POST',
-      body: data,
-    });
-  } catch (error) {
-    console.error('Error marking invoice paid:', error);
-    return null;
-  }
+): Promise<{ invoice: Invoice }> {
+  // Throws on failure so the UI can show the server's message.
+  return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/mark-paid`, {
+    method: 'POST',
+    body: data,
+  });
+}
+
+// Reject a pending payment claim (pending_verification -> issued)
+export async function rejectInvoiceClaim(partyId: string, invoiceId: string): Promise<{ invoice: Invoice }> {
+  // Throws on failure so the UI can show the server's message.
+  return await apiRequest<{ invoice: Invoice }>(`/api/parties/${partyId}/invoices/${invoiceId}/reject-claim`, {
+    method: 'POST',
+  });
 }
 
 // Get public invoice by view token (no auth required)
@@ -4856,6 +4863,7 @@ interface GPPEventApiResponse {
   id: string;
   name: string;
   city: string;
+  geoCity?: string | null;
   customUrl: string | null;
   inviteCode: string;
   date: string | null;
@@ -4942,6 +4950,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
       region: e.region ?? null,
       rsvpCount: e.guestCount ?? 0,
       eventImageUrl: e.eventImageUrl ?? null,
+      latitude: e.latitude ?? null,
+      longitude: e.longitude ?? null,
     }));
   }
   const data = await apiRequest<GPPEventsApiPayload>(
@@ -4951,7 +4961,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
   return (data.events || []).map((e) => ({
     id: e.id,
     name: e.name,
-    city: e.city,
+    // geoCity = host/geocoded city only; `city` falls back to the event name server-side.
+    city: e.geoCity !== undefined ? e.geoCity ?? '' : e.city,
     slug: e.customUrl || e.inviteCode,
     date: e.date,
     venueName: e.venueName,
@@ -4960,6 +4971,8 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
     region: e.region ?? null,
     rsvpCount: e.guestCount ?? 0,
     eventImageUrl: e.eventImageUrl ?? null,
+    latitude: e.latitude ?? null,
+    longitude: e.longitude ?? null,
   }));
 }
 

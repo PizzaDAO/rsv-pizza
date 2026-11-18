@@ -36,7 +36,7 @@ export function RSVPCodeStep({ form, onClose }: RSVPCodeStepProps) {
   };
 
   return (
-    <div className="card p-8 max-w-md w-full relative" data-testid="rsvp-code-step">
+    <div className="card p-8 max-w-md w-full relative" data-testid="rsvp-code-step" role="dialog" aria-modal="true" aria-labelledby="rsvp-code-title">
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
@@ -45,7 +45,7 @@ export function RSVPCodeStep({ form, onClose }: RSVPCodeStepProps) {
         <X size={24} />
       </button>
 
-      <h1 className="text-2xl font-bold text-theme-text mb-2">Check your email</h1>
+      <h1 id="rsvp-code-title" className="text-2xl font-bold text-theme-text mb-2">Check your email</h1>
       <p className="text-theme-text-secondary mb-1">
         This email is already on the guest list. We sent a code to <strong className="text-theme-text">{email}</strong>.
       </p>

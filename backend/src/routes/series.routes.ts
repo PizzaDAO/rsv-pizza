@@ -12,6 +12,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { isTestParty } from '../lib/testParty.js';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
       take: 2000,
     });
 
-    const events = rows.map((e) => ({
+    const events = rows.filter((e) => !isTestParty(e.name)).map((e) => ({
       id: e.id,
       name: e.name,
       city: e.city,

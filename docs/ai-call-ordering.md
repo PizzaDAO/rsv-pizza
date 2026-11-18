@@ -8,17 +8,14 @@ We use **Bland AI** for AI phone calls.
 
 > **sec-edge-functions (2026-11):** the `ai-phone-order`, `ai-call-status`, `ai-call-recording` and
 > `stripe-payment` edge functions were removed (anyone with the public anon key could start calls,
-> mint virtual cards and read their PAN/CVC). Everything below now runs in the Express backend:
-> `POST /api/ai-phone/initiate` (login + party edit access; `payWithCard: true` makes the backend
-> issue the virtual card with a server-computed all-time limit and pass it to Bland directly),
-> `GET /api/ai-phone/calls/:ref/live` and `/recording` (call owner or party editors; card data
-> masked, recordings withheld for card-paid calls), `POST /api/ai-phone/webhook` (Bland
-> `X-Webhook-Signature` HMAC required), and `/api/stripe-payments/{donation-intent,invoice-intent,setup-intent}`.
-> Backend env: `BLAND_API_KEY`, `BLAND_WEBHOOK_SECRET`, `BACKEND_URL`, `STRIPE_SECRET_KEY`,
-> `STRIPE_ISSUING_CARDHOLDER_ID` (optional caps: `AI_PHONE_CARD_MAX_CENTS`,
-> `AI_PHONE_CARD_MAX_PER_USER_PER_DAY`, `AI_PHONE_CARD_MAX_PER_DAY`,
-> `AI_PHONE_MAX_CALLS_PER_PARTY_PER_DAY`, `DONATION_MAX_CENTS`). The edge-function sections below
-> are historical.
+> mint virtual cards and read their PAN/CVC). Placing calls is retired (basil-14648: AI ordering
+> goes through pizza-mcp, **no card by voice**; `/api/ai-phone/initiate` and `/:id/retry` answer
+> 410). What remains is in the Express backend: `GET /api/ai-phone/calls/:ref/live` and
+> `/recording` (call owner or party editors; card numbers masked, transcript and recording withheld
+> for calls that carried a card), `POST /api/ai-phone/webhook` (Bland `X-Webhook-Signature` HMAC
+> required), and `/api/stripe-payments/{donation-intent,invoice-intent,setup-intent}`.
+> Backend env: `BLAND_API_KEY`, `BLAND_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY` (optional
+> `DONATION_MAX_CENTS`). The sections below are historical.
 
 ### How It Works
 

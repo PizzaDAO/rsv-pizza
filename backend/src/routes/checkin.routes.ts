@@ -48,7 +48,8 @@ async function recordAttestation(params: {
 }
 
 // provolone-39042: helper to fetch attestation history for the API response.
-async function fetchAttestations(guestId: string) {
+// Attester emails are only returned to hosts/co-hosts (includeEmails = true); peers and guests never see them.
+async function fetchAttestations(guestId: string, includeEmails = false) {
   const rows = await prisma.guestAttestation.findMany({
     where: { guestId },
     orderBy: { createdAt: 'asc' },
@@ -62,7 +63,7 @@ async function fetchAttestations(guestId: string) {
   return rows.map((a) => ({
     kind: a.attesterKind,
     name: a.attesterName,
-    email: a.attesterEmail,
+    email: includeEmails ? a.attesterEmail : null,
     at: a.createdAt.toISOString(),
   }));
 }
@@ -214,7 +215,7 @@ router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res:
         attesterEmail: attester?.email ?? req.userEmail ?? null,
         attesterName: attester?.name ?? null,
       });
-      const attestations = await fetchAttestations(guest.id);
+      const attestations = await fetchAttestations(guest.id, true);
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
@@ -246,7 +247,7 @@ router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res:
       attesterEmail: attester?.email ?? req.userEmail ?? null,
       attesterName: attester?.name ?? null,
     });
-    const attestations = await fetchAttestations(updatedGuest.id);
+    const attestations = await fetchAttestations(updatedGuest.id, true);
 
     res.status(200).json({
       success: true,
@@ -312,6 +313,11 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError('Guest not found or belongs to a different event', 404, 'GUEST_NOT_FOUND');
     }
 
+    // Same eligibility as the host path (mushroom-31723): a rejected guest can't be vouched in.
+    if (targetGuest.approved === false) {
+      throw new AppError('Guest was rejected', 400, 'GUEST_REJECTED');
+    }
+
     // provolone-39042: always record the peer attestation, even if already
     // checked in. The DB UNIQUE index dedupes per attester so re-scans by the
     // same voucher are no-ops, while NEW vouchers get counted as additional
@@ -328,7 +334,7 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
     // Already checked in — don't flip checked_in_at, but DO return updated
     // attestation list (the new voucher should now appear).
     if (targetGuest.checkedInAt) {
-      const attestations = await fetchAttestations(targetGuest.id);
+      const attestations = await fetchAttestations(targetGuest.id, false);
       // Auto-complete the voucher's "vouch" scorecard item (even for re-scans)
       autoCompleteScorecardItem(voucher.id, party.id, 'vouch', undefined, 'auto');
       return res.status(200).json({
@@ -356,7 +362,7 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
     // Auto-complete the voucher's "vouch" scorecard item
     autoCompleteScorecardItem(voucher.id, party.id, 'vouch', undefined, 'auto');
 
-    const attestations = await fetchAttestations(updatedGuest.id);
+    const attestations = await fetchAttestations(updatedGuest.id, false);
 
     res.status(200).json({
       success: true,
@@ -422,7 +428,7 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
     });
 
     if (guest.checkedInAt) {
-      const attestations = await fetchAttestations(guest.id);
+      const attestations = await fetchAttestations(guest.id, true);
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
@@ -446,7 +452,7 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
       },
     });
 
-    const attestations = await fetchAttestations(updatedGuest.id);
+    const attestations = await fetchAttestations(updatedGuest.id, true);
 
     res.status(200).json({
       success: true,
@@ -607,10 +613,13 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
     }
 
     // provolone-39042: include attestation history for attribution display
-    const attestations = await fetchAttestations(guest.id);
+    const attestations = await fetchAttestations(guest.id, isHostOrCohost);
+
+    // Another guest's email is host-only; the target guest may see their own.
+    const guestOut = isHostOrCohost || isTargetGuest ? guest : { ...guest, email: null, checkedInBy: null };
 
     res.json({
-      guest,
+      guest: guestOut,
       isCheckedIn: !!guest.checkedInAt,
       callerIsTarget: isTargetGuest,
       callerIsHost: isHostOrCohost,

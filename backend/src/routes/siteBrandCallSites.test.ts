@@ -120,7 +120,7 @@ describe('branded call sites', () => {
       id: 'p1', name: 'T1 Party', date: null, timezone: null, address: null, customUrl: 'my-t1',
       eventImageUrl: null, eventSeriesId: 'series-team1',
     });
-    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1', name: 'Gus', email: 'g@example.com' });
+    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1', name: 'Gus', email: 'g@example.com', status: 'CONFIRMED', approved: true, waitlistPosition: null });
     await request(app())
       .post('/api/rsvp/abc123/send-confirmation')
       // rsvp-overwrite-fix: needs the guest token; the email goes to the stored address.

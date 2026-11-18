@@ -108,6 +108,7 @@ import scorecardRoutes from './routes/scorecard.routes.js';
 import citiesRoutes from './routes/cities.routes.js';
 import configRoutes from './routes/config.routes.js'; // marinara-71630 P5: admin/UB-gated private-config read endpoint
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
+import stripeWebhookRouter from './routes/webhooks.stripe.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
 import { hostSurveyPublicRouter } from './routes/hostSurvey.routes.js'; // panzerotti-58527: public host survey (no auth)
@@ -154,6 +155,8 @@ app.use(cors(corsOptionsDelegate(ALLOWED_ORIGINS, getSeriesOrigins)));
 // express.raw() handler sees the unparsed body bytes that Svix signed.
 // bounce-rate-heuristic.
 app.use('/api/webhooks/resend', resendWebhookRouter);
+// Stripe webhook also needs the raw body for signature verification.
+app.use('/api/webhooks/stripe', stripeWebhookRouter);
 
 // basil-14648: pizza-mcp webhook ALSO needs the raw bytes (HMAC over the exact body), so it
 // mounts before express.json() too. JWKS is public and static.

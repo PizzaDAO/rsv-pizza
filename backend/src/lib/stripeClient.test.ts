@@ -54,6 +54,9 @@ describe('getStripe', () => {
     expect(init.headers.Authorization).toBe('Bearer sk_test_x');
     expect(init.body).toBe(`amount=500&${encodeURIComponent('metadata[type]')}=donation`);
 
+    await getStripe().customers.create({ email: 'a@example.org' }, { idempotencyKey: 'rsvpizza-customer-u1' });
+    expect((fetchMock.mock.calls[1] as any)[1].headers['Idempotency-Key']).toBe('rsvpizza-customer-u1');
+
     fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({ error: { message: 'bad' } }), { status: 400 }));
     await expect(getStripe().paymentIntents.create({ amount: 1 })).rejects.toBeInstanceOf(StripeApiError);
   });

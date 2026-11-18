@@ -30,6 +30,21 @@
   "notFound": {
     "title": "Página Não Encontrada",
     "description": "Esta página não existe. O link pode estar errado ou desatualizado.",
-    "goHome": "Ir para Início"
+    "goHome": "Ir para Início",
+    "eventTitle": "Evento Não Encontrado",
+    "eventDescription": "Não encontramos esse evento. O link pode estar errado ou o evento foi removido.",
+    "seriesTitle": "Série Não Encontrada",
+    "seriesDescription": "Não existe nenhuma série de eventos neste endereço.",
+    "browseEvents": "Explorar eventos",
+    "createYourOwn": "Crie o seu",
+    "searchPlaceholder": "Buscar eventos",
+    "search": "Buscar",
+    "activeSeries": "Séries ativas"
+  },
+  "banner": {
+    "findCities": "Encontre outras cidades em",
+    "pause": "Pausar o banner animado",
+    "play": "Retomar o banner animado",
+    "dismiss": "Fechar"
   }
 }

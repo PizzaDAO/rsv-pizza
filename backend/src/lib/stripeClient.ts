@@ -48,7 +48,12 @@ export function encodeForm(params: Params, prefix = ''): string[] {
   return out;
 }
 
-async function call<T>(method: 'GET' | 'POST', path: string, params: Params = {}): Promise<T> {
+export interface RequestOpts {
+  /** Stripe Idempotency-Key: a retried/concurrent POST with the same key returns the first result. */
+  idempotencyKey?: string;
+}
+
+async function call<T>(method: 'GET' | 'POST', path: string, params: Params = {}, opts: RequestOpts = {}): Promise<T> {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new StripeNotConfiguredError();
   const form = encodeForm(params).join('&');
@@ -58,6 +63,7 @@ async function call<T>(method: 'GET' | 'POST', path: string, params: Params = {}
     headers: {
       Authorization: `Bearer ${key}`,
       ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+      ...(method === 'POST' && opts.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : {}),
     },
     body: method === 'POST' ? form : undefined,
   });
@@ -95,7 +101,7 @@ export interface StripeLike {
   setupIntents: { create(p: Params): Promise<{ client_secret: string | null }> };
   customers: {
     search(p: { query: string; limit?: number }): Promise<StripeList<{ id: string }>>;
-    create(p: Params): Promise<{ id: string }>;
+    create(p: Params, opts?: RequestOpts): Promise<{ id: string }>;
   };
   issuing: {
     cards: {
@@ -114,7 +120,7 @@ const fetchClient: StripeLike = {
   setupIntents: { create: (p) => call('POST', '/setup_intents', p) },
   customers: {
     search: (p) => call('GET', '/customers/search', p),
-    create: (p) => call('POST', '/customers', p),
+    create: (p, opts) => call('POST', '/customers', p, opts),
   },
   issuing: {
     cards: {

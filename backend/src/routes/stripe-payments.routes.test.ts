@@ -145,7 +145,10 @@ describe('POST /setup-intent', () => {
       .send({ customerId: 'cus_victim' });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ customerId: 'cus_new', clientSecret: 'seti_secret' });
-    expect(stripe.customers.create).toHaveBeenCalledWith({ email: 'u1@example.org', metadata: { source: 'rsvpizza', rsvpizzaUserId: 'u1' } });
+    expect(stripe.customers.create).toHaveBeenCalledWith(
+      { email: 'u1@example.org', metadata: { source: 'rsvpizza', rsvpizzaUserId: 'u1' } },
+      { idempotencyKey: 'rsvpizza-customer-u1' }
+    );
     expect(stripe.setupIntents.create.mock.calls[0][0].customer).toBe('cus_new');
   });
 

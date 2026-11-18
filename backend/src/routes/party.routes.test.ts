@@ -231,6 +231,56 @@ describe('Party Routes', () => {
       });
     }
 
+    // scam-flag-private: targeted prepay toggle — never needs (or trusts) the client's tag list.
+    async function patchPrepay(email: string, userId: string, body: any, current: string[]) {
+      const app = createTestApp();
+      const party = {
+        id: PARTY_ID, userId: HOST_USER_ID, coHosts: [{ email: OTHER_EMAIL, canEdit: true }],
+        eventTags: current, eventType: 'gpp', region: 'LATAM', city: 'X', name: 'Global Pizza Party X',
+      };
+      mockPrisma.party.findUnique.mockResolvedValue(party);
+      mockPrisma.party.update.mockResolvedValue({ ...party, user: { name: 'H' } });
+      return request(app)
+        .patch(`/api/parties/${PARTY_ID}`)
+        .set('Authorization', `Bearer ${makeToken(userId, email)}`)
+        .send(body);
+    }
+    const STORED = ['swc', 'possible-scam', 'paid', 'go', '500', 'k40'];
+
+    for (const role of ['super_admin', 'admin', 'payment_admin', undefined] as const) {
+      it(`prepay:true as ${role ?? 'host'} adds only prepay to the STORED tags (internal tags kept)`, async () => {
+        if (role) tagRoles[HOST_EMAIL] = role;
+        const res = await patchPrepay(HOST_EMAIL, HOST_USER_ID, { prepay: true }, STORED);
+        expect(res.status).toBe(200);
+        expect(written()).toEqual([...STORED, 'prepay']);
+      });
+
+      it(`prepay:false as ${role ?? 'host'} removes only prepay`, async () => {
+        if (role) tagRoles[HOST_EMAIL] = role;
+        const res = await patchPrepay(HOST_EMAIL, HOST_USER_ID, { prepay: false }, [...STORED, 'Prepay']);
+        expect(res.status).toBe(200);
+        expect(written()).toEqual(STORED);
+      });
+    }
+
+    it('prepay toggle that changes nothing does not rewrite tags', async () => {
+      const res = await patchPrepay(HOST_EMAIL, HOST_USER_ID, { prepay: true }, [...STORED, 'prepay']);
+      expect(res.status).toBe(200);
+      expect(written()).toBeUndefined();
+    });
+
+    it('co-host can toggle prepay', async () => {
+      const res = await patchPrepay(OTHER_EMAIL, OTHER_USER_ID, { prepay: true }, STORED);
+      expect(res.status).toBe(200);
+      expect(written()).toEqual([...STORED, 'prepay']);
+    });
+
+    it('non-boolean prepay is rejected', async () => {
+      const res = await patchPrepay(HOST_EMAIL, HOST_USER_ID, { prepay: 'yes' }, STORED);
+      expect(res.status).toBe(400);
+      expect(written()).toBeUndefined();
+    });
+
     it('admin can write arbitrary tags', async () => {
       tagRoles[HOST_EMAIL] = 'admin';
       const res = await patchTags(HOST_EMAIL, HOST_USER_ID, ['nonhub', 'paid', 'avax', 'new-partner']);
@@ -631,6 +681,7 @@ describe('Party Routes', () => {
         })
         .mockResolvedValueOnce({
           id: PARTY_ID,
+          userId: HOST_USER_ID, // co-host guard reads the owner from this select
           coHosts: existingCoHosts,
         });
 

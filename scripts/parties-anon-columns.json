@@ -50,7 +50,7 @@
   "photos_public",
   "photo_moderation",
   "event_type",
-  "event_tags",
+  "public_event_tags",
   "event_series_id",
   "budget_total",
   "budget_enabled",

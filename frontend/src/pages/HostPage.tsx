@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { NextStepsCard } from '../components/NextStepsCard';
 import { useParams, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home, Zap, MessageSquare } from 'lucide-react';
@@ -374,6 +375,19 @@ function HostPageContent() {
             );
           })}
         </div>
+
+        {activeTab === defaultTab && party && !partyLoading && !guestsLoadFailed && (
+          <NextStepsCard
+            key={party.id}
+            partyId={party.id}
+            inviteCode={party.inviteCode}
+            customUrl={party.customUrl}
+            createdAt={party.createdAt}
+            guestCount={guests.length}
+            onInviteGuests={tabs.some(x => x.id === 'guests') ? () => setActiveTab('guests') : undefined}
+            onOrderPizza={tabs.some(x => x.id === 'pizza') ? () => setActiveTab('pizza') : undefined}
+          />
+        )}
 
         {activeTab === 'dashboard' && party ? (
           // brand-checklists: only brand-series parties get the series dashboard;

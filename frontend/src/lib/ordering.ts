@@ -295,9 +295,7 @@ export async function initiateAIPhoneCall(
   fulfillmentType: 'pickup' | 'delivery',
   deliveryAddress?: string,
   partySize?: number,
-  // When true the backend issues a virtual card (server-decided limit) and the AI reads it to the
-  // pizzeria. Card details never reach the browser.
-  payWithCard: boolean = false
+  estimatedTotal?: number
 ): Promise<{ success: boolean; callId?: string; aiPhoneCallId?: string; error?: string }> {
   const token = localStorage.getItem('authToken');
 
@@ -317,7 +315,7 @@ export async function initiateAIPhoneCall(
       fulfillmentType,
       deliveryAddress,
       partySize,
-      payWithCard,
+      estimatedTotal,
     }),
   });
 

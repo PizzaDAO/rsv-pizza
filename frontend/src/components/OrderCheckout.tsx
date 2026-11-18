@@ -169,8 +169,9 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
     const partySize = recommendations.reduce((sum, pizza) => sum + pizza.guestCount, 0);
 
-    // sec-edge-functions: AI calls are placed only by the backend, for a party the user can edit.
-    // With "pay with card" the backend issues the virtual card and reads it to the pizzeria itself.
+    // sec-edge-functions: the browser no longer creates or reads virtual cards, and there is no
+    // edge-function fallback. The backend route is retired (410, basil-14648: ordering moved to
+    // pizza-mcp, no card by voice), so this shows its message.
     if (!partyId) {
       setError('Save your party first, then place the AI order from its host page');
       setLoading(false);
@@ -188,7 +189,7 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
         fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
         deliveryAddress || undefined,
         partySize,
-        payWithCard && hasPaymentMethod
+        estimatedTotal
       );
 
       if (result.success && result.aiPhoneCallId) {

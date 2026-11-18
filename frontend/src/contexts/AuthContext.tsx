@@ -1,3 +1,4 @@
+import { clearEventDraft } from '../lib/eventDraft';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AUTH_EXPIRED_EVENT } from '../lib/api';
 import { rememberAuthCodeEmail } from '../lib/authCodeEmail';
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Storage is already cleared by apiRequest, but ensure consistency
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    clearEventDraft();
   }, []);
 
   // Check for stored token on mount
@@ -135,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok) {
       const error = await response.json().catch(() => null);
       // The API puts the message under error.error (e.g. the 429 "Try again in a few minutes").
-      throw new Error(error?.error?.message ?? error?.message ?? 'Failed to send magic link');
+      throw Object.assign(new Error(error?.error?.message ?? error?.message ?? 'Failed to send magic link'), { code: error?.error?.code as string | undefined });
     }
 
     // invite-verify: the code-entry page sends the email with the code (the backend binds
@@ -148,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    clearEventDraft();
     setUser(null);
   };
 

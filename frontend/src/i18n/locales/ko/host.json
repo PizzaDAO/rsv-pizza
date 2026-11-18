@@ -969,5 +969,14 @@
       "rsvpBody": "코드를 스캔하여 이벤트 페이지를 보고 RSVP하세요.",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "다음 단계",
+    "subtitle": "이벤트가 게시되었습니다. 사람들을 초대하세요.",
+    "copyLink": "초대 링크 복사",
+    "copied": "링크 복사됨",
+    "inviteGuests": "게스트 초대",
+    "orderPizza": "피자 주문",
+    "dismiss": "다음 단계 닫기"
   }
 }
