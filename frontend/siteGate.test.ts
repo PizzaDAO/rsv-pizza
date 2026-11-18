@@ -76,6 +76,42 @@ describe('siteGate', () => {
   });
 });
 
+describe('siteGate bypass header', () => {
+  const SECRET = 'b'.repeat(40);
+  const H = 'x-site-gate-bypass';
+
+  it('skips the gate with the correct header and sets no cookie', async () => {
+    for (const p of ['/', '/some-event', '/host/abc/guests']) {
+      expect(await siteGate(req(p, { headers: { [H]: SECRET } }), PW, SECRET)).toBeNull();
+    }
+  });
+
+  it('shows the gate form for a wrong or missing header', async () => {
+    for (const headers of [{ [H]: 'c'.repeat(40) }, { [H]: SECRET + 'x' }, { [H]: '' }, {}]) {
+      const res = await siteGate(req('/some-event', { headers }), PW, SECRET);
+      expect(res?.status).toBe(401);
+      expect(await res!.text()).toContain('type="password"');
+    }
+  });
+
+  it('does not accept the secret as a query param', async () => {
+    expect((await siteGate(req(`/some-event?x-site-gate-bypass=${SECRET}`), PW, SECRET))?.status).toBe(401);
+  });
+
+  it('ignores the header when the bypass env is unset or shorter than 32 chars', async () => {
+    const short = 'a'.repeat(31);
+    for (const secret of [undefined, '', short]) {
+      const res = await siteGate(req('/some-event', { headers: { [H]: secret ?? 'anything' } }), PW, secret);
+      expect(res?.status).toBe(401);
+    }
+  });
+
+  it('is unchanged when the gate is off', async () => {
+    expect(await siteGate(req('/x', { headers: { [H]: SECRET } }), undefined, SECRET)).toBeNull();
+    expect(await siteGate(req('/x'), undefined, SECRET)).toBeNull();
+  });
+});
+
 describe("OPEN_FILES", () => {
   it("every entry exists in frontend/public", async () => {
     const { OPEN_FILES } = await import("./middleware");
