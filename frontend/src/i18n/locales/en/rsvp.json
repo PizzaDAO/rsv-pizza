@@ -38,7 +38,9 @@
     "submit": "RSVP",
     "editSubmit": "Edit RSVP",
     "submitting": "Submitting...",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "skip": "Skip — I'll eat anything",
+    "optionalHint": "Optional: you're already in. Add preferences or skip."
   },
   "success": {
     "seeYou": "See you at {{eventName}}!",
@@ -50,7 +52,13 @@
     "preferenceSaved": "Your preferences have been saved.",
     "waitlisted": "You're on the Waitlist!",
     "waitlistedDesc": "This event is currently at capacity, but you're #{{position}} on the waitlist! We'll notify you if a spot opens up.",
-    "backToEvent": "Back to Event"
+    "backToEvent": "Back to Event",
+    "alreadyOnList": "You're already on the list",
+    "alreadyOnListDesc": "This email is already registered for this event, so nothing was changed.",
+    "confirmationSent": "Confirmation sent to {{email}}",
+    "addToCalendar": "Add to Calendar",
+    "calendar": "Calendar",
+    "changeRsvpHint": "Need to change something? You can edit your RSVP from the event page."
   },
   "password": {
     "title": "Password Required",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "Buy Pizza for {{recipient}}",
     "buyPizzaForEvent": "Buy Pizza for this event",
     "buyPizzaForEventName": "Buy Pizza for {{eventName}}",
-    "thanksForSupport": "Thanks for your support!"
+    "thanksForSupport": "Thanks for your support!",
+    "buyPizzaForPrefix": "Buy Pizza for"
   },
   "nft": {
     "minting": "Minting your NFT...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFT Already Claimed!",
     "viewOnOpenSea": "View on OpenSea",
     "viewTransaction": "View Transaction",
-    "mintFailed": "NFT minting failed"
+    "mintFailed": "NFT minting failed",
+    "afterApproval": "You'll get your NFT once the host approves you."
   },
   "share": {
     "tellFriends": "Tell your friends about the party!",
@@ -137,5 +147,6 @@
     "Plain": "Plain",
     "Gluten-Free": "Gluten-Free",
     "Dairy-Free": "Dairy-Free"
-  }
+  },
+  "close": "Close"
 }

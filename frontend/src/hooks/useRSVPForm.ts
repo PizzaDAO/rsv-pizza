@@ -792,6 +792,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     // Handlers
     handleStep1Continue,
     handleSubmit,
+    submitRsvp,
 
     // Computed
     isSwcEvent,

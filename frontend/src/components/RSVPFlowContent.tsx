@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Check, AlertCircle, Loader2, X, Heart, Calendar } from 'lucide-react';
+import { Check, Loader2, X, Heart, Calendar, MapPin, Mail, ListChecks } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PublicEvent } from '../lib/api';
 import { DonationStep } from './DonationStep';
 import { RSVPFormStep1 } from './RSVPFormStep1';
@@ -37,6 +38,8 @@ export function RSVPFlowContent({
   mintResult,
   twitterHandles,
 }: RSVPFlowContentProps) {
+  const { t } = useTranslation('rsvp');
+  const closeLabel = t('close');
   // Calendar popup state (success screen)
   const [calendarOpen, setCalendarOpen] = useState(false);
   const calendarBtnRef = useRef<HTMLButtonElement>(null);
@@ -53,23 +56,22 @@ export function RSVPFlowContent({
     // was" note is gone with the decoy.)
 
     const getSuccessIcon = () => {
-      if (form.alreadyRegistered && !form.wasUpdated) return 'bg-[#ff393a]/20 border-[#ff393a]/30';
       if (form.waitlisted) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       if (form.pendingApproval) return 'bg-[#ffc107]/20 border-[#ffc107]/30';
       return 'bg-[#39d98a]/20 border-[#39d98a]/30';
     };
 
     const getSuccessTitle = () => {
-      if (form.wasUpdated) return 'RSVP Updated';
-      if (form.alreadyRegistered) return "You're already registered!";
-      if (form.waitlisted) return "You're on the Waitlist!";
-      if (form.pendingApproval) return 'RSVP Submitted!';
-      return `See you at ${eventName}!`;
+      if (form.wasUpdated) return t('success.rsvpUpdated');
+      if (form.alreadyRegistered) return t('success.alreadyOnList');
+      if (form.waitlisted) return t('success.waitlisted');
+      if (form.pendingApproval) return t('success.rsvpSubmitted');
+      return t('success.seeYou', { eventName });
     };
 
     const getSuccessIconComponent = () => {
       if (form.alreadyRegistered && !form.wasUpdated) {
-        return <AlertCircle className="w-8 h-8 text-[#ff393a]" />;
+        return <ListChecks className="w-8 h-8 text-[#39d98a]" />;
       }
       if (form.waitlisted) {
         return <span className="text-2xl font-bold text-[#ffc107]">#{form.waitlistPosition}</span>;
@@ -80,39 +82,70 @@ export function RSVPFlowContent({
       return <Check className="w-8 h-8 text-[#39d98a]" />;
     };
 
+    const isNewRsvp = !form.alreadyRegistered && !form.wasUpdated;
+    const eventDate = event.date ? new Date(event.date) : null;
+    const dateText = eventDate && !isNaN(eventDate.getTime())
+      ? eventDate.toLocaleString(undefined, {
+          weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+          timeZone: event.timezone || undefined,
+        })
+      : null;
+    const placeText = [event.venueName, event.city].filter(Boolean).join(', ') || event.address || null;
+
     return (
-      <div className="card p-8 max-w-md w-full text-center relative">
+      <div
+        className="card p-8 max-w-md w-full text-center relative"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rsvp-flow-title"
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
+          aria-label={closeLabel}
         >
           <X size={20} />
         </button>
         <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${getSuccessIcon()}`}>
           {getSuccessIconComponent()}
         </div>
-        <h1 className="text-2xl font-bold text-theme-text mb-2">
+        <h1 id="rsvp-flow-title" className="text-2xl font-bold text-theme-text mb-2">
           {getSuccessTitle()}
         </h1>
+        {(dateText || placeText) && (
+          <div className="text-sm text-theme-text-secondary mb-4 space-y-1" data-testid="rsvp-recap">
+            {dateText && (
+              <p className="flex items-center justify-center gap-2"><Calendar size={14} aria-hidden="true" />{dateText}</p>
+            )}
+            {placeText && (
+              <p className="flex items-center justify-center gap-2"><MapPin size={14} aria-hidden="true" />{placeText}</p>
+            )}
+          </div>
+        )}
+        {isNewRsvp && form.email.trim() && (
+          <p className="text-xs text-theme-text-muted mb-4 flex items-center justify-center gap-1" data-testid="rsvp-confirmation-sent">
+            <Mail size={12} aria-hidden="true" />
+            {t('success.confirmationSent', { email: form.email.trim() })}
+          </p>
+        )}
         {form.alreadyRegistered && !form.wasUpdated && (
           <p className="text-theme-text-secondary mb-4">
-            This email has already been used to RSVP to this event.
+            {t('success.alreadyOnListDesc')}
           </p>
         )}
         {form.wasUpdated && (
           <p className="text-theme-text-secondary mb-4">
-            Your preferences have been saved.
+            {t('success.preferenceSaved')}
           </p>
         )}
         {form.waitlisted && !form.wasUpdated && (
           <p className="text-theme-text-secondary mb-4">
-            This event is currently at capacity, but you're #{form.waitlistPosition} on the waitlist!
-            We'll notify you if a spot opens up.
+            {t('success.waitlistedDesc', { position: form.waitlistPosition })}
           </p>
         )}
         {form.pendingApproval && !form.alreadyRegistered && !form.waitlisted && (
           <p className="text-theme-text-secondary mb-4">
-            Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
+            {t('success.pendingApproval')}
           </p>
         )}
         {/* Share Section */}
@@ -132,8 +165,8 @@ export function RSVPFlowContent({
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-theme-surface border border-theme-stroke rounded-xl hover:bg-theme-surface-hover transition-colors text-theme-text"
                 >
                   <Calendar size={14} />
-                  <span className="hidden sm:inline">Add to Calendar</span>
-                  <span className="sm:hidden">Calendar</span>
+                  <span className="hidden sm:inline">{t('success.addToCalendar')}</span>
+                  <span className="sm:hidden">{t('success.calendar')}</span>
                 </button>
                 <AddToCalendarPopup
                   isOpen={calendarOpen}
@@ -149,7 +182,7 @@ export function RSVPFlowContent({
         {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && form.pendingApproval && !form.alreadyRegistered && (
           <div className="mt-4 pt-4 border-t border-theme-stroke">
             <p className="text-theme-text-secondary text-sm text-center">
-              You'll get your NFT once the host approves you.
+              {t('nft.afterApproval')}
             </p>
           </div>
         )}
@@ -158,13 +191,13 @@ export function RSVPFlowContent({
             {mintStatus === 'minting' && (
               <div className="flex items-center gap-2 text-theme-text-secondary justify-center">
                 <Loader2 size={16} className="animate-spin" />
-                <span>Minting your NFT...</span>
+                <span>{t('nft.minting')}</span>
               </div>
             )}
             {mintStatus === 'success' && (mintResult?.txHash || mintResult?.tokenId) && (
               <div className="space-y-2">
                 <p className="text-[#39d98a] font-medium">
-                  {mintResult.alreadyMinted ? 'NFT Already Claimed!' : 'NFT Minted!'}
+                  {mintResult.alreadyMinted ? t('nft.alreadyClaimed') : t('nft.minted')}
                 </p>
                 {mintResult.tokenId ? (
                   <a
@@ -173,7 +206,7 @@ export function RSVPFlowContent({
                     rel="noopener noreferrer"
                     className="text-sm text-theme-text-secondary hover:text-theme-text underline"
                   >
-                    View on OpenSea
+                    {t('nft.viewOnOpenSea')}
                   </a>
                 ) : mintResult.txHash ? (
                   <a
@@ -182,13 +215,13 @@ export function RSVPFlowContent({
                     rel="noopener noreferrer"
                     className="text-sm text-theme-text-secondary hover:text-theme-text underline"
                   >
-                    View Transaction
+                    {t('nft.viewTransaction')}
                   </a>
                 ) : null}
               </div>
             )}
             {mintStatus === 'error' && (
-              <p className="text-[#ff393a] text-sm">{mintResult?.error || 'NFT minting failed'}</p>
+              <p className="text-[#ff393a] text-sm">{mintResult?.error || t('nft.mintFailed')}</p>
             )}
           </div>
         )}
@@ -200,12 +233,12 @@ export function RSVPFlowContent({
               className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 hover:bg-theme-surface-hover transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2 text-theme-text"
             >
               <Heart size={18} className="text-[#ff393a]" />
-              Donate
+              {t('donation.donate')}
             </button>
             <p className="text-theme-text-secondary text-sm text-center mt-1">
               {event.donationRecipient ? (
-                <>Buy Pizza for {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
-              ) : `Buy Pizza for ${eventName}`}
+                <>{t('donation.buyPizzaForPrefix')} {event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors">{event.donationRecipient}</a> : event.donationRecipient}</>
+              ) : t('donation.buyPizzaForEventName', { eventName })}
             </p>
           </>
         )}
@@ -227,10 +260,21 @@ export function RSVPFlowContent({
         {donationComplete && (
           <div className="flex items-center justify-center gap-2 mt-4 text-[#39d98a]">
             <Check size={16} />
-            <span className="text-sm">Thanks for your support!</span>
+            <span className="text-sm">{t('donation.thanksForSupport')}</span>
           </div>
         )}
-
+        {/* Back to the event page, where the guest can change their RSVP */}
+        <div className="mt-4 pt-4 border-t border-theme-stroke">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-secondary w-full"
+            data-testid="rsvp-back-to-event"
+          >
+            {t('success.backToEvent')}
+          </button>
+          <p className="text-xs text-theme-text-muted mt-2">{t('success.changeRsvpHint')}</p>
+        </div>
       </div>
     );
   }
@@ -243,17 +287,18 @@ export function RSVPFlowContent({
   // ---- Step 1 - Personal Info ----
   if (form.step === 1) {
     return (
-      <div className="card p-8 max-w-lg w-full relative">
+      <div className="card p-8 max-w-lg w-full relative" role="dialog" aria-modal="true" aria-labelledby="rsvp-flow-title">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
+          aria-label={closeLabel}
         >
           <X size={24} />
         </button>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit RSVP' : `RSVP to ${eventName}`}</h1>
-          <p className="text-sm text-theme-text-secondary">Step 1 of 2</p>
+          <h1 id="rsvp-flow-title" className="text-2xl font-bold text-theme-text">{isEditing ? t('step1.editTitle') : t('step1.title', { eventName })}</h1>
+          <p className="text-sm text-theme-text-secondary">{t('step1.stepIndicator')}</p>
         </div>
 
         <RSVPFormStep1
@@ -270,17 +315,19 @@ export function RSVPFlowContent({
 
   // ---- Step 2 - Pizza Preferences ----
   return (
-    <div className="card p-8 max-w-2xl w-full relative">
+    <div className="card p-8 max-w-2xl w-full relative" role="dialog" aria-modal="true" aria-labelledby="rsvp-flow-title">
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
+        aria-label={closeLabel}
       >
         <X size={24} />
       </button>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-theme-text">{isEditing ? 'Edit Pizza Preferences' : 'Pizza Requests'}</h1>
-        <p className="text-sm text-theme-text-secondary">Step 2 of 2</p>
+        <h1 id="rsvp-flow-title" className="text-2xl font-bold text-theme-text">{isEditing ? t('step2.editTitle') : t('step2.title')}</h1>
+        <p className="text-sm text-theme-text-secondary">{t('step2.stepIndicator')}</p>
+        <p className="text-sm text-theme-text-muted mt-1">{t('step2.optionalHint')}</p>
       </div>
 
       <RSVPFormStep2

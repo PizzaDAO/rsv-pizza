@@ -38,7 +38,9 @@
     "submit": "RSVP",
     "editSubmit": "RSVPを編集",
     "submitting": "送信中...",
-    "saving": "保存中..."
+    "saving": "保存中...",
+    "skip": "スキップ：なんでも食べます",
+    "optionalHint": "任意：すでに参加登録済みです。好みを追加するか、スキップしてください。"
   },
   "success": {
     "seeYou": "{{eventName}}でお会いしましょう！",
@@ -50,7 +52,13 @@
     "preferenceSaved": "設定が保存されました。",
     "waitlisted": "キャンセル待ちに登録されました！",
     "waitlistedDesc": "このイベントは現在定員に達していますが、キャンセル待ち{{position}}番目です！空きが出たらお知らせします。",
-    "backToEvent": "イベントに戻る"
+    "backToEvent": "イベントに戻る",
+    "alreadyOnList": "すでにリストに登録されています",
+    "alreadyOnListDesc": "このメールアドレスはすでにこのイベントに登録されているため、変更はありません。",
+    "confirmationSent": "確認メールを {{email}} に送信しました",
+    "addToCalendar": "カレンダーに追加",
+    "calendar": "カレンダー",
+    "changeRsvpHint": "変更したい場合は、イベントページから出欠を編集できます。"
   },
   "password": {
     "title": "パスワードが必要です",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "{{recipient}}にピザを贈る",
     "buyPizzaForEvent": "このイベントにピザを贈る",
     "buyPizzaForEventName": "{{eventName}}にピザを贈る",
-    "thanksForSupport": "ご支援ありがとうございます！"
+    "thanksForSupport": "ご支援ありがとうございます！",
+    "buyPizzaForPrefix": "ピザを贈る："
   },
   "nft": {
     "minting": "NFTをミント中...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFTはすでに取得済みです！",
     "viewOnOpenSea": "OpenSeaで表示",
     "viewTransaction": "トランザクションを表示",
-    "mintFailed": "NFTのミントに失敗しました"
+    "mintFailed": "NFTのミントに失敗しました",
+    "afterApproval": "ホストの承認後にNFTが届きます。"
   },
   "share": {
     "tellFriends": "パーティーのことを友達に教えましょう！",
@@ -137,5 +147,6 @@
     "Plain": "プレーン",
     "Gluten-Free": "グルテンフリー",
     "Dairy-Free": "乳製品フリー"
-  }
+  },
+  "close": "閉じる"
 }
