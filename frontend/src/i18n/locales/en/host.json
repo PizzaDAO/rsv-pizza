@@ -1518,5 +1518,14 @@
       "rsvpBody": "Scan the code to see the event page and RSVP.",
       "wifiHeadline": "WiFi"
     }
+  },
+  "nextSteps": {
+    "title": "Next steps",
+    "subtitle": "Your event is live. Get people in the door.",
+    "copyLink": "Copy invite link",
+    "copied": "Link copied",
+    "inviteGuests": "Invite guests",
+    "orderPizza": "Order pizza",
+    "dismiss": "Dismiss next steps"
   }
 }

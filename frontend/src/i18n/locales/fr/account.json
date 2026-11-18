@@ -13,7 +13,11 @@
     "guest_other": "{{count}} invités",
     "alreadyCreated": "Vous avez déjà créé un événement ?",
     "viewAllTest": "Voir tous les événements test",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "hosting": "J'organise",
+    "attending": "J'y participe",
+    "searchPlaceholder": "Rechercher vos événements",
+    "showMore": "Afficher plus ({{count}} de plus)"
   },
   "profile": {
     "title": "Votre profil",
@@ -74,6 +78,12 @@
     "endTime": "Heure de fin",
     "done": "Terminé",
     "datePlaceholder": "Jeudi 15 janvier",
-    "timePlaceholder": "14h00 – 15h00 CET"
+    "timePlaceholder": "14h00 – 15h00 CET",
+    "heading": "Créer un événement",
+    "starts": "Début",
+    "ends": "Fin",
+    "confirmEmailNote": "Vous confirmerez votre e-mail pour publier.",
+    "draftRestored": "Brouillon restauré. Vérifiez et créez.",
+    "invalidCustomUrl": "Cette URL personnalisée n'est pas valide. Essayez-en une autre."
   }
 }

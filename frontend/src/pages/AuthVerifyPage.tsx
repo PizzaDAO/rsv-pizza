@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
 import { Layout } from '../components/Layout';
 import { sanitizeNextPath } from '../lib/wallet/handoff';
+import { authErrorKey } from '../lib/authErrors';
+import { hasEventDraft } from '../lib/eventDraft';
 import { getAuthCodeEmail, clearAuthCodeEmail, postVerifyCode } from '../lib/authCodeEmail';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
@@ -13,7 +15,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 export function AuthVerifyPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser, signOut } = useAuth();
+  const { setUser, signOut, signIn } = useAuth();
   const { t } = useTranslation('auth');
   const [status, setStatus] = useState<'idle' | 'already' | 'confirm' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,11 @@ export function AuthVerifyPage() {
   const initialParams = useRef(new URLSearchParams(location.search));
   const tokenRedeemStarted = useRef(false);
   const redirectTimer = useRef<number | null>(null);
+  // Resend: the code was just sent when we land here (if we know the address), so start the cooldown.
+  const RESEND_COOLDOWN_S = 30;
+  const [cooldown, setCooldown] = useState(() => (getAuthCodeEmail() ? RESEND_COOLDOWN_S : 0));
+  const [resending, setResending] = useState(false);
+  const [resendNote, setResendNote] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [signedInAs, setSignedInAs] = useState<string | null>(null);
   const signedInAsRef = useRef<string | null>(null);
 
@@ -107,6 +114,39 @@ export function AuthVerifyPage() {
     }
   }
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [cooldown]);
+
+  async function handleResend() {
+    if (cooldown > 0 || resending || !emailOk) return;
+    setResending(true);
+    setResendNote(null);
+    try {
+      await signIn(codeEmail);
+      setCode(['', '', '', '', '', '']);
+      setCooldown(RESEND_COOLDOWN_S);
+      setResendNote({ kind: 'ok', text: t('verifyPage.resent', { email: codeEmail }) });
+      inputRefs.current[0]?.focus();
+    } catch (err: any) {
+      setResendNote({ kind: 'err', text: t(authErrorKey(err?.message, 'send')) });
+    } finally {
+      setResending(false);
+    }
+  }
+
+  // Where to go once signed in: explicit ?next=, then a saved event draft, then the stored return URL.
+  function postLoginPath(): string {
+    const nextParam = sanitizeNextPath(initialParams.current.get('next'));
+    if (nextParam) return nextParam;
+    if (hasEventDraft()) return '/new';
+    const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl'));
+    sessionStorage.removeItem('authReturnUrl');
+    return returnUrl || '/';
+  }
+
   // Check if this is a new user on mount
   useEffect(() => {
     const newUser = sessionStorage.getItem('isNewUser') === 'true';
@@ -146,7 +186,7 @@ export function AuthVerifyPage() {
       }
     } catch (err: any) {
       setStatus('error');
-      setError(err.message || 'Failed to verify code');
+      setError(t(authErrorKey(err?.message, 'verify')));
     }
   }
 
@@ -183,12 +223,7 @@ export function AuthVerifyPage() {
     // Redirect to ?next= (local paths only), else the stored return URL, else home.
     // Hand-off sign-ins stay on the confirmation screen (showing the account email) until the user continues.
     if (signedInAsRef.current) return;
-    redirectTimer.current = window.setTimeout(() => {
-      const nextParam = sanitizeNextPath(initialParams.current.get('next'));
-      const returnUrl = sanitizeNextPath(sessionStorage.getItem('authReturnUrl'));
-      sessionStorage.removeItem('authReturnUrl');
-      navigate(nextParam || returnUrl || '/');
-    }, 2000);
+    navigate(postLoginPath(), { replace: true });
   }
 
   function handleCodeChange(index: number, value: string) {
@@ -248,7 +283,26 @@ export function AuthVerifyPage() {
               <Mail className="w-8 h-8 text-[#ff393a]" />
             </div>
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.title')}</h1>
-            <p className="text-theme-text-secondary mb-6">{t('verifyPage.subtitle')}</p>
+            {storedEmail ? (
+              <p className="text-theme-text-secondary mb-1 break-all" data-testid="verify-sent-to">
+                {t('verifyPage.sentTo', { email: storedEmail })}
+              </p>
+            ) : (
+              <p className="text-theme-text-secondary mb-1">{t('verifyPage.subtitle')}</p>
+            )}
+            {storedEmail && (
+              <p className="text-sm mb-1">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/login?email=${encodeURIComponent(storedEmail)}`)}
+                  className="text-[#ff393a] hover:underline"
+                  data-testid="verify-wrong-email"
+                >
+                  {t('verifyPage.wrongEmail')}
+                </button>
+              </p>
+            )}
+            <p className="text-theme-text-muted text-xs mb-6">{t('verifyPage.checkSpam')}</p>
 
             {!storedEmail && (
               <div className="mb-4 text-left">
@@ -286,12 +340,23 @@ export function AuthVerifyPage() {
             <p className="text-theme-text-muted text-sm">
               {t('verifyPage.didntReceive')}{' '}
               <button
-                onClick={() => navigate('/login')}
-                className="text-[#ff393a] hover:underline"
+                type="button"
+                onClick={handleResend}
+                disabled={cooldown > 0 || resending || !emailOk}
+                className="text-[#ff393a] hover:underline disabled:opacity-50 disabled:no-underline"
+                data-testid="verify-resend"
               >
-                {t('verifyPage.requestNew')}
+                {cooldown > 0 ? t('verifyPage.resendIn', { seconds: cooldown }) : t('verifyPage.requestNew')}
               </button>
             </p>
+            {resendNote && (
+              <p
+                className={`text-sm mt-3 ${resendNote.kind === 'ok' ? 'text-[#39d98a]' : 'text-[#ff393a]'}`}
+                role={resendNote.kind === 'ok' ? 'status' : 'alert'}
+              >
+                {resendNote.text}
+              </p>
+            )}
           </>
         )}
 
@@ -302,7 +367,7 @@ export function AuthVerifyPage() {
             </div>
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.alreadySignedIn', { defaultValue: 'Already signed in' })}</h1>
             {confirmEmail && <p className="text-theme-text-secondary mb-6 break-all">{confirmEmail}</p>}
-            <button onClick={() => navigate(nextPath() || '/', { replace: true })} className="btn-primary">
+            <button onClick={() => navigate(postLoginPath(), { replace: true })} className="btn-primary">
               {t('verifyPage.continue')}
             </button>
           </>
@@ -380,7 +445,7 @@ export function AuthVerifyPage() {
               <button
                 type="button"
                 className="btn-primary mt-4"
-                onClick={() => navigate(nextPath() || '/', { replace: true })}
+                onClick={() => navigate(postLoginPath(), { replace: true })}
               >
                 {t('verifyPage.continue')}
               </button>

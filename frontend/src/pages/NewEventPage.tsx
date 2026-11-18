@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { EventForm } from '../components/EventForm';
@@ -10,10 +11,12 @@ import { resolvePreset } from '../config/createPresets';
 import { fetchPublicSeries } from '../lib/api';
 
 function GenericCreate() {
+  const { t } = useTranslation('account');
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="card p-8">
+          <h1 className="text-2xl font-bold text-theme-text mb-6">{t('eventForm.heading')}</h1>
           <EventForm />
         </div>
       </div>

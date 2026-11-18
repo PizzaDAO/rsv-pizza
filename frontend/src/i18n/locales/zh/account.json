@@ -13,7 +13,11 @@
     "guest_other": "{{count}} 位来宾",
     "alreadyCreated": "已经创建了派对？",
     "viewAllTest": "查看所有测试活动",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "hosting": "我主办的",
+    "attending": "我参加的",
+    "searchPlaceholder": "搜索你的活动",
+    "showMore": "显示更多（还有 {{count}} 个）"
   },
   "profile": {
     "title": "您的个人资料",
@@ -74,6 +78,12 @@
     "endTime": "结束时间",
     "done": "完成",
     "datePlaceholder": "1月15日 星期四",
-    "timePlaceholder": "14:00 – 15:00 CST"
+    "timePlaceholder": "14:00 – 15:00 CST",
+    "heading": "创建活动",
+    "starts": "开始",
+    "ends": "结束",
+    "confirmEmailNote": "发布前需要确认你的邮箱。",
+    "draftRestored": "草稿已恢复，请检查后创建。",
+    "invalidCustomUrl": "此自定义网址无效，请换一个。"
   }
 }
