@@ -7,7 +7,7 @@
  * Everything below is series-scoped, under `/:seriesId`, behind `requireSeriesAdmin` (404 for any
  * series the caller isn't an admin of). Handlers read the series id ONLY from `req.seriesAdmin`
  * and re-scope every child lookup by it. Every mutation writes a `series_audit` row and is rate
- * limited per user. Brand admins can never touch money, domains, tags, slug, create flow, approval
+ * limited per user. Brand admins can never touch money, tags, slug, create flow, approval
  * default, other series or global settings (see lib/seriesBrandSettings.ts for the allowlist).
  *
  *   GET   /:seriesId/settings                  Editable fields + read-only context + current image URLs (`assets`)
@@ -21,6 +21,7 @@
  *   GET   /:seriesId/events?status=pending     The series' events by approval status
  *   PATCH /:seriesId/events/:partyId/status    Approve / reject / hide (final; super-admins keep a veto)
  *   PATCH /:seriesId/alerts {alertsEnabled}    Own new-event alert toggle
+ *   .../domain, .../email-domain               Partner custom domain + sending domain (brand-admin.domain.routes.ts)
  */
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
@@ -47,6 +48,7 @@ import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 import {
   LISTABLE_EVENT_STATUSES, listSeriesEvents, setSeriesEventStatus,
 } from '../lib/seriesEventStatus.js';
+import { registerDomainRoutes } from './brand-admin.domain.routes.js';
 
 const router = Router();
 
@@ -413,5 +415,8 @@ scoped.patch('/alerts', writeLimited, wrap(async (req, res) => {
   const admin = await setSeriesAdminAlerts({ seriesId, email, alertsEnabled: v, actorEmail: email, actorKind });
   res.json({ admin });
 }));
+
+// ----- custom domain + sending domain (PR 16): brand admins request/check; attach/cutover/rollback are super-admin only -----
+registerDomainRoutes(scoped);
 
 export default router;

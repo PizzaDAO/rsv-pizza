@@ -189,9 +189,12 @@ describe('route registry', () => {
     expect(inner[0].handle).toBe(requireSeriesAdmin);
     const scopedRoutes = inner.filter((l) => l.route).map((l) => `${Object.keys(l.route.methods)[0].toUpperCase()} ${l.route.path}`).sort();
     expect(scopedRoutes).toEqual([
-      'DELETE /assets/:slot', 'DELETE /checklist/:itemId', 'GET /audit', 'GET /checklist', 'GET /events', 'GET /settings',
+      'DELETE /assets/:slot', 'DELETE /checklist/:itemId', 'DELETE /domain', 'DELETE /email-domain', 'GET /audit', 'GET /checklist',
+      'GET /domain', 'GET /email-domain', 'GET /events', 'GET /settings',
       'PATCH /alerts', 'PATCH /checklist/:itemId', 'PATCH /events/:partyId/status', 'PATCH /settings',
-      'POST /assets/attach', 'POST /assets/upload-url', 'POST /checklist', 'POST /revert',
+      'POST /assets/attach', 'POST /assets/upload-url', 'POST /checklist', 'POST /domain/alias/remove', 'POST /domain/attach', 'POST /domain/check',
+      'POST /domain/cutover', 'POST /domain/reset', 'POST /domain/rollback', 'POST /email-domain/check', 'POST /revert',
+      'PUT /domain', 'PUT /email-domain',
     ]);
   });
 });

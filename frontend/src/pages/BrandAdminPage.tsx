@@ -15,6 +15,8 @@ import { ImagesPanel } from '../components/brand-admin/ImagesPanel';
 import { ChecklistPanel } from '../components/brand-admin/ChecklistPanel';
 import { EventsPanel } from '../components/brand-admin/EventsPanel';
 import { HistoryPanel } from '../components/brand-admin/HistoryPanel';
+import { DomainPanel } from '../components/brand-admin/DomainPanel';
+import { EmailDomainPanel } from '../components/brand-admin/EmailDomainPanel';
 
 export const BRAND_ADMIN_TABS = [
   { key: 'identity', label: 'Identity' },
@@ -22,6 +24,8 @@ export const BRAND_ADMIN_TABS = [
   { key: 'images', label: 'Images' },
   { key: 'checklist', label: 'Checklist' },
   { key: 'events', label: 'Events' },
+  { key: 'domain', label: 'Domain' },
+  { key: 'email', label: 'Email' },
   { key: 'history', label: 'History' },
 ] as const;
 type TabKey = (typeof BRAND_ADMIN_TABS)[number]['key'];
@@ -71,6 +75,8 @@ const SeriesAdmin: React.FC<{ series: BrandAdminSeries; tab: TabKey }> = ({ seri
       {panel('images', <ImagesPanel seriesId={series.id} assets={assets} onChanged={onAssetChanged} />)}
       {panel('checklist', <ChecklistPanel seriesId={series.id} />)}
       {panel('events', <EventsPanel seriesId={series.id} alertsEnabled={series.actorKind === 'series_admin' ? series.alertsEnabled : null} />)}
+      {panel('domain', <DomainPanel seriesId={series.id} isSuperAdmin={series.actorKind === 'super_admin'} />)}
+      {panel('email', <EmailDomainPanel seriesId={series.id} />)}
       {panel('history', <HistoryPanel seriesId={series.id} onReverted={setSettings} />)}
     </>
   );
@@ -78,7 +84,7 @@ const SeriesAdmin: React.FC<{ series: BrandAdminSeries; tab: TabKey }> = ({ seri
 
 /**
  * Brand settings for brand admins (and super-admins), served on the brand's own site at
- * /brand-admin[/identity|look|images|checklist|events|history]. Anyone else sees the ordinary
+ * /brand-admin[/identity|look|images|checklist|events|domain|email|history]. Anyone else sees the ordinary
  * not-found page, so the route does not advertise itself.
  */
 export function BrandAdminPage() {
