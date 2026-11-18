@@ -129,6 +129,9 @@ model Party {
   // Event type and tagging (for GPP and other special events)
   eventType String?  @map("event_type") // 'standard', 'gpp', 'private', etc.
   eventTags String[] @default([]) @map("event_tags") // Tags for filtering/grouping
+  // blackolive-70521: host-chosen PUBLIC tags (curated keys, see lib/eventLabels.ts). NOT event_tags
+  // (admin/system control channel) and NOT host_tags (dead). Max 5. See plans/blackolive-70521.md.
+  labels String[] @default([]) @map("labels")
 
   // White-label event series (e.g. GPP). Nullable: standalone parties have none;
   // GPP parties link to a seeded series. See EventSeries.

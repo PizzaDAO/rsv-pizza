@@ -92,5 +92,33 @@
     "reasonLabel": "Reason",
     "noticeTitle": "Event Cancelled",
     "noticeBody": "RSVPs are closed for this event."
+  },
+  "labels": {
+    "title": "タグ",
+    "helper": "最大{{max}}個まで選べます",
+    "maxReached": "タグは最大{{max}}個までです",
+    "filterAll": "すべてのタグ",
+    "keys": {
+      "family-friendly": "家族向け",
+      "kid-friendly": "お子様歓迎",
+      "all-ages": "全年齢",
+      "21-plus": "21歳以上",
+      "outdoor": "屋外",
+      "live-music": "ライブ音楽",
+      "dj": "DJ",
+      "workshop": "ワークショップ",
+      "talks": "トーク",
+      "networking": "ネットワーキング",
+      "hackathon": "ハッカソン",
+      "meetup": "ミートアップ",
+      "students": "学生",
+      "women-in-web3": "Web3の女性",
+      "vegan-options": "ヴィーガン対応",
+      "gluten-free-options": "グルテンフリー対応",
+      "free": "無料",
+      "wheelchair-accessible": "車椅子対応",
+      "art": "アート",
+      "gaming": "ゲーム"
+    }
   }
 }

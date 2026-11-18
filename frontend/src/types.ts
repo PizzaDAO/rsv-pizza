@@ -326,6 +326,8 @@ export interface Party {
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null; // 'standard', 'gpp', 'private', etc.
   eventTags?: string[]; // Tags for filtering/grouping
+  // blackolive-70521: host-chosen PUBLIC tags (curated keys, parties.labels). Not eventTags.
+  labels: string[];
   // scam-flag-private: true only when eventTags is the RAW list (merged from GET /api/parties/:id).
   // Otherwise eventTags holds only public tags (internal ones stripped) and tag-dependent write
   // controls must not render.

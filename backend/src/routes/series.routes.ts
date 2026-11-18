@@ -145,7 +145,7 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
       select: {
         id: true, name: true, customUrl: true, inviteCode: true, city: true,
         country: true, region: true, date: true, latitude: true, longitude: true,
-        eventImageUrl: true, underbossStatus: true,
+        eventImageUrl: true, underbossStatus: true, labels: true,
         // Branded series only: venue/address/guest count, same fields a public event page shows.
         ...(branded ? { venueName: true, address: true, hideGuests: true, _count: { select: { guests: true } } } : {}),
       },
@@ -163,6 +163,7 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
       longitude: e.longitude,
       eventImageUrl: e.eventImageUrl,
       slug: e.customUrl || e.inviteCode,
+      labels: e.labels ?? [],
       community: e.underbossStatus === 'listed',
       ...(branded ? {
         venueName: (e as any).venueName ?? null,

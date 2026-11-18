@@ -8,6 +8,7 @@ import { MarkdownBoundary } from '../components/ErrorBoundary';
 import { MapPin, Users, Pizza, Loader2, Lock, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
 import { NotFoundView } from '../components/NotFoundView';
 import { useTranslation } from 'react-i18next';
+import { EventLabelChips } from '../components/EventLabelChips';
 import { verifyPartyPassword, getMyGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats, checkEventHost } from '../lib/api';
 import { IconInput } from '../components/IconInput';
@@ -1052,6 +1053,8 @@ export function EventPage() {
                   </div>
                 )}
                 <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0 break-words" data-testid="event-name" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
+                {/* blackolive-70521: host-chosen public tags; each chip links to /events filtered by it */}
+                <EventLabelChips labels={event.labels} className="mt-3" />
               </div>
 
               {/* Mobile: Host Info */}

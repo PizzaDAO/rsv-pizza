@@ -92,5 +92,33 @@
     "reasonLabel": "Reason",
     "noticeTitle": "Event Cancelled",
     "noticeBody": "RSVPs are closed for this event."
+  },
+  "labels": {
+    "title": "태그",
+    "helper": "최대 {{max}}개까지 선택하세요",
+    "maxReached": "태그는 최대 {{max}}개까지 선택할 수 있습니다",
+    "filterAll": "모든 태그",
+    "keys": {
+      "family-friendly": "가족 친화",
+      "kid-friendly": "어린이 환영",
+      "all-ages": "전 연령",
+      "21-plus": "21세 이상",
+      "outdoor": "야외",
+      "live-music": "라이브 음악",
+      "dj": "DJ",
+      "workshop": "워크숍",
+      "talks": "강연",
+      "networking": "네트워킹",
+      "hackathon": "해커톤",
+      "meetup": "밋업",
+      "students": "학생",
+      "women-in-web3": "Web3 여성",
+      "vegan-options": "비건 옵션",
+      "gluten-free-options": "글루텐프리 옵션",
+      "free": "무료",
+      "wheelchair-accessible": "휠체어 이용 가능",
+      "art": "아트",
+      "gaming": "게임"
+    }
   }
 }

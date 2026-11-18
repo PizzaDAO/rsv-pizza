@@ -5,30 +5,20 @@
 
 ---
 
-## Open questions for Snax (answer before implementing)
+## Decisions (Snax, 2026-11-18)
 
-1. **What are tags for?** This plan assumes **host-chosen, public "what kind of party is this"
-   tags** (e.g. *Family friendly*, *Live music*, *Vegan options*, *Workshop*) that guests see on the
-   event page and can filter by on `/events` and the maps. If you actually meant **admin tags**,
-   most of that already exists (`parties.event_tags`, see "What already exists"). In that case
-   the task shrinks to the small admin fixes in Phase 0. Which one did you mean?
-2. **Curated list or free-form?** The recommendation is a **curated list** (about 15 tags, each
-   translated into all 8 locales). Hosts can't type their own. OK with that? If yes, please
-   confirm or edit the starter list in Step 1.
-3. **Limit per event:** the plan uses a **max of 5**. OK?
-4. **Should restricted co-hosts be able to set tags?** The proposal: anyone with the
-   `details` tab. Owner and full co-hosts always can.
-5. **Admins/underbosses:** should they be able to override host tags from `/underboss` (Phase 2),
-   or is the host's edit view enough?
-6. **White-label:** should a brand series (doge / monad / swc / team1) get its own tag
-   vocabulary (e.g. monad: *DeFi*, *Gaming*), or is the global list fine for v1? The
-   recommendation is global for v1, with a per-series override in Phase 3.
-7. **Phase 0 security fix:** right now **any host can PATCH arbitrary `event_tags`**. Only
-   `go`, `possible-scam` and numeric cap tags are blocked. That means a host can add `swc`,
-   `SWC Hub`, `refund`, `nonhub`, `avax` or a partner tag. Those change RSVP opt-ins, payout
-   routing, flyer templates, and which partner dashboards/reports list the event. Should that
-   fix ship here as Phase 0, or as its own task? The recommendation is its own small task,
-   tracked here.
+1. **Public host tags** (option 1): host-chosen, guest-visible "what kind of party is this" tags.
+2. **Curated list**, the starter list in Step 1 as written (20 keys). Hosts can't type their own.
+3. **Max 5 per event.**
+4. **Who can set them:** owner, full co-hosts, and restricted co-hosts whose `allowedTabs` includes `details`.
+5. **Admin/underboss override:** a later phase (Phase 2), not v1.
+6. **One global list for v1.** Per-series vocabularies come later (Phase 3).
+7. **Phase 0 (host `event_tags` lockdown): DONE**, shipped in #1349 and #1368.
+
+v1 shipped as one PR (backend + frontend together; the prod column must be applied first, see
+"Migration + anon exposure"). Not in v1: the AI assistant `labels` field (the assistant's patches
+are applied client-side through `updateParty`, so it needs its own pass), `/map`, SeriesLandingPage
+chips, `/underboss` column, create-flow picker.
 
 ---
 
@@ -389,7 +379,7 @@ Checks on preview (after PR1 is live):
 - **Untranslated keys:** if a key is added to the list without all 8 translations, CI parity
   catches it.
 
-## Phase 0 (separate small task, recommended): lock down host writes to `event_tags`
+## Phase 0 (DONE in #1349 and #1368): lock down host writes to `event_tags`
 
 This isn't required for labels, but it was found during this investigation. PATCH
 `/api/parties/:id` accepts any `eventTags` from any editor. Only `go`, `possible-scam` and

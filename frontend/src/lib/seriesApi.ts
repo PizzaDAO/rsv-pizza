@@ -130,6 +130,8 @@ export interface PublicSeriesEvent {
   eventImageUrl: string | null;
   slug: string;
   community: boolean;
+  /** blackolive-70521: host-chosen public tags (curated keys). */
+  labels?: string[];
   // Branded series only (absent for GPP).
   venueName?: string | null;
   address?: string | null;

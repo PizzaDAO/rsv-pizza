@@ -977,6 +977,8 @@ export interface DbParty {
   region?: string | null;
   event_type?: string | null;
   event_tags?: string[];
+  // blackolive-70521: host-chosen public tags (curated keys). NOT event_tags.
+  labels?: string[];
   event_series_id?: string | null;
   flyer_generated_at?: string | null;
   flyer_config?: Record<string, any> | null;
@@ -1082,7 +1084,7 @@ export const SAFE_PARTY_COLUMNS = `
   donation_recipient_url, donation_eth_address, donation_amounts_public, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
   photos_enabled, photos_public, photo_moderation,
-  event_type, event_tags:public_event_tags, event_series_id, budget_total, budget_enabled,
+  event_type, event_tags:public_event_tags, labels, event_series_id, budget_total, budget_enabled,
   music_enabled, music_notes,
   kit_enabled, kit_deadline,
   fundraising_goal, report_recap, report_video_url, report_photos_url,
@@ -2281,6 +2283,7 @@ export async function updateParty(
     target_attendance?: number | null;
     expected_attendance?: number | null;
     event_tags?: string[];
+    labels?: string[];
     hide_guests?: boolean;
     require_approval?: boolean;
     co_hosts?: any[];
@@ -2370,6 +2373,7 @@ export async function updateParty(
         targetAttendance: updates.target_attendance,
         expectedAttendance: updates.expected_attendance,
         eventTags: updates.event_tags,
+        labels: updates.labels,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,

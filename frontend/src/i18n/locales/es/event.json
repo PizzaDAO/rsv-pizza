@@ -93,5 +93,33 @@
     "reasonLabel": "Reason",
     "noticeTitle": "Event Cancelled",
     "noticeBody": "RSVPs are closed for this event."
+  },
+  "labels": {
+    "title": "Etiquetas",
+    "helper": "Elige hasta {{max}}",
+    "maxReached": "Máximo de {{max}} etiquetas alcanzado",
+    "filterAll": "Todas las etiquetas",
+    "keys": {
+      "family-friendly": "Apto para familias",
+      "kid-friendly": "Apto para niños",
+      "all-ages": "Todas las edades",
+      "21-plus": "Mayores de 21",
+      "outdoor": "Al aire libre",
+      "live-music": "Música en vivo",
+      "dj": "DJ",
+      "workshop": "Taller",
+      "talks": "Charlas",
+      "networking": "Networking",
+      "hackathon": "Hackathon",
+      "meetup": "Encuentro",
+      "students": "Estudiantes",
+      "women-in-web3": "Mujeres en Web3",
+      "vegan-options": "Opciones veganas",
+      "gluten-free-options": "Opciones sin gluten",
+      "free": "Gratis",
+      "wheelchair-accessible": "Accesible en silla de ruedas",
+      "art": "Arte",
+      "gaming": "Videojuegos"
+    }
   }
 }

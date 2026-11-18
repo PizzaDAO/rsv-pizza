@@ -27,6 +27,7 @@ import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { siteForParty, brandedSeriesBySlug, brandedSiteForParty, seriesSlugForOrigin } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
+import { normalizeLabels, exceedsMaxLabels, MAX_EVENT_LABELS } from '../lib/eventLabels.js';
 import { changesGuardedTags, changesGoTag, canonicalizeEventTags, mergeHostEventTags, withPrepay } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 import { resolveCreatePreset } from '../lib/createPresets.js';
@@ -735,6 +736,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       expectedGuests,
       estimatedAttendance,
       eventTags,
+      // blackolive-70521: host-chosen public tags (curated keys; separate from eventTags)
+      labels,
       // scam-flag-private: targeted 'prepay' toggle (PrepayCheckbox). Applied server-side to the
       // stored tags, so the client never has to send (and can't wipe) the full tag list.
       prepay,
@@ -1015,6 +1018,24 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // blackolive-70521: host-chosen public labels. Owner / full co-hosts / restricted co-hosts with
+    // the `details` tab (canUserAccessTab). Without access the field is silently dropped (the rest
+    // of the save still succeeds). Unknown keys are dropped; more than the max is a 400.
+    let labelsToWrite: string[] | undefined = undefined;
+    if (labels !== undefined) {
+      if (!Array.isArray(labels)) {
+        throw new AppError('labels must be an array', 400, 'VALIDATION_ERROR');
+      }
+      const canSetLabels = await canUserAccessTab(id, req.userEmail, req.userId, 'details');
+      if (canSetLabels) {
+        const normalized = normalizeLabels(labels);
+        if (exceedsMaxLabels(normalized)) {
+          throw new AppError(`At most ${MAX_EVENT_LABELS} tags per event`, 400, 'VALIDATION_ERROR');
+        }
+        labelsToWrite = normalized;
+      }
+    }
+
     // fennel-49102: snapshot the prior cap value so we can log only real
     // changes to reimbursement_cap_audit. Skipped when the request doesn't
     // touch the cap (either field omitted or caller wasn't authorized to
@@ -1191,6 +1212,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(expectedGuests !== undefined && { expectedGuests: expectedGuests !== null && expectedGuests !== '' ? Number(expectedGuests) : null }),
         ...(estimatedAttendance !== undefined && { estimatedAttendance: estimatedAttendance !== null && estimatedAttendance !== '' ? Number(estimatedAttendance) : null }),
         ...(eventTagsToWrite !== undefined && { eventTags: eventTagsToWrite }),
+        ...(labelsToWrite !== undefined && { labels: labelsToWrite }),
         ...(hideGuests !== undefined && { hideGuests }),
         ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),
