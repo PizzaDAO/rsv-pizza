@@ -539,7 +539,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     // The one response shape every public "new RSVP" gets (201). The duplicate-email decoy
     // and an invite completion use it too, so the caller can't tell them apart.
     const requireApproval = party.requireApproval;
-    const newRsvpResponse = (guestId: string) => ({
+    const newRsvpResponse = (guestId: string, emailSent = false) => ({
       success: true,
       guest: {
         id: guestId,
@@ -552,6 +552,8 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       waitlisted: isAtCapacity,
       waitlistPosition,
       message,
+      // True only when a confirmation/waitlist/pending email was actually sent for this RSVP.
+      emailSent,
     });
 
     // Side effects of a FIRST RSVP: a brand-new guest, and (invite-verify) a host invite
@@ -577,8 +579,8 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
         console.error('Privy wallet provisioning failed (non-fatal):', privyError);
       }
     };
-    const sendNewRsvpEmail = async (guestId: string) => {
-      if (!email?.trim()) return;
+    const sendNewRsvpEmail = async (guestId: string): Promise<boolean> => {
+      if (!email?.trim() || !process.env.RESEND_API_KEY) return false;
       try {
         if (isAtCapacity) {
           await sendWaitlistConfirmationEmail({
@@ -609,9 +611,11 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
             eventSeriesId: party.eventSeriesId,
           });
         }
+        return true;
       } catch (emailError) {
         console.error('Failed to send confirmation email:', emailError);
         // Don't fail the RSVP if email fails
+        return false;
       }
     };
 
@@ -699,8 +703,8 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
             if (completed) {
               await provisionWalletIfNeeded(completed.id);
               await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
-              await sendNewRsvpEmail(completed.id);
-              return res.status(201).json(newRsvpResponse(completed.id));
+              const sent = await sendNewRsvpEmail(completed.id);
+              return res.status(201).json(newRsvpResponse(completed.id, sent));
             }
             // Lost the race: someone else completed it. Don't let updateData keep the stale
             // host-invite submittedVia.
@@ -812,9 +816,9 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     }
 
     // Send appropriate email if email provided
-    await sendNewRsvpEmail(guest.id);
+    const emailSent = await sendNewRsvpEmail(guest.id);
 
-    res.status(201).json(newRsvpResponse(guest.id));
+    res.status(201).json(newRsvpResponse(guest.id, emailSent));
   } catch (error) {
     next(error);
   }

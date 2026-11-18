@@ -38,7 +38,9 @@
     "submit": "Confirmar Presença",
     "editSubmit": "Editar RSVP",
     "submitting": "Enviando...",
-    "saving": "Salvando..."
+    "saving": "Salvando...",
+    "skip": "Pular: eu como de tudo",
+    "optionalHint": "Opcional: adicione preferências ou pule para concluir seu RSVP."
   },
   "success": {
     "seeYou": "Nos vemos em {{eventName}}!",
@@ -50,7 +52,13 @@
     "preferenceSaved": "Suas preferências foram salvas.",
     "waitlisted": "Você está na Lista de Espera!",
     "waitlistedDesc": "Este evento está lotado, mas você é o #{{position}} na lista de espera! Notificaremos se uma vaga abrir.",
-    "backToEvent": "Voltar ao Evento"
+    "backToEvent": "Voltar ao Evento",
+    "alreadyOnList": "Você já está na lista",
+    "alreadyOnListDesc": "Este e-mail já está registrado neste evento, então nada foi alterado.",
+    "confirmationSent": "Confirmação enviada para {{email}}",
+    "addToCalendar": "Adicionar ao calendário",
+    "calendar": "Calendário",
+    "changeRsvpHint": "Precisa mudar algo? Você pode editar seu RSVP na página do evento."
   },
   "password": {
     "title": "Senha Necessária",
@@ -65,7 +73,8 @@
     "buyPizzaFor": "Comprar Pizza para {{recipient}}",
     "buyPizzaForEvent": "Comprar Pizza para este evento",
     "buyPizzaForEventName": "Comprar Pizza para {{eventName}}",
-    "thanksForSupport": "Obrigado pelo seu apoio!"
+    "thanksForSupport": "Obrigado pelo seu apoio!",
+    "buyPizzaForPrefix": "Comprar pizza para"
   },
   "nft": {
     "minting": "Cunhando seu NFT...",
@@ -73,7 +82,8 @@
     "alreadyClaimed": "NFT Já Resgatado!",
     "viewOnOpenSea": "Ver no OpenSea",
     "viewTransaction": "Ver Transação",
-    "mintFailed": "Falha na cunhagem do NFT"
+    "mintFailed": "Falha na cunhagem do NFT",
+    "afterApproval": "Você receberá seu NFT assim que o anfitrião aprovar."
   },
   "share": {
     "tellFriends": "Conte aos seus amigos sobre a festa!",
@@ -137,5 +147,6 @@
     "Plain": "Simples",
     "Gluten-Free": "Sem Glúten",
     "Dairy-Free": "Sem Laticínios"
-  }
+  },
+  "close": "Fechar"
 }
