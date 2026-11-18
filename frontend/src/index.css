@@ -768,7 +768,7 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .team1-theme .site-header {
   background: rgba(0, 0, 0, 0.9) !important;
   border-bottom: 1px solid var(--team1-line) !important;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px) !important;
 }
 .team1-theme .site-header a span { display: none; }
 /* Cards: flat #1a1b1c, hairline border, 16px radius. */
@@ -1706,8 +1706,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .wl-theme h1, .wl-theme h2, .wl-theme h3 { font-family: var(--font-heading); }
 .wl-theme h1[data-testid="event-name"] { font-family: var(--font-heading) !important; }
 .wl-theme button, .wl-theme input, .wl-theme textarea, .wl-theme select { font-family: var(--font-body); }
-/* brand-doge keeps the page wrappers' own backgrounds (DisplayPage bg-black, series wrapper), as the old doge theme did. */
-.wl-theme:not(.brand-doge) .min-h-screen { background: transparent !important; }
+/* brand-doge / -monad / -swc keep the page wrappers' own backgrounds (DisplayPage bg-black, series wrapper), as their old themes did. */
+.wl-theme:not(.brand-doge):not(.brand-monad):not(.brand-swc) .min-h-screen { background: transparent !important; }
 
 /* Header: solid token surface and a hairline border. */
 .wl-theme .site-header {
@@ -1815,14 +1815,15 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .wl-theme.wl-light footer img { filter: brightness(0) opacity(0.7); }
 
 /* Mobile: keep logo, language switcher and login on one line; timer tiles share the row. */
+/* (brand-team1's old theme never had these mobile rules; excluded so it renders exactly as before.) */
 @media (max-width: 480px) {
-  .wl-theme .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
-  .wl-theme .site-header > div > a img { height: 1.5rem; }
-  .wl-theme .site-header > div > div { gap: 0.25rem; }
-  .wl-theme .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
-  .wl-theme .site-header button svg.lucide-chevron-down { display: none; }
-  .wl-theme [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
-  .wl-theme [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .wl-theme:not(.brand-team1) .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .wl-theme:not(.brand-team1) .site-header > div > a img { height: 1.5rem; }
+  .wl-theme:not(.brand-team1) .site-header > div > div { gap: 0.25rem; }
+  .wl-theme:not(.brand-team1) .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .wl-theme:not(.brand-team1) .site-header button svg.lucide-chevron-down { display: none; }
+  .wl-theme:not(.brand-team1) [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .wl-theme:not(.brand-team1) [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2030,3 +2031,490 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 .wl-theme.brand-doge .site-header a span { display: none; }
 /* The generic layer rounds textareas like cards; the old doge theme left them at the base 12px. */
 .wl-theme.brand-doge textarea { border-radius: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * brand-team1: the Team1 (Avalanche) flourish class for the runtime-config build
+ * (plans/wl-self-serve-brands.md PR 9). Same pattern as brand-doge below: colours, Kanit type, pill
+ * radius and the header-name / hero-logo hiding come from the theme tokens in
+ * backend/scripts/data/brand-tokens.json (+ pinned overrides) through the generic .wl-theme layer; this block
+ * is only what the tokens cannot express (the red page glow, 16px cards, event tiles, red underline
+ * links, brand-red utilities). Every selector is `.wl-theme.brand-team1 ...`, so it only exists on runtime
+ * builds whose series row has theme_class = 'brand-team1' and tokens. The old `.team1-theme` rules above stay as
+ * dead CSS for one release (rollback = unset VITE_BRAND_RUNTIME); PR 18 deletes them.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.brand-team1 {
+  --team1-red: #E6212F;
+  --team1-card: #1a1b1c;
+  --team1-line: #2a2d31;
+  --team1-font: 'Kanit', system-ui, sans-serif;
+}
+.wl-theme.brand-team1 body {
+  font-family: var(--team1-font);
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(230, 33, 47, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 30% at 50% 0%, rgba(230, 33, 47, 0.07), transparent 70%),
+    #000;
+  background-attachment: fixed;
+}
+.wl-theme.brand-team1 button, .wl-theme.brand-team1 input, .wl-theme.brand-team1 textarea, .wl-theme.brand-team1 select { font-family: var(--team1-font); }
+.wl-theme.brand-team1 h1, .wl-theme.brand-team1 h2, .wl-theme.brand-team1 h3 {
+  font-family: var(--team1-font) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.02em;
+}
+.wl-theme.brand-team1 main > header > h1 { font-size: clamp(2.25rem, 6vw, 3.75rem); line-height: 1.05; text-wrap: balance; }
+.wl-theme.brand-team1 .min-h-screen { background: transparent !important; }
+.wl-theme.brand-team1 main a.block.rounded-xl {
+  background: var(--team1-card);
+  border: 1px solid var(--team1-line);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+.wl-theme.brand-team1 main a.block.rounded-xl:hover { background: #222324; border-color: var(--team1-red); }
+.wl-theme.brand-team1 main section > h2 { font-size: 1.75rem; margin-bottom: 1.25rem; }
+.wl-theme.brand-team1 .site-header {
+  background: rgba(0, 0, 0, 0.9) !important;
+  border-bottom: 1px solid var(--team1-line) !important;
+  backdrop-filter: blur(12px) !important;
+}
+.wl-theme.brand-team1 .site-header a span { display: none; }
+.wl-theme.brand-team1 .card {
+  background: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 16px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.wl-theme.brand-team1 .card:hover { border-color: #3d4147 !important; }
+.wl-theme.brand-team1 .btn-primary, .wl-theme.brand-team1 .btn-secondary {
+  border-radius: 9999px;
+  font-family: var(--team1-font);
+  font-weight: 600;
+  padding: 12px 24px;
+}
+.wl-theme.brand-team1 .btn-primary {
+  background-color: var(--team1-red);
+  border: 1px solid var(--team1-red);
+  color: #fff;
+}
+.wl-theme.brand-team1 .btn-primary:hover:not(:disabled) { background-color: #C41C28; border-color: #C41C28; }
+.wl-theme.brand-team1 .btn-secondary {
+  background: var(--team1-card);
+  border: 1px solid var(--team1-line);
+  color: #e5e7eb;
+}
+.wl-theme.brand-team1 .btn-secondary:hover { background: #222324; border-color: #3d4147; }
+.wl-theme.brand-team1 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .wl-theme.brand-team1 textarea, .wl-theme.brand-team1 select {
+  background: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 12px;
+  color: #fff !important;
+}
+.wl-theme.brand-team1 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus, .wl-theme.brand-team1 textarea:focus, .wl-theme.brand-team1 select:focus {
+  border-color: var(--team1-red) !important;
+  box-shadow: 0 0 0 3px rgba(230, 33, 47, 0.3);
+}
+.wl-theme.brand-team1 input::placeholder, .wl-theme.brand-team1 textarea::placeholder { color: #9ca3af !important; }
+.wl-theme.brand-team1 .text-\[\#ff393a\] { color: #fff; text-decoration: underline; text-decoration-color: #E6212F; text-underline-offset: 3px; }
+.wl-theme.brand-team1 main > header > img:first-child { display: none; }
+.wl-theme.brand-team1 .bg-\[\#ff393a\] { background-color: var(--team1-red); }
+.wl-theme.brand-team1 .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #E6212F, #7a0f18); }
+.wl-theme.brand-team1 .pac-container {
+  background-color: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+.wl-theme.brand-team1 .pac-item { background-color: var(--team1-card) !important; border-color: var(--team1-line) !important; color: #e5e7eb !important; }
+.wl-theme.brand-team1 .pac-item:hover { background-color: #222324 !important; }
+.wl-theme.brand-team1 .pac-item-query { color: #fff !important; }
+.wl-theme.brand-team1 .fixed.inset-0 .card, .wl-theme.brand-team1 .fixed.inset-0 .bg-theme-header {
+  background: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7) !important;
+}
+.wl-theme.brand-team1 .text-white\/40, .wl-theme.brand-team1 .text-white\/30, .wl-theme.brand-team1 .text-white\/20 { color: rgba(255, 255, 255, 0.58); }
+.wl-theme.brand-team1 .text-theme-accent { color: var(--accent-hover); }
+.wl-theme.brand-team1 .text-\[\#5c7cfa\] { color: #8fa6ff; }
+.wl-theme.brand-team1 .text-\[\#ff393a\]\/60 { color: #ff6b75; }
+.wl-theme.brand-team1 [class~="text-theme-text"][class*=" bg-"][class*="-400"] { color: #0b0b0c; }
+/* The generic layer maps these utilities to the token status hues; the old team1 theme left Tailwind's own. */
+/* The old build loaded Kanit 400/500/600 only, so every bold request rendered the 600 face; the token font set also
+ * ships 700. :where() keeps the specificity low so the heading weights above still win. */
+.wl-theme.brand-team1 :where(.font-bold, .font-extrabold, .font-black, strong, b, th) { font-weight: 600; }
+.wl-theme.brand-team1 .text-green-400 { color: #4ade80; }
+.wl-theme.brand-team1 .text-green-300 { color: #86efac; }
+.wl-theme.brand-team1 .text-emerald-400 { color: #34d399; }
+.wl-theme.brand-team1 .text-amber-400 { color: #fbbf24; }
+.wl-theme.brand-team1 .text-yellow-400 { color: #facc15; }
+.wl-theme.brand-team1 .text-yellow-300 { color: #fde047; }
+.wl-theme.brand-team1 .text-orange-400 { color: #fb923c; }
+.wl-theme.brand-team1 .text-red-400 { color: #f87171; }
+.wl-theme.brand-team1 .text-red-300 { color: #fca5a5; }
+.wl-theme.brand-team1 .text-gray-500 { color: #6b7280; }
+.wl-theme.brand-team1 .text-neutral-400 { color: #a3a3a3; }
+.wl-theme.brand-team1 .text-slate-400 { color: #94a3b8; }
+@media (max-width: 480px) {
+  .wl-theme.brand-team1 .guest-list-head { flex-wrap: wrap; row-gap: 0.75rem; }
+  .wl-theme.brand-team1 .guest-list-head > div { flex-wrap: wrap; row-gap: 0.5rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * brand-monad: the Monad flourish class for the runtime-config build (PR 10). Tokens give the light
+ * palette, Inter and the header-name / hero-logo flags; this block is the dot grid, framed column, hero
+ * line art, small uppercase mono buttons and the purple brand-red remaps. Every selector is
+ * `.wl-theme.brand-monad ...`; the old `.monad-theme` rules stay as dead CSS until PR 18.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.brand-monad {
+  --monad-ink: #111111;
+  --monad-purple: #6E54FF;
+  --monad-purple-deep: #5A41E8;
+  --monad-paper: #FAFAFA;
+  --monad-card: #FFFFFF;
+  --monad-line: #E5E3EC;
+  --monad-font: 'Inter', -apple-system, 'system-ui', 'Segoe UI', Roboto, sans-serif;
+  --monad-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.wl-theme.brand-monad body {
+  font-family: var(--monad-font);
+  background-color: var(--monad-paper);
+  background-image: radial-gradient(circle, rgba(10, 10, 10, 0.07) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+.wl-theme.brand-monad #root {
+  min-height: 100vh;
+  max-width: 1190px;
+  margin: 0 auto;
+  border-left: 1px solid var(--monad-line);
+  border-right: 1px solid var(--monad-line);
+  background-color: var(--monad-paper);
+  background-image:
+    linear-gradient(180deg, rgba(221, 215, 254, 0.85) 0%, rgba(249, 232, 236, 0.55) 140px, rgba(250, 250, 250, 0) 420px);
+  background-repeat: no-repeat;
+}
+.wl-theme.brand-monad h1, .wl-theme.brand-monad h2, .wl-theme.brand-monad h3 {
+  font-family: var(--monad-font);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.wl-theme.brand-monad h1 { line-height: 1.08; text-wrap: balance; }
+.wl-theme.brand-monad h2 { text-wrap: balance; }
+.wl-theme.brand-monad h1[data-testid="event-name"] { font-family: var(--monad-font) !important; font-weight: 500; }
+.wl-theme.brand-monad main > header > h1 { font-size: clamp(2.5rem, 7vw, 3.6rem); font-weight: 500; }
+.wl-theme.brand-monad [role="timer"] .tabular-nums { font-family: var(--monad-font); font-weight: 500; }
+.wl-theme.brand-monad .site-header {
+  background: #FDFCFB !important;
+  border-bottom: 1px solid var(--monad-line) !important;
+  backdrop-filter: none !important;
+}
+.wl-theme.brand-monad .site-header a span { display: none; }
+.wl-theme.brand-monad .card {
+  background: var(--monad-card) !important;
+  border: 1px solid var(--monad-line) !important;
+  border-radius: 12px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 2px rgba(14, 9, 28, 0.04);
+}
+.wl-theme.brand-monad .card:hover { border-color: #C9C2F5 !important; }
+.wl-theme.brand-monad [role="timer"] > div {
+  background: var(--monad-card);
+  border: 1px solid var(--monad-line);
+  border-radius: 8px;
+}
+.wl-theme.brand-monad [role="timer"] .tabular-nums { font-size: 2.25rem; line-height: 1.1; }
+@media (max-width: 480px) {
+  .wl-theme.brand-monad [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .wl-theme.brand-monad [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .wl-theme.brand-monad [role="timer"] .tabular-nums { font-size: 1.875rem; }
+}
+.wl-theme.brand-monad .btn-primary, .wl-theme.brand-monad .btn-secondary {
+  font-family: var(--monad-mono);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+.wl-theme.brand-monad .btn-primary {
+  background-color: var(--monad-purple);
+  color: #fff;
+  border: 1px solid #5A41E8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(14, 9, 28, 0.15);
+}
+.wl-theme.brand-monad .btn-primary:hover:not(:disabled) { background-color: var(--monad-purple-deep); color: #fff; }
+.wl-theme.brand-monad .btn-secondary {
+  background: #FBFAF9;
+  border: 1px solid var(--monad-line);
+  color: var(--monad-ink);
+  box-shadow: 0 1px 2px rgba(14, 9, 28, 0.08);
+}
+.wl-theme.brand-monad .btn-secondary:hover { background: #F1EEFF; border-color: #C9C2F5; }
+.wl-theme.brand-monad .text-center > a.btn-primary { padding: 12px 24px; }
+.wl-theme.brand-monad .text-white, .wl-theme.brand-monad .text-white\/90 { color: var(--monad-ink); }
+.wl-theme.brand-monad .text-white\/80, .wl-theme.brand-monad .text-white\/70 { color: rgba(17, 17, 17, 0.8); }
+.wl-theme.brand-monad .text-white\/60, .wl-theme.brand-monad .text-white\/50 { color: rgba(17, 17, 17, 0.68); }
+.wl-theme.brand-monad .text-white\/40, .wl-theme.brand-monad .text-white\/30 { color: rgba(17, 17, 17, 0.6); }
+.wl-theme.brand-monad .text-white\/20 { color: rgba(17, 17, 17, 0.5); }
+.wl-theme.brand-monad .hover\:text-white:hover { color: var(--monad-ink); }
+.wl-theme.brand-monad .hover\:text-white\/60:hover { color: rgba(17, 17, 17, 0.85); }
+.wl-theme.brand-monad .border-white\/10, .wl-theme.brand-monad .border-white\/20 { border-color: var(--monad-line); }
+.wl-theme.brand-monad .bg-white\/5, .wl-theme.brand-monad .bg-white\/6, .wl-theme.brand-monad .bg-white\/10 { background: rgba(110, 84, 255, 0.05); }
+.wl-theme.brand-monad .bg-white\/20 { background: rgba(110, 84, 255, 0.1); }
+.wl-theme.brand-monad .hover\:bg-white\/5:hover, .wl-theme.brand-monad .hover\:bg-white\/10:hover { background: rgba(110, 84, 255, 0.08); }
+.wl-theme.brand-monad .hover\:bg-white\/20:hover { background: rgba(110, 84, 255, 0.12); }
+.wl-theme.brand-monad .bg-red-500, .wl-theme.brand-monad .bg-red-500 .text-white { color: #fff; }
+.wl-theme.brand-monad .btn-primary .text-white { color: inherit; }
+.wl-theme.brand-monad input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .wl-theme.brand-monad textarea, .wl-theme.brand-monad select {
+  background: #fff !important;
+  border: 1px solid #D4D0E0 !important;
+  border-radius: 6px;
+  color: var(--monad-ink) !important;
+}
+.wl-theme.brand-monad input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus, .wl-theme.brand-monad textarea:focus, .wl-theme.brand-monad select:focus {
+  border-color: var(--monad-purple) !important;
+  box-shadow: 0 0 0 3px rgba(110, 84, 255, 0.22);
+}
+.wl-theme.brand-monad input::placeholder, .wl-theme.brand-monad textarea::placeholder { color: rgba(17, 17, 17, 0.6) !important; }
+.wl-theme.brand-monad input[type="time"], .wl-theme.brand-monad input[type="date"], .wl-theme.brand-monad input[type="datetime-local"] { color-scheme: light !important; }
+.wl-theme.brand-monad a:not(.btn-primary):not(.btn-secondary) { text-decoration-color: rgba(110, 84, 255, 0.5); }
+.wl-theme.brand-monad .pac-container {
+  background-color: #fff !important;
+  border: 1px solid var(--monad-line) !important;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(14, 9, 28, 0.15) !important;
+}
+.wl-theme.brand-monad .pac-item { background-color: #fff !important; border-color: #EEEBF6 !important; color: var(--monad-ink) !important; }
+.wl-theme.brand-monad .pac-item:hover { background-color: #F6F4FF !important; }
+.wl-theme.brand-monad .pac-item-query { color: var(--monad-ink) !important; }
+.wl-theme.brand-monad main > header {
+  position: relative;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1200 420%22 preserveAspectRatio=%22xMidYMid slice%22 fill=%22none%22 stroke=%22%236E54FF%22 stroke-width=%221%22 stroke-opacity=%220.18%22%3E%3Cpath d=%22M0 20 C300 62 440 300 600 300%22/%3E%3Cpath d=%22M0 48 C300 86 440 300 600 300%22/%3E%3Cpath d=%22M0 75 C300 109 440 300 600 300%22/%3E%3Cpath d=%22M0 103 C300 133 440 300 600 300%22/%3E%3Cpath d=%22M0 131 C300 156 440 300 600 300%22/%3E%3Cpath d=%22M0 158 C300 180 440 300 600 300%22/%3E%3Cpath d=%22M0 186 C300 203 440 300 600 300%22/%3E%3Cpath d=%22M0 214 C300 227 440 300 600 300%22/%3E%3Cpath d=%22M0 242 C300 250 440 300 600 300%22/%3E%3Cpath d=%22M0 269 C300 274 440 300 600 300%22/%3E%3Cpath d=%22M0 297 C300 297 440 300 600 300%22/%3E%3Cpath d=%22M0 325 C300 321 440 300 600 300%22/%3E%3Cpath d=%22M0 352 C300 344 440 300 600 300%22/%3E%3Cpath d=%22M0 380 C300 368 440 300 600 300%22/%3E%3Cpath d=%22M1200 20 C900 62 760 300 600 300%22/%3E%3Cpath d=%22M1200 48 C900 86 760 300 600 300%22/%3E%3Cpath d=%22M1200 75 C900 109 760 300 600 300%22/%3E%3Cpath d=%22M1200 103 C900 133 760 300 600 300%22/%3E%3Cpath d=%22M1200 131 C900 156 760 300 600 300%22/%3E%3Cpath d=%22M1200 158 C900 180 760 300 600 300%22/%3E%3Cpath d=%22M1200 186 C900 203 760 300 600 300%22/%3E%3Cpath d=%22M1200 214 C900 227 760 300 600 300%22/%3E%3Cpath d=%22M1200 242 C900 250 760 300 600 300%22/%3E%3Cpath d=%22M1200 269 C900 274 760 300 600 300%22/%3E%3Cpath d=%22M1200 297 C900 297 760 300 600 300%22/%3E%3Cpath d=%22M1200 325 C900 321 760 300 600 300%22/%3E%3Cpath d=%22M1200 352 C900 344 760 300 600 300%22/%3E%3Cpath d=%22M1200 380 C900 368 760 300 600 300%22/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: 100% 100%;
+  padding-bottom: 2.5rem;
+}
+.wl-theme.brand-monad main > header > img:first-child { display: none; }
+@media (max-width: 480px) {
+  .wl-theme.brand-monad .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .wl-theme.brand-monad .site-header > div > a img { height: 1.5rem; }
+  .wl-theme.brand-monad .site-header > div > div { gap: 0.25rem; }
+  .wl-theme.brand-monad .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .wl-theme.brand-monad .site-header button svg.lucide-chevron-down { display: none; }
+}
+.wl-theme.brand-monad footer img { filter: brightness(0) opacity(0.7); }
+.wl-theme.brand-monad .text-\[\#ff393a\] { color: var(--monad-purple); }
+.wl-theme.brand-monad [class*="border-[#ff393a]/30"][class*="text-[#ff393a]"] { color: #b3261e; }
+.wl-theme.brand-monad .bg-\[\#ff393a\] { background-color: var(--monad-purple); color: #fff; }
+.wl-theme.brand-monad .bg-\[\#ff393a\] .text-white, .wl-theme.brand-monad .bg-\[\#ff393a\].text-white { color: #fff; }
+.wl-theme.brand-monad .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #DDD7FE, #F9E4F3); }
+.wl-theme.brand-monad .from-\[\#ff393a\] svg { color: rgba(14, 9, 28, 0.4); }
+.wl-theme.brand-monad .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--monad-purple); }
+.wl-theme.brand-monad .fixed.inset-0 .card, .wl-theme.brand-monad .fixed.inset-0 .bg-theme-header {
+  background: #fff !important;
+  border: 1px solid var(--monad-line) !important;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(14, 9, 28, 0.25) !important;
+}
+.wl-theme.brand-monad .text-white\/40, .wl-theme.brand-monad .text-white\/30 { color: rgba(17, 17, 17, 0.64); }
+.wl-theme.brand-monad .text-white\/20 { color: rgba(17, 17, 17, 0.58); }
+.wl-theme.brand-monad .text-green-400, .wl-theme.brand-monad .text-green-300, .wl-theme.brand-monad .text-emerald-400, .wl-theme.brand-monad .text-\[\#39d98a\] { color: #1f7a45; }
+.wl-theme.brand-monad .text-amber-400, .wl-theme.brand-monad .text-amber-400\/70, .wl-theme.brand-monad .text-yellow-400, .wl-theme.brand-monad .text-yellow-300, .wl-theme.brand-monad .text-orange-400 { color: #8a5a00; }
+.wl-theme.brand-monad .text-red-400, .wl-theme.brand-monad .text-red-300, .wl-theme.brand-monad .text-\[\#ff393a\]\/60 { color: #b3261e; }
+.wl-theme.brand-monad .text-\[\#5c7cfa\] { color: #3a4fc4; }
+.wl-theme.brand-monad .text-blue-400, .wl-theme.brand-monad .text-sky-400, .wl-theme.brand-monad .text-cyan-400 { color: #1d5fa8; }
+.wl-theme.brand-monad .text-purple-400, .wl-theme.brand-monad .text-violet-400, .wl-theme.brand-monad .text-pink-400 { color: #7a35b5; }
+.wl-theme.brand-monad :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]) { background-color: rgba(110, 84, 255, 0.12); }
+.wl-theme.brand-monad :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"])[class*="border-[#ff393a]"]:not([class*="text-[#ff393a]"]) {
+  background-color: rgba(110, 84, 255, 0.08);
+  border-color: rgba(110, 84, 255, 0.4);
+}
+.wl-theme.brand-monad :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]).text-\[\#ff393a\] { color: #4a35c9; }
+.wl-theme.brand-monad [class*="bg-[#39d98a]/"].text-\[\#39d98a\] { color: #17663a; }
+.wl-theme.brand-monad svg[style*="color: rgb(245, 158, 11)"] { color: #8a5a00 !important; }
+.wl-theme.brand-monad svg[style*="color: rgb(57, 217, 138)"], .wl-theme.brand-monad svg[style*="color: rgb(34, 197, 94)"] { color: #1f7a45 !important; }
+.wl-theme.brand-monad svg[style*="color: rgb(92, 124, 250)"] { color: #3a4fc4 !important; }
+.wl-theme.brand-monad svg[style*="color: rgb(255, 57, 58)"] { color: var(--monad-purple-deep) !important; }
+.wl-theme.brand-monad .bg-theme-accent, .wl-theme.brand-monad .bg-theme-accent .text-white { color: #fff; }
+@media (max-width: 480px) {
+  .wl-theme.brand-monad .guest-list-head { flex-wrap: wrap; row-gap: 0.75rem; }
+  .wl-theme.brand-monad .guest-list-head > div { flex-wrap: wrap; row-gap: 0.5rem; }
+}
+.brand-monad {
+  --eb-bg: var(--bg-main);
+  --eb-fg: var(--text-primary);
+  --eb-btn-bg: var(--accent);
+  --eb-btn-fg: var(--text-inverted);
+}
+.wl-theme.brand-monad .text-gray-400, .wl-theme.brand-monad .text-gray-500, .wl-theme.brand-monad .text-neutral-400, .wl-theme.brand-monad .text-slate-400 { color: var(--text-muted); }
+.wl-theme.brand-monad [class*="bg-green-500/"].text-green-400 { color: #17663a; }
+.wl-theme.brand-monad [class*="bg-gray-500/"].text-gray-400 { color: var(--text-primary); }
+/* The series landing page wraps itself in the series theme class (SeriesLandingPage pageThemeClass); on the old
+ * build that gave the wrapper the page background. The generic layer's transparent .min-h-screen is skipped for
+ * this brand (see the :not() list above), so the wrapper just needs its opaque page colour. */
+.wl-theme .brand-monad.min-h-screen { background: var(--bg-main) !important; }
+/* The old build loaded Inter 400/500/600 only, so every bold request rendered the 600 face; the token font set also
+ * ships 700. :where() keeps the specificity low so the heading weights above still win. */
+.wl-theme.brand-monad :where(.font-bold, .font-extrabold, .font-black, strong, b, th) { font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * brand-swc: the Stand With Crypto flourish class for the runtime-config build (PR 12). Tokens give the
+ * light palette, Satoshi and the header-name / hero-logo flags; this block is the lavender hero wash,
+ * the stacked-logo height, pill buttons and the purple brand-red remaps. Every selector is
+ * `.wl-theme.brand-swc ...`; the old `.swc-theme` rules stay as dead CSS until PR 18.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.brand-swc {
+  --swc-ink: #020817;
+  --swc-purple: #6C11FF;
+  --swc-purple-deep: #5A0DE0;
+  --swc-lavender: #F1EAFF;
+  --swc-card: #F2F5F9;
+  --swc-line: #DBE4F0;
+  --swc-font: 'Satoshi', 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+.wl-theme.brand-swc body { font-family: var(--swc-font); background: #FFFFFF; }
+.wl-theme.brand-swc button, .wl-theme.brand-swc input, .wl-theme.brand-swc textarea, .wl-theme.brand-swc select { font-family: var(--swc-font); }
+.wl-theme.brand-swc h1, .wl-theme.brand-swc h2, .wl-theme.brand-swc h3 {
+  font-family: var(--swc-font);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.wl-theme.brand-swc h1 { line-height: 1.05; text-wrap: balance; }
+.wl-theme.brand-swc h2 { text-wrap: balance; }
+.wl-theme.brand-swc h1[data-testid="event-name"] { font-family: var(--swc-font) !important; font-weight: 700; }
+.wl-theme.brand-swc main > header > h1 { font-size: clamp(2.5rem, 7vw, 3.75rem); }
+.wl-theme.brand-swc [role="timer"] .tabular-nums { font-family: var(--swc-font); font-weight: 700; font-size: 2.25rem; line-height: 1.1; }
+.wl-theme.brand-swc .site-header {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid var(--swc-line) !important;
+  backdrop-filter: none !important;
+}
+.wl-theme.brand-swc .site-header a span { display: none; }
+.wl-theme.brand-swc .site-header > div > a img { height: 3rem; }
+.wl-theme.brand-swc .card {
+  background: var(--swc-card) !important;
+  border: 1px solid var(--swc-line) !important;
+  border-radius: 24px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none;
+}
+.wl-theme.brand-swc .card:hover { border-color: #CAABFF !important; }
+.wl-theme.brand-swc main a.block.rounded-xl { background: var(--swc-card); border-color: var(--swc-line); border-radius: 20px; }
+.wl-theme.brand-swc main a.block.rounded-xl:hover { background: var(--swc-lavender); border-color: #CAABFF; }
+.wl-theme.brand-swc [role="timer"] > div { background: #fff; border: 1px solid var(--swc-line); border-radius: 16px; }
+.wl-theme.brand-swc .btn-primary, .wl-theme.brand-swc .btn-secondary {
+  font-weight: 700;
+  border-radius: 1000px;
+}
+.wl-theme.brand-swc .btn-primary {
+  background-color: var(--swc-purple);
+  color: #fff;
+  border: 1px solid var(--swc-purple);
+}
+.wl-theme.brand-swc .btn-primary:hover:not(:disabled) { background-color: var(--swc-purple-deep); border-color: var(--swc-purple-deep); color: #fff; }
+.wl-theme.brand-swc .btn-secondary {
+  background: #fff;
+  border: 1px solid var(--swc-line);
+  color: var(--swc-ink);
+}
+.wl-theme.brand-swc .btn-secondary:hover { background: var(--swc-lavender); border-color: #CAABFF; }
+.wl-theme.brand-swc .text-center > a.btn-primary { padding: 14px 32px; }
+.wl-theme.brand-swc .text-white, .wl-theme.brand-swc .text-white\/90 { color: var(--swc-ink); }
+.wl-theme.brand-swc .text-white\/80, .wl-theme.brand-swc .text-white\/70 { color: rgba(2, 8, 23, 0.82); }
+.wl-theme.brand-swc .text-white\/60, .wl-theme.brand-swc .text-white\/50 { color: rgba(2, 8, 23, 0.72); }
+.wl-theme.brand-swc .text-white\/40, .wl-theme.brand-swc .text-white\/30, .wl-theme.brand-swc .text-white\/20 { color: rgba(2, 8, 23, 0.68); }
+.wl-theme.brand-swc .hover\:text-white:hover { color: var(--swc-ink); }
+.wl-theme.brand-swc .hover\:text-white\/60:hover { color: rgba(2, 8, 23, 0.85); }
+.wl-theme.brand-swc .border-white\/10, .wl-theme.brand-swc .border-white\/20 { border-color: var(--swc-line); }
+.wl-theme.brand-swc .bg-white\/5, .wl-theme.brand-swc .bg-white\/6, .wl-theme.brand-swc .bg-white\/10 { background: rgba(108, 17, 255, 0.05); }
+.wl-theme.brand-swc .bg-white\/20 { background: rgba(108, 17, 255, 0.1); }
+.wl-theme.brand-swc .hover\:bg-white\/5:hover, .wl-theme.brand-swc .hover\:bg-white\/10:hover { background: rgba(108, 17, 255, 0.08); }
+.wl-theme.brand-swc .hover\:bg-white\/20:hover { background: rgba(108, 17, 255, 0.12); }
+.wl-theme.brand-swc .bg-red-500, .wl-theme.brand-swc .bg-red-500 .text-white { color: #fff; }
+.wl-theme.brand-swc .btn-primary .text-white { color: inherit; }
+.wl-theme.brand-swc .bg-theme-accent, .wl-theme.brand-swc .bg-theme-accent .text-white { color: #fff; }
+.wl-theme.brand-swc input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .wl-theme.brand-swc textarea, .wl-theme.brand-swc select {
+  background: #fff !important;
+  border: 1px solid #C7D3E2 !important;
+  border-radius: 14px;
+  color: var(--swc-ink) !important;
+}
+.wl-theme.brand-swc input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus, .wl-theme.brand-swc textarea:focus, .wl-theme.brand-swc select:focus {
+  border-color: var(--swc-purple) !important;
+  box-shadow: 0 0 0 3px rgba(108, 17, 255, 0.2);
+}
+.wl-theme.brand-swc input::placeholder, .wl-theme.brand-swc textarea::placeholder { color: #52607A !important; }
+.wl-theme.brand-swc input[type="time"], .wl-theme.brand-swc input[type="date"], .wl-theme.brand-swc input[type="datetime-local"] { color-scheme: light !important; }
+.wl-theme.brand-swc a:not(.btn-primary):not(.btn-secondary) { text-decoration-color: rgba(108, 17, 255, 0.5); }
+.wl-theme.brand-swc .pac-container {
+  background-color: #fff !important;
+  border: 1px solid var(--swc-line) !important;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(19, 0, 59, 0.15) !important;
+}
+.wl-theme.brand-swc .pac-item { background-color: #fff !important; border-color: #EAEFF6 !important; color: var(--swc-ink) !important; }
+.wl-theme.brand-swc .pac-item:hover { background-color: var(--swc-lavender) !important; }
+.wl-theme.brand-swc .pac-item-query { color: var(--swc-ink) !important; }
+.wl-theme.brand-swc main > header {
+  background-image: radial-gradient(ellipse 80% 100% at 50% 0%, rgba(226, 208, 255, 0.55), rgba(241, 234, 255, 0) 70%);
+  border-radius: 32px;
+  padding-bottom: 2rem;
+}
+.wl-theme.brand-swc main > header > img:first-child { display: none; }
+.wl-theme.brand-swc footer img { filter: brightness(0) opacity(0.7); }
+.wl-theme.brand-swc .text-\[\#ff393a\] { color: var(--swc-purple); }
+.wl-theme.brand-swc [class*="border-[#ff393a]/30"][class*="text-[#ff393a]"] { color: #b3261e; }
+.wl-theme.brand-swc .bg-\[\#ff393a\] { background-color: var(--swc-purple); color: #fff; }
+.wl-theme.brand-swc .bg-\[\#ff393a\] .text-white, .wl-theme.brand-swc .bg-\[\#ff393a\].text-white { color: #fff; }
+.wl-theme.brand-swc .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #E2D0FF, #F1EAFF); }
+.wl-theme.brand-swc .from-\[\#ff393a\] svg { color: rgba(19, 0, 59, 0.4); }
+.wl-theme.brand-swc .group:hover .group-hover\:border-\[\#ff393a\] { border-color: var(--swc-purple); }
+.wl-theme.brand-swc :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]) { background-color: rgba(108, 17, 255, 0.1); }
+.wl-theme.brand-swc :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"])[class*="border-[#ff393a]"]:not([class*="text-[#ff393a]"]) {
+  background-color: rgba(108, 17, 255, 0.07);
+  border-color: rgba(108, 17, 255, 0.4);
+}
+.wl-theme.brand-swc :is([class~="bg-[#ff393a]/5"],[class~="bg-[#ff393a]/10"],[class~="bg-[#ff393a]/15"],[class~="bg-[#ff393a]/20"],[class~="bg-[#ff393a]/25"]):not([class*="border-[#ff393a]"]).text-\[\#ff393a\] { color: #4a0bb8; }
+.wl-theme.brand-swc .text-green-400, .wl-theme.brand-swc .text-green-300, .wl-theme.brand-swc .text-emerald-400, .wl-theme.brand-swc .text-\[\#39d98a\] { color: #1f7a45; }
+.wl-theme.brand-swc .text-amber-400, .wl-theme.brand-swc .text-amber-400\/70, .wl-theme.brand-swc .text-yellow-400, .wl-theme.brand-swc .text-yellow-300, .wl-theme.brand-swc .text-orange-400 { color: #8a5a00; }
+.wl-theme.brand-swc .text-red-400, .wl-theme.brand-swc .text-red-300, .wl-theme.brand-swc .text-\[\#ff393a\]\/60 { color: #b3261e; }
+.wl-theme.brand-swc .text-\[\#5c7cfa\] { color: #3a4fc4; }
+.wl-theme.brand-swc .text-blue-400, .wl-theme.brand-swc .text-sky-400, .wl-theme.brand-swc .text-cyan-400 { color: #1d5fa8; }
+.wl-theme.brand-swc .text-purple-400, .wl-theme.brand-swc .text-violet-400, .wl-theme.brand-swc .text-pink-400 { color: #6a2bb0; }
+.wl-theme.brand-swc [class*="bg-[#39d98a]/"].text-\[\#39d98a\] { color: #17663a; }
+.wl-theme.brand-swc svg[style*="color: rgb(245, 158, 11)"] { color: #8a5a00 !important; }
+.wl-theme.brand-swc svg[style*="color: rgb(57, 217, 138)"], .wl-theme.brand-swc svg[style*="color: rgb(34, 197, 94)"] { color: #1f7a45 !important; }
+.wl-theme.brand-swc svg[style*="color: rgb(255, 57, 58)"] { color: var(--swc-purple-deep) !important; }
+.wl-theme.brand-swc svg[style*="color: rgb(92, 124, 250)"] { color: #3a4fc4 !important; }
+.wl-theme.brand-swc .fixed.inset-0 .card, .wl-theme.brand-swc .fixed.inset-0 .bg-theme-header {
+  background: #fff !important;
+  border: 1px solid var(--swc-line) !important;
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(19, 0, 59, 0.25) !important;
+}
+@media (max-width: 480px) {
+  .wl-theme.brand-swc [role="timer"] { display: flex; gap: 0.5rem; width: 100%; }
+  .wl-theme.brand-swc [role="timer"] > div { flex: 1; min-width: 0; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .wl-theme.brand-swc [role="timer"] .tabular-nums { font-size: 1.875rem; }
+  .wl-theme.brand-swc .site-header > div { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .wl-theme.brand-swc .site-header > div > a img { height: 2.5rem; }
+  .wl-theme.brand-swc .site-header > div > div { gap: 0.25rem; }
+  .wl-theme.brand-swc .site-header button { white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .wl-theme.brand-swc .site-header button svg.lucide-chevron-down { display: none; }
+  .wl-theme.brand-swc .guest-list-head { flex-wrap: wrap; row-gap: 0.75rem; }
+  .wl-theme.brand-swc .guest-list-head > div { flex-wrap: wrap; row-gap: 0.5rem; }
+}
+.brand-swc {
+  --eb-bg: var(--bg-main);
+  --eb-fg: var(--text-primary);
+  --eb-btn-bg: var(--accent);
+  --eb-btn-fg: var(--text-inverted);
+}
+.wl-theme.brand-swc .text-gray-400, .wl-theme.brand-swc .text-gray-500, .wl-theme.brand-swc .text-neutral-400, .wl-theme.brand-swc .text-slate-400 { color: var(--text-muted); }
+.wl-theme.brand-swc [class*="bg-green-500/"].text-green-400 { color: #17663a; }
+.wl-theme.brand-swc [class*="bg-gray-500/"].text-gray-400 { color: var(--text-primary); }
+.wl-theme .brand-swc.min-h-screen { background: var(--bg-main) !important; }
+
