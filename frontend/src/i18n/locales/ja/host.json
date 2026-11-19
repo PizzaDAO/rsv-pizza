@@ -1038,7 +1038,13 @@
       "wifiCaption": "WiFiに接続: {{ssid}}",
       "sponsorsShow": "スポンサーのロゴを表示",
       "sponsorsNone": "ロゴ付きの確定済みスポンサーはまだいません。パートナーで追加してください。",
-      "sponsorsMax": "最大{{max}}個のロゴが入ります。チェックを外して印刷するロゴを選べます。"
+      "sponsorsMax": "最大{{max}}個のロゴが入ります。チェックを外して印刷するロゴを選べます。",
+      "wifiPasswordHint": "パスワードを入力するか「パスワードなし」を選んでください。入力がないとQRコードは作成されません。",
+      "wifiShowPassword": "パスワードを表示",
+      "wifiHidePassword": "パスワードを非表示",
+      "differentBack": "裏面に別の文章を入れる",
+      "backHeadlinePlaceholder": "裏面の見出し",
+      "backBodyPlaceholder": "裏面のテキスト"
     }
   },
   "nextSteps": {

@@ -994,7 +994,13 @@
       "wifiCaption": "WiFi 접속: {{ssid}}",
       "sponsorsShow": "스폰서 로고 표시",
       "sponsorsNone": "로고가 있는 확정 스폰서가 아직 없습니다. 파트너에서 추가하세요.",
-      "sponsorsMax": "로고는 최대 {{max}}개까지 들어갑니다. 체크를 해제해 인쇄할 로고를 고르세요."
+      "sponsorsMax": "로고는 최대 {{max}}개까지 들어갑니다. 체크를 해제해 인쇄할 로고를 고르세요.",
+      "wifiPasswordHint": "비밀번호를 입력하거나 \"비밀번호 없음\"을 선택하세요. 비밀번호가 없으면 QR 코드가 만들어지지 않습니다.",
+      "wifiShowPassword": "비밀번호 표시",
+      "wifiHidePassword": "비밀번호 숨기기",
+      "differentBack": "뒷면에 다른 내용 넣기",
+      "backHeadlinePlaceholder": "뒷면 제목",
+      "backBodyPlaceholder": "뒷면 텍스트"
     }
   },
   "nextSteps": {

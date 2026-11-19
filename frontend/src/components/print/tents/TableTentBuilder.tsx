@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Printer, Type, Link as LinkIcon, Hash, Table, Wifi, KeyRound } from 'lucide-react';
+import { Printer, Type, Link as LinkIcon, Hash, Table, Wifi, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { usePizza } from '../../../contexts/PizzaContext';
 import { BRAND } from '../../../config/brand';
 import { getSponsors } from '../../../lib/api';
@@ -40,6 +40,10 @@ export function TableTentBuilder({ canViewSponsors = false }: { canViewSponsors?
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
   const [wifiSecurity, setWifiSecurity] = useState<WifiSecurity>('WPA');
+  const [showPassword, setShowPassword] = useState(false);
+  const [differentBack, setDifferentBack] = useState(false);
+  const [backHeadline, setBackHeadline] = useState('');
+  const [backBody, setBackBody] = useState('');
   const [showSponsors, setShowSponsors] = useState(false);
   const [sponsors, setSponsors] = useState<TentSponsor[] | null>(null);
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
@@ -83,11 +87,18 @@ export function TableTentBuilder({ canViewSponsors = false }: { canViewSponsors?
       body: c.body,
       dateLine: c.showDate ? formatDateLine(party?.date, party?.timezone, i18n.language) : null,
       qrUrl,
+      qrSensitive: c.qr === 'wifi',
       qrCaptionText: wifiPayload ? t('print.tents.wifiCaption', { ssid: wifiSsid.trim() }) : null,
       logoUrl: useLogo ? BRAND.logoUrl : null,
       sponsorLogos: logos.slice(0, MAX_TENT_SPONSORS),
     };
   }, [c, party, useLogo, i18n.language, wifiSsid, wifiPassword, wifiSecurity, canViewSponsors, showSponsors, sponsors, skipped, t]);
+
+  // Back panel (the upside-down half): same layout, its own headline and text.
+  const backData = useMemo<TentFaceData | undefined>(
+    () => (differentBack ? { ...data, headline: backHeadline, body: backBody } : undefined),
+    [differentBack, data, backHeadline, backBody],
+  );
 
   if (!party) return null;
 
@@ -160,15 +171,30 @@ export function TableTentBuilder({ canViewSponsors = false }: { canViewSponsors?
         <div className="space-y-2">
           <IconInput icon={Wifi} value={wifiSsid} onChange={(e) => setWifiSsid(e.target.value)} placeholder={t('print.tents.wifiSsidPlaceholder')} autoComplete="off" />
           {wifiSecurity !== 'nopass' && (
-            <IconInput
-              icon={KeyRound}
-              value={wifiPassword}
-              onChange={(e) => setWifiPassword(e.target.value)}
-              placeholder={t('print.tents.wifiPasswordPlaceholder')}
-              autoComplete="off"
-              spellCheck={false}
-            />
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <IconInput
+                  icon={KeyRound}
+                  type={showPassword ? 'text' : 'password'}
+                  value={wifiPassword}
+                  onChange={(e) => setWifiPassword(e.target.value)}
+                  placeholder={t('print.tents.wifiPasswordPlaceholder')}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? t('print.tents.wifiHidePassword') : t('print.tents.wifiShowPassword')}
+                aria-pressed={showPassword}
+                className="p-2 rounded-lg bg-theme-surface text-theme-text-muted hover:text-theme-text"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           )}
+          {wifiSecurity !== 'nopass' && !wifiPassword && <p className="text-xs text-amber-400">{t('print.tents.wifiPasswordHint')}</p>}
           <SegmentedButtons
             ariaLabel={t('print.tents.wifiSecurity')}
             options={[
@@ -210,9 +236,17 @@ export function TableTentBuilder({ canViewSponsors = false }: { canViewSponsors?
         </div>
       )}
 
+      <Checkbox checked={differentBack} onChange={() => setDifferentBack((v) => !v)} label={t('print.tents.differentBack')} />
+      {differentBack && (
+        <div className="space-y-2" data-testid="tent-back">
+          <IconInput icon={Type} value={backHeadline} maxLength={HEADLINE_MAX} onChange={(e) => setBackHeadline(e.target.value)} placeholder={t('print.tents.backHeadlinePlaceholder')} />
+          <IconInput icon={Type} multiline rows={3} value={backBody} maxLength={BODY_MAX} onChange={(e) => setBackBody(e.target.value)} placeholder={t('print.tents.backBodyPlaceholder')} />
+        </div>
+      )}
+
       <IconInput icon={Hash} type="number" min={1} max={20} value={copies} onChange={(e) => setCopies(e.target.value)} placeholder={t('print.tents.copiesPlaceholder')} />
 
-      <PrintPreview paper={paper} pageCount={1} renderPage={() => <TableTentPage paper={paper} data={data} />} />
+      <PrintPreview paper={paper} pageCount={1} renderPage={() => <TableTentPage paper={paper} data={data} backData={backData} />} />
 
       <button
         type="button"
@@ -226,7 +260,7 @@ export function TableTentBuilder({ canViewSponsors = false }: { canViewSponsors?
 
       {printing && (
         <PrintPortal paper={printing}>
-          <TableTentSheet paper={printing} data={data} copies={n} />
+          <TableTentSheet paper={printing} data={data} backData={backData} copies={n} />
         </PrintPortal>
       )}
     </section>

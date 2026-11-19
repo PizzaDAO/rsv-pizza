@@ -1038,7 +1038,13 @@
       "wifiCaption": "连接 WiFi：{{ssid}}",
       "sponsorsShow": "显示赞助商标志",
       "sponsorsNone": "还没有已确认且带标志的赞助商。请在合作伙伴中添加。",
-      "sponsorsMax": "最多可放 {{max}} 个标志。取消勾选可选择要打印的标志。"
+      "sponsorsMax": "最多可放 {{max}} 个标志。取消勾选可选择要打印的标志。",
+      "wifiPasswordHint": "请输入密码，或选择\"无密码\"。没有密码不会生成二维码。",
+      "wifiShowPassword": "显示密码",
+      "wifiHidePassword": "隐藏密码",
+      "differentBack": "背面使用不同文字",
+      "backHeadlinePlaceholder": "背面标题",
+      "backBodyPlaceholder": "背面文字"
     }
   },
   "nextSteps": {

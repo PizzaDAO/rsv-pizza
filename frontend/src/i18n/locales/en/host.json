@@ -1544,7 +1544,13 @@
       "wifiCaption": "Join WiFi: {{ssid}}",
       "sponsorsShow": "Show sponsor logos",
       "sponsorsNone": "No confirmed sponsors with a logo yet. Add them in Partners.",
-      "sponsorsMax": "Up to {{max}} logos fit. Untick some to choose which print."
+      "sponsorsMax": "Up to {{max}} logos fit. Untick some to choose which print.",
+      "wifiPasswordHint": "Enter the password, or choose \"No password\". No QR code is made without it.",
+      "wifiShowPassword": "Show password",
+      "wifiHidePassword": "Hide password",
+      "differentBack": "Different text on the back",
+      "backHeadlinePlaceholder": "Back headline",
+      "backBodyPlaceholder": "Back text"
     }
   },
   "nextSteps": {

@@ -1041,7 +1041,13 @@
       "wifiCaption": "Conecte-se ao WiFi: {{ssid}}",
       "sponsorsShow": "Mostrar logos dos patrocinadores",
       "sponsorsNone": "Ainda não há patrocinadores confirmados com logo. Adicione-os em Parceiros.",
-      "sponsorsMax": "Cabem até {{max}} logos. Desmarque alguns para escolher quais imprimir."
+      "sponsorsMax": "Cabem até {{max}} logos. Desmarque alguns para escolher quais imprimir.",
+      "wifiPasswordHint": "Digite a senha ou escolha \"Sem senha\". Sem ela, nenhum QR code é gerado.",
+      "wifiShowPassword": "Mostrar senha",
+      "wifiHidePassword": "Ocultar senha",
+      "differentBack": "Texto diferente no verso",
+      "backHeadlinePlaceholder": "Título do verso",
+      "backBodyPlaceholder": "Texto do verso"
     }
   },
   "nextSteps": {

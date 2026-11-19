@@ -1039,7 +1039,13 @@
       "wifiCaption": "WLAN beitreten: {{ssid}}",
       "sponsorsShow": "Sponsorenlogos anzeigen",
       "sponsorsNone": "Noch keine bestätigten Sponsoren mit Logo. Füge sie unter Partner hinzu.",
-      "sponsorsMax": "Bis zu {{max}} Logos passen. Wähle einige ab, um festzulegen, welche gedruckt werden."
+      "sponsorsMax": "Bis zu {{max}} Logos passen. Wähle einige ab, um festzulegen, welche gedruckt werden.",
+      "wifiPasswordHint": "Gib das Passwort ein oder wähle \"Kein Passwort\". Ohne Passwort wird kein QR-Code erzeugt.",
+      "wifiShowPassword": "Passwort anzeigen",
+      "wifiHidePassword": "Passwort verbergen",
+      "differentBack": "Anderer Text auf der Rückseite",
+      "backHeadlinePlaceholder": "Überschrift Rückseite",
+      "backBodyPlaceholder": "Text Rückseite"
     }
   },
   "nextSteps": {

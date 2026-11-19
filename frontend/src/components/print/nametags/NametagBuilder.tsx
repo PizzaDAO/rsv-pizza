@@ -9,6 +9,7 @@ import { Checkbox } from '../../Checkbox';
 import { SegmentedButtons } from '../SegmentedButtons';
 import { PrintPortal, PrintPreview, usePrintSheets } from '../printSheet';
 import { BADGE_LAYOUTS, fillSheetBlanks, getBadgeLayout, pageCount, paginate } from '../layouts';
+import { useQrDataUrl } from '../useQrDataUrl';
 import { isHttpUrl, tentQrUrl } from '../tents/tentPresets';
 import { blankBadges, buildBadges, typedBadges, type GuestSource } from './nametagData';
 import { AlignmentTestPage, NametagPage, NametagSheet } from './NametagSheet';
@@ -87,13 +88,15 @@ function NametagBuilderBody({ canViewGuests, guests }: { canViewGuests: boolean;
     return q ? candidates.filter((b) => b.name.toLowerCase().includes(q)) : candidates;
   }, [candidates, query]);
 
+  const qrUrl = !party || qr === 'none' ? null : tentQrUrl(qr, party, customUrl);
+  const qrSrc = useQrDataUrl(qrUrl);
+
   if (!party) return null;
 
   const eventImage = party.eventImageUrl || null;
   const logoUrl = logo === 'event' ? eventImage : logo === 'brand' ? BRAND.logoUrl : null;
-  const qrUrl = qr === 'none' ? null : tentQrUrl(qr, party, customUrl);
   const customInvalid = qr === 'custom' && !!customUrl && !isHttpUrl(customUrl);
-  const header = { title: headerText.trim() || party.name, logoUrl, splitName: splitNames, qrUrl };
+  const header = { title: headerText.trim() || party.name, logoUrl, splitName: splitNames, qrUrl, qrSrc: qrUrl ? qrSrc : undefined };
   const cutLines = cutOverride ?? layout.kind === 'plain-paper';
   const pages = pageCount(badges.length, layout);
   const named = badges.filter((b) => !b.blank);

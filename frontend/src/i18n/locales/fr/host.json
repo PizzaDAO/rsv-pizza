@@ -1041,7 +1041,13 @@
       "wifiCaption": "Rejoindre le WiFi : {{ssid}}",
       "sponsorsShow": "Afficher les logos des sponsors",
       "sponsorsNone": "Aucun sponsor confirmé avec logo pour l'instant. Ajoutez-les dans Partenaires.",
-      "sponsorsMax": "Jusqu'à {{max}} logos tiennent. Décochez-en pour choisir ceux à imprimer."
+      "sponsorsMax": "Jusqu'à {{max}} logos tiennent. Décochez-en pour choisir ceux à imprimer.",
+      "wifiPasswordHint": "Saisissez le mot de passe ou choisissez \"Sans mot de passe\". Sans lui, aucun QR code n'est créé.",
+      "wifiShowPassword": "Afficher le mot de passe",
+      "wifiHidePassword": "Masquer le mot de passe",
+      "differentBack": "Texte différent au verso",
+      "backHeadlinePlaceholder": "Titre du verso",
+      "backBodyPlaceholder": "Texte du verso"
     }
   },
   "nextSteps": {

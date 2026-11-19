@@ -60,6 +60,45 @@ describe('badge QR and name split', () => {
   });
 });
 
+describe('shared QR image and L4785 fit', () => {
+  const l4785 = getBadgeLayout('avery-l4785');
+  it('uses one pre-rendered QR source for every badge (no per-badge generation)', () => {
+    const badges = Array.from({ length: 10 }, (_, i) => ({ key: `k${i}`, name: `Guest ${i}` }));
+    const src = 'data:image/png;base64,SHARED';
+    const { container } = render(<NametagSheet layout={l4785} badges={badges} header={{ title: 'S', logoUrl: null, qrUrl: 'https://example.test/x', qrSrc: src }} outline="none" />);
+    const imgs = Array.from(container.querySelectorAll('[data-badge-qr] img'));
+    expect(imgs.length).toBe(10);
+    expect(imgs.every((i) => i.getAttribute('src') === src)).toBe(true);
+    expect(container.querySelector('[data-qr-pending]')).toBeNull();
+  });
+  it('shows a pending box (so printing waits) while the shared QR is generating', () => {
+    const { container } = render(
+      <NametagSheet layout={l4785} badges={[{ key: 'a', name: 'A B' }]} header={{ title: 'S', logoUrl: null, qrUrl: 'https://example.test/x', qrSrc: null }} outline="none" />,
+    );
+    expect(container.querySelector('[data-qr-pending]')).toBeTruthy();
+  });
+  it('short names stay on one line on small QR labels (no forced wrap)', () => {
+    const { container } = render(
+      <NametagSheet layout={l4785} badges={[{ key: 'a', name: 'Cher', role: 'Co-host' }]} header={{ title: 'S', logoUrl: null, qrUrl: 'https://example.test/x', qrSrc: 'data:image/png;base64,A' }} outline="none" />,
+    );
+    expect(container.querySelector('[data-badge-name]')!.children.length).toBe(1);
+  });
+  it('split + QR + role on L4785 scales text down so the block fits above the QR strip', () => {
+    const badge = { key: 'a', name: 'Maximilian Wolfeschlegelsteinhausen', role: 'Co-host' };
+    const { container } = render(
+      <NametagSheet layout={l4785} badges={[badge]} header={{ title: 'S', logoUrl: null, splitName: true, qrUrl: 'https://example.test/x', qrSrc: 'data:image/png;base64,A' }} outline="none" />,
+    );
+    const pt = (sel: string) => Number((container.querySelector(sel) as HTMLElement).style.fontSize.replace('pt', ''));
+    const first = pt('[data-badge-name]');
+    const last = pt('[data-badge-last]');
+    const role = Number(((container.querySelector('[data-badge-last]') as HTMLElement).nextElementSibling as HTMLElement).style.fontSize.replace('pt', ''));
+    // available body height: 50mm label - 10.5 header - (20 QR + 3.3 caption + 1) - 2.5 = 12.7mm
+    const availPt = (12.7 * 72) / 25.4;
+    expect(first * 1.1 + last * 1.15 + role * 1.25 + 3.6).toBeLessThanOrEqual(availPt + 0.5);
+    expect(first).toBeLessThan(14);
+  });
+});
+
 describe('guest picker', () => {
   it('checklist filters by search, select none/all, and never shows emails', () => {
     const { container } = render(<NametagBuilder canViewGuests />);
