@@ -19,7 +19,6 @@ import { EventDetailsTab } from '../components/EventDetailsTab';
 import { EventAssistant, isEventAssistantEnabled } from '../components/EventAssistant';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
-import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery, ReelMaker } from '../components/photos';
 import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
@@ -526,7 +525,6 @@ function HostPageContent() {
                   </div>
 
                   <PizzaOrderSummary />
-                  <AiCallHistory partyId={party.id} />
                   <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                   <BeverageSettings />
                   <DietarySettings />

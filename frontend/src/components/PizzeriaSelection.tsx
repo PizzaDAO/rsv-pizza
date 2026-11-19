@@ -15,7 +15,6 @@ const OrderCheckout = lazyComponent(() => import('./OrderCheckout').then((m) => 
 import { PizzaOrderFlow } from './PizzaOrderFlow';
 import { AiOrderDialog } from './AiOrderDialog';
 import { usePizzaOrderingEnabled } from '../lib/pizzaOrder';
-import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { uuid } from '../lib/utils';
 
 interface PizzeriaSelectionProps {
@@ -852,11 +851,6 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 Calling {orderComplete.pizzeriaName}
               </p>
             </div>
-
-            <CallRecordingPlayer
-              callId={orderComplete.callId}
-              pizzeriaName={orderComplete.pizzeriaName}
-            />
 
             <button
               onClick={() => setOrderComplete(null)}
