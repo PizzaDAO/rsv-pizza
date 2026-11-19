@@ -10,17 +10,17 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | prosciutto-60417 | Upgrade Prisma 6 → 7 (security advisories; Dependabot #1272) | todo | P3 |  |  | security, deps | plans/prosciutto-60417.md |  | Dependabot #1272 open as reference; needs a plan (schema/client changes, migrate deploy in Deploy Backend, CLAUDE.md migration-safety rules); 2026-11-14: the advisory (deepmerge-ts, build-time only) is fixed by an override, so this is no longer urgent. Plan: option A (keep prisma-client-js generator, add adapter-pg) |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
-| basil-14648 | AI ordering | doing | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md P1 shipped in #1172 (behind flag); Bland calls outstanding |
+| basil-14648 | AI ordering | doing | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md P1 shipped in #1172 (behind flag); Bland calls outstanding; 2026-11-19: #1377 merged (legacy ai-phone/stripe virtual-card endpoints retired, edge fns deployed 2026-11-18). Still blocked: pizza-mcp BlandOutbound not built. |
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
 | neapolitan-48814 | Create Invoice, Receipt, and Media tabs on RSV.Pizza Profiles (could make specific host ones or make this available for the general public) | todo | P2 |  |  |  |  |  |  |
 | basil-48766 | Create template for gpp hosts | todo | P2 |  |  |  |  |  |  |
 | neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | todo | P2 |  |  |  | plans/neapolitan-93690.md | #1346 | print/stickers app shipped in #228; 2026-11-17: phase 1 (badge + table tent builders in Print app) shipped in #1346; phase 2 left: badge QR, 4x3 inserts, guest picker, tent sponsor logos, wifi QR |
-| blackolive-70521 | add event tags | review | P2 |  |  |  | plans/blackolive-70521.md | #1383 | 2026-11-18: v1 in PR #1383 (public host tags in parties.labels; curated 20 keys, max 5; decisions in plan). Apply backend/scripts/apply-party-labels.cjs to prod BEFORE merge. Phase 0 done: #1349, #1368. Later: admin override, per-series vocab, /map + series chips, AI assistant field |
 | pepperoni-26709 | Real-Time Dashboard:<br>Task: Implement Supabase Realtime subscriptions on the Host Dashboard.<br>Why: So hosts can see RSVPs pop in live without refreshing the page. | todo | P2 |  |  |  |  |  |  |
 | truffle-59761 | Merch Implementation on RSVP pages | todo | P2 |  |  |  |  |  |  |
 | crust-55886 | natural language event creation and edits | todo | P2 |  |  |  |  |  |  |
 | capers-97579 | connect discord to pull in pizzadao status | todo | P2 |  |  |  |  |  |  |
 | buffalo-82324 | Support for specialty pizzas on the menu | todo | P2 |  |  |  |  |  |  |
+| capers-11903 | Reimbursement cap amounts are public (effectiveReimbursementCapUsd on /api/events/:slug + anon-readable reimbursement_cap_usd) | todo | P2 |  |  | security |  |  |  |
 | basil-94900 | https://cerebralvalley.ai/auth/login | todo | P3 |  |  |  |  |  |  |
 | onion-83378 | graphics review dashboard that shows all generated flyers | todo | P3 |  |  |  |  |  |  |
 | quattro-formaggi-63954 | graphics generator that adds logos | todo | P3 |  |  |  |  |  |  |
@@ -70,6 +70,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 ## Done
 
+| blackolive-70521 | add event tags | P2 | 2026-11-18 | #1383 | public host-chosen tags in parties.labels (curated 20 keys, max 5); plan archived to plans/done/. Phase 0 done: #1349, #1368. Later: admin override, per-series vocab, /map + series chips, AI assistant field |
+| scam-flag-private | Stop anon reading admin-only parties.event_tags (public_event_tags column) | P1 | 2026-11-19 | #1369 | step 3 revoke applied to prod 2026-11-19 |
 | brick-oven-18875 | square image doesn't accept other kinds of images | P2 | 2026-11-16 | #1340 | HEIC (native, heic2any, then authed backend /api/heic/to-jpeg), center-crop, 2048px cap, 25MB input |
 | sicilian-41954 | expanding the description field is laggy feeling | P2 | 2026-11-16 | #1339 | editor keeps local state; parent updated on blur/Done/close |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | P2 | 2026-11-16 | #1337 | |

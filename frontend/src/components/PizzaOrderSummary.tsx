@@ -11,7 +11,6 @@ import { LocationAutocomplete } from './LocationAutocomplete';
 import { TableRow } from './TableRow';
 import { GuestPreferencesList } from './GuestPreferencesList';
 import { Pizzeria, OrderingOption } from '../types';
-import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { ClipboardList, Share2, Check, ShoppingCart, X, ExternalLink, Search, Star, Phone, Loader2, Navigation, Clock, ChevronDown, ChevronUp, Beer, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -858,11 +857,6 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
                     {orderComplete.pizzeriaName ? t('pizza.callingPizzeria', { name: orderComplete.pizzeriaName }) : t('pizza.orderCallInProgress')}
                   </p>
                 </div>
-
-                <CallRecordingPlayer
-                  callId={orderComplete.orderId}
-                  pizzeriaName={orderComplete.pizzeriaName}
-                />
 
                 <button
                   onClick={() => setOrderComplete(null)}
