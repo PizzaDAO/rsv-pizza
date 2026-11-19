@@ -986,7 +986,22 @@
       "averyNote": "Avery 5395 の位置は概算です。最初に位置合わせテストを行ってください。",
       "roleHost": "ホスト",
       "roleCoHost": "共同ホスト",
-      "rolePartner": "パートナー"
+      "rolePartner": "パートナー",
+      "sourcePick": "ゲストを選ぶ",
+      "pickSearch": "ゲストを検索",
+      "pickAll": "すべて選択",
+      "pickNone": "すべて解除",
+      "pickCount": "{{total}}人中{{selected}}人を選択",
+      "pickEmpty": "一致するゲストがいません。",
+      "splitNames": "名を大きく、姓を小さく表示",
+      "qr": "QRコード",
+      "qrNone": "QRなし",
+      "qrEvent": "イベントページ",
+      "qrCustom": "カスタムリンク",
+      "layoutAvery5392": "Avery 5392 差し込みカード 4x3インチ (Letter)",
+      "layoutAveryL4785": "Avery L4785 ラベル 80x50 mm (A4)",
+      "avery5392Note": "Avery 5392の位置は第三者の仕様に基づいています。先に位置合わせテストを行ってください。",
+      "averyL4785Note": "Avery L4785の余白はAveryのテンプレートで未確認です。先に位置合わせテストを行ってください。"
     },
     "tents": {
       "title": "テーブルテント",
@@ -1011,7 +1026,19 @@
       "copiesPlaceholder": "部数 (1-20)",
       "rsvpHeadline": "スキャンして出欠登録",
       "rsvpBody": "コードをスキャンしてイベントページを開き、出欠を登録してください。",
-      "wifiHeadline": "WiFi"
+      "wifiHeadline": "WiFi",
+      "qrWifi": "WiFi接続",
+      "wifiSsidPlaceholder": "WiFiネットワーク名 (SSID)",
+      "wifiPasswordPlaceholder": "WiFiパスワード",
+      "wifiSecurity": "WiFiセキュリティ",
+      "wifiWpa": "WPA/WPA2",
+      "wifiWep": "WEP",
+      "wifiNone": "パスワードなし",
+      "wifiNote": "スマートフォンでコードを読み取ると接続できます。パスワードは保存も印刷もされず、QRコード内にのみ含まれます。",
+      "wifiCaption": "WiFiに接続: {{ssid}}",
+      "sponsorsShow": "スポンサーのロゴを表示",
+      "sponsorsNone": "ロゴ付きの確定済みスポンサーはまだいません。パートナーで追加してください。",
+      "sponsorsMax": "最大{{max}}個のロゴが入ります。チェックを外して印刷するロゴを選べます。"
     }
   },
   "nextSteps": {

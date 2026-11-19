@@ -989,7 +989,22 @@
       "averyNote": "Las posiciones de Avery 5395 son aproximadas. Haz primero la prueba de alineación.",
       "roleHost": "Anfitrión",
       "roleCoHost": "Coanfitrión",
-      "rolePartner": "Socio"
+      "rolePartner": "Socio",
+      "sourcePick": "Elegir invitados",
+      "pickSearch": "Buscar invitados",
+      "pickAll": "Seleccionar todo",
+      "pickNone": "No seleccionar ninguno",
+      "pickCount": "{{selected}} de {{total}} seleccionados",
+      "pickEmpty": "Ningún invitado coincide.",
+      "splitNames": "Nombre grande, apellido pequeño",
+      "qr": "Código QR",
+      "qrNone": "Sin QR",
+      "qrEvent": "Página del evento",
+      "qrCustom": "Enlace personalizado",
+      "layoutAvery5392": "Insertos Avery 5392, 4x3 pulg. (Letter)",
+      "layoutAveryL4785": "Etiquetas Avery L4785, 80x50 mm (A4)",
+      "avery5392Note": "Las posiciones de Avery 5392 provienen de una especificación de terceros. Haz primero la prueba de alineación.",
+      "averyL4785Note": "Los márgenes de Avery L4785 no están verificados con la plantilla de Avery. Haz primero la prueba de alineación."
     },
     "tents": {
       "title": "Tarjetas de mesa",
@@ -1014,7 +1029,19 @@
       "copiesPlaceholder": "Copias (1-20)",
       "rsvpHeadline": "Escanea para confirmar",
       "rsvpBody": "Escanea el código para ver la página del evento y confirmar asistencia.",
-      "wifiHeadline": "WiFi"
+      "wifiHeadline": "WiFi",
+      "qrWifi": "Conexión WiFi",
+      "wifiSsidPlaceholder": "Nombre de la red WiFi (SSID)",
+      "wifiPasswordPlaceholder": "Contraseña del WiFi",
+      "wifiSecurity": "Seguridad del WiFi",
+      "wifiWpa": "WPA/WPA2",
+      "wifiWep": "WEP",
+      "wifiNone": "Sin contraseña",
+      "wifiNote": "Los teléfonos escanean el código para conectarse. La contraseña no se guarda ni se imprime, solo va codificada en el QR.",
+      "wifiCaption": "Conéctate al WiFi: {{ssid}}",
+      "sponsorsShow": "Mostrar logotipos de patrocinadores",
+      "sponsorsNone": "Aún no hay patrocinadores confirmados con logotipo. Agrégalos en Socios.",
+      "sponsorsMax": "Caben hasta {{max}} logotipos. Desmarca algunos para elegir cuáles se imprimen."
     }
   },
   "nextSteps": {

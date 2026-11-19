@@ -986,7 +986,22 @@
       "averyNote": "Avery 5395 的位置为近似值,请先做对齐测试。",
       "roleHost": "主办方",
       "roleCoHost": "联合主办方",
-      "rolePartner": "合作伙伴"
+      "rolePartner": "合作伙伴",
+      "sourcePick": "选择嘉宾",
+      "pickSearch": "搜索嘉宾",
+      "pickAll": "全选",
+      "pickNone": "全不选",
+      "pickCount": "已选 {{selected}} / {{total}}",
+      "pickEmpty": "没有匹配的嘉宾。",
+      "splitNames": "名字大，姓氏小",
+      "qr": "二维码",
+      "qrNone": "无二维码",
+      "qrEvent": "活动页面",
+      "qrCustom": "自定义链接",
+      "layoutAvery5392": "Avery 5392 插卡，4x3 英寸 (Letter)",
+      "layoutAveryL4785": "Avery L4785 标签，80x50 毫米 (A4)",
+      "avery5392Note": "Avery 5392 的位置来自第三方规格。请先运行对齐测试。",
+      "averyL4785Note": "Avery L4785 的页边距尚未用 Avery 模板核实。请先运行对齐测试。"
     },
     "tents": {
       "title": "桌牌",
@@ -1011,7 +1026,19 @@
       "copiesPlaceholder": "份数 (1-20)",
       "rsvpHeadline": "扫码报名",
       "rsvpBody": "扫描二维码查看活动页面并报名。",
-      "wifiHeadline": "WiFi"
+      "wifiHeadline": "WiFi",
+      "qrWifi": "连接 WiFi",
+      "wifiSsidPlaceholder": "WiFi 网络名称 (SSID)",
+      "wifiPasswordPlaceholder": "WiFi 密码",
+      "wifiSecurity": "WiFi 加密方式",
+      "wifiWpa": "WPA/WPA2",
+      "wifiWep": "WEP",
+      "wifiNone": "无密码",
+      "wifiNote": "手机扫描二维码即可连接。密码不会被保存或打印，只编码在二维码中。",
+      "wifiCaption": "连接 WiFi：{{ssid}}",
+      "sponsorsShow": "显示赞助商标志",
+      "sponsorsNone": "还没有已确认且带标志的赞助商。请在合作伙伴中添加。",
+      "sponsorsMax": "最多可放 {{max}} 个标志。取消勾选可选择要打印的标志。"
     }
   },
   "nextSteps": {

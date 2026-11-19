@@ -9,9 +9,16 @@ export interface TentFaceData {
   headline: string;
   body: string;
   dateLine: string | null;
+  /** What the QR encodes (URL, or a WIFI: payload). */
   qrUrl: string | null;
+  /** Text under the QR; defaults to the short URL. Never the wifi password. */
+  qrCaptionText?: string | null;
   logoUrl: string | null;
+  /** Sponsor logo URLs (only ever filled when the viewer has Partners access). Max 8 shown. */
+  sponsorLogos?: string[];
 }
+
+export const MAX_TENT_SPONSORS = 8;
 
 /**
  * One face of the tent. The bottom panel renders it as is; the top panel renders the identical
@@ -25,6 +32,7 @@ export function TentFace({ paper, data }: { paper: PaperSize; data: TentFaceData
   const panelH = d.h / 2;
   const innerWpt = toPt(d.w - 2 * d.safe, unit);
   const head = data.headline.trim() ? fitText(data.headline, { maxWidth: innerWpt, maxSize: 44, minSize: 24, wrapBelow: 30 }) : null;
+  const sponsors = (data.sponsorLogos ?? []).slice(0, MAX_TENT_SPONSORS);
   const fixed = { flexShrink: 0, maxWidth: '100%' } as const;
   const clamp = (n: number) =>
     ({ display: '-webkit-box', WebkitLineClamp: n, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }) as const;
@@ -63,7 +71,37 @@ export function TentFace({ paper, data }: { paper: PaperSize; data: TentFaceData
           <div style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0, width: '100%', position: 'relative' }}>
             <QRCode value={data.qrUrl} size={480} margin={4} alt="" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', imageRendering: 'pixelated' }} />
           </div>
-          <div style={{ flexShrink: 0, ...clamp(1), fontSize: '10pt', marginTop: u(unit === 'in' ? 0.03 : 1), maxWidth: '100%' }}>{qrCaption(data.qrUrl)}</div>
+          <div style={{ flexShrink: 0, ...clamp(1), fontSize: '10pt', marginTop: u(unit === 'in' ? 0.03 : 1), maxWidth: '100%' }}>{data.qrCaptionText ?? qrCaption(data.qrUrl)}</div>
+        </div>
+      )}
+      {sponsors.length > 0 && (
+        <div
+          data-tent-sponsors
+          style={{
+            ...fixed,
+            width: '100%',
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: u(unit === 'in' ? 0.1 : 2.5),
+          }}
+        >
+          {sponsors.map((src, i) => (
+            <img
+              key={`${src}-${i}`}
+              data-tent-sponsor
+              src={src}
+              alt=""
+              style={{
+                // 4 per row at most: (100% - 3 gaps) / 4
+                flex: '0 0 auto',
+                height: u(unit === 'in' ? 0.45 : 11),
+                width: `calc((100% - ${u(unit === 'in' ? 0.3 : 7.5)}) / 4)`,
+                objectFit: 'contain',
+              }}
+            />
+          ))}
         </div>
       )}
     </div>

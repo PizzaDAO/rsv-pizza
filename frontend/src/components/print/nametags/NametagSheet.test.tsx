@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 const GUESTS = [
   { id: '1', name: 'Ada Lovelace', email: 'ada@secret-mail.example', approved: true, dietaryRestrictions: [], toppings: [], dislikedToppings: [] },
@@ -8,7 +8,16 @@ const GUESTS = [
 ];
 const PARTY = { id: 'p1', name: 'Slice Night', inviteCode: 'abc', customUrl: 'slice', hostName: null, coHosts: [{ id: 'c', name: 'Ada', email: 'ada@secret-mail.example' }] };
 
-vi.mock('../../../contexts/PizzaContext', () => ({ usePizza: () => ({ party: PARTY, guests: GUESTS }) }));
+const guestReads = vi.hoisted(() => ({ count: 0 }));
+vi.mock('../../../contexts/PizzaContext', () => ({
+  usePizza: () => ({
+    party: PARTY,
+    get guests() {
+      guestReads.count++;
+      return GUESTS;
+    },
+  }),
+}));
 
 import { NametagSheet } from './NametagSheet';
 import { NametagBuilder } from './NametagBuilder';
@@ -31,7 +40,54 @@ describe('email guard', () => {
   });
 });
 
+describe('badge QR and name split', () => {
+  const badges = [{ key: 'a', name: 'Ada Lovelace' }, { key: 'b', name: '山田 太郎' }, { key: 'c', name: 'Cher' }];
+  const layout = getBadgeLayout('avery-5392');
+  it('splits Latin names only, and draws the QR with a caption', () => {
+    const { container } = render(
+      <NametagSheet layout={layout} badges={badges} header={{ title: 'Slice', logoUrl: null, splitName: true, qrUrl: 'https://example.test/slice' }} outline="none" />,
+    );
+    const lasts = Array.from(container.querySelectorAll('[data-badge-last]')).map((n) => n.textContent);
+    expect(lasts).toEqual(['Lovelace']);
+    expect(container.querySelectorAll('[data-badge-qr]').length).toBe(3);
+    expect(container.textContent).toContain('example.test/slice');
+    expect(container.textContent).toContain('山田 太郎');
+  });
+  it('no QR and no split by default', () => {
+    const { container } = render(<NametagSheet layout={layout} badges={badges} header={{ title: 'Slice', logoUrl: null }} outline="none" />);
+    expect(container.querySelector('[data-badge-qr]')).toBeNull();
+    expect(container.querySelector('[data-badge-last]')).toBeNull();
+  });
+});
+
+describe('guest picker', () => {
+  it('checklist filters by search, select none/all, and never shows emails', () => {
+    const { container } = render(<NametagBuilder canViewGuests />);
+    fireEvent.click(screen.getByRole('radio', { name: /sourcePick/ }));
+    const picker = screen.getByTestId('guest-picker');
+    expect(picker.textContent).toContain('Ada Lovelace');
+    expect(picker.textContent).not.toMatch(/@/);
+    fireEvent.change(screen.getByPlaceholderText('print.nametags.pickSearch'), { target: { value: 'ada' } });
+    expect(picker.textContent).toContain('Ada Lovelace');
+    expect(picker.textContent).not.toContain('山田太郎');
+    fireEvent.click(screen.getByText('print.nametags.pickNone'));
+    const printed = () => Array.from(container.querySelectorAll('[data-badge-name]')).map((n) => n.textContent);
+    // "none" applies to the filtered list only: Ada is off, the others stay on.
+    expect(printed().join('|')).not.toContain('Ada');
+    expect(printed().join('|')).toContain('山田太郎');
+    fireEvent.click(screen.getByText('print.nametags.pickAll'));
+    expect(printed().join('|')).toContain('Ada');
+    expect(container.innerHTML).not.toMatch(/secret-mail/);
+  });
+});
+
 describe('NametagBuilder gating', () => {
+  it('without guest access never reads the guest list or shows the picker', () => {
+    guestReads.count = 0;
+    render(<NametagBuilder canViewGuests={false} />);
+    expect(guestReads.count).toBe(0);
+    expect(screen.queryByRole('radio', { name: /sourcePick/ })).toBeNull();
+  });
   it('without guest access never shows names from the guest list', () => {
     const { container } = render(<NametagBuilder canViewGuests={false} />);
     expect(container.textContent).not.toContain('Ada Lovelace');
