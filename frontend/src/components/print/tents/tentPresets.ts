@@ -2,7 +2,8 @@ import { brandUrl } from '../../../config/brand';
 import { flyerEventUrl } from '../../generative/flyerQr';
 
 export type TentPreset = 'rsvp' | 'wifi' | 'custom';
-export type TentQrTarget = 'none' | 'event' | 'booth' | 'custom';
+/** 'wifi' is encoded by wifiQr.ts (the password never goes through TentContent). */
+export type TentQrTarget = 'none' | 'event' | 'booth' | 'custom' | 'wifi';
 
 export interface TentContent {
   headline: string;

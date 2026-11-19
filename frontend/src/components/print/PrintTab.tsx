@@ -128,7 +128,7 @@ export function PrintMaterials() {
   return <PrintContent showAllSwc />;
 }
 
-export function PrintTab({ canViewGuests = false }: { canViewGuests?: boolean }) {
+export function PrintTab({ canViewGuests = false, canViewSponsors = false }: { canViewGuests?: boolean; canViewSponsors?: boolean }) {
   const { t } = useTranslation('host');
   const { party } = usePizza();
   const eventTags = party?.eventTags || [];
@@ -151,7 +151,7 @@ export function PrintTab({ canViewGuests = false }: { canViewGuests?: boolean })
       {party && (
         <>
           <NametagBuilder canViewGuests={canViewGuests} />
-          <TableTentBuilder />
+          <TableTentBuilder canViewSponsors={canViewSponsors} />
           <h2 className="text-xl font-semibold text-theme-text">{t('print.sheet.readyMade')}</h2>
         </>
       )}

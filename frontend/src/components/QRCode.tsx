@@ -13,10 +13,15 @@ interface QRCodeProps {
   style?: CSSProperties;
   dark?: string;
   light?: string;
+  /**
+   * Write the encoded value into a `data-qr-url` attribute (default). Pass false for secrets
+   * (e.g. a WIFI: payload with its password) so they never appear in the DOM.
+   */
+  exposeValue?: boolean;
 }
 
 /** Local QR code (replaces api.qrserver.com so event / check-in links stay private). */
-export function QRCode({ value, size, alt = 'QR code', className, style, margin = 1, dark = '#000000', light = '#ffffff' }: QRCodeProps) {
+export function QRCode({ value, size, alt = 'QR code', className, style, margin = 1, dark = '#000000', light = '#ffffff', exposeValue = true }: QRCodeProps) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,5 +41,5 @@ export function QRCode({ value, size, alt = 'QR code', className, style, margin 
     // Reserve the space so layout doesn't jump while the code renders.
     return <div className={className} style={{ width: size, height: size, ...style }} aria-hidden="true" data-qr-pending="true" />;
   }
-  return <img src={src} alt={alt} width={size} height={size} className={className} style={style} data-qr-url={value} />;
+  return <img src={src} alt={alt} width={size} height={size} className={className} style={style} data-qr-url={exposeValue ? value : undefined} />;
 }

@@ -12,6 +12,24 @@ const data = {
   logoUrl: '/logo.png',
 };
 
+describe('TableTentPage sponsors and wifi', () => {
+  it('renders at most 8 sponsor logos in a non-shrinking row, and a custom QR caption', () => {
+    const logos = Array.from({ length: 11 }, (_, i) => `/s${i}.png`);
+    const { container } = render(
+      <TableTentPage paper="letter" data={{ ...data, sponsorLogos: logos, qrUrl: 'WIFI:T:WPA;S:Net;P:secret;;', qrCaptionText: 'Join WiFi: Net' }} />,
+    );
+    const bottom = container.querySelector('[data-tent-bottom]') as HTMLElement;
+    expect(bottom.querySelectorAll('[data-tent-sponsor]').length).toBe(8);
+    expect((bottom.querySelector('[data-tent-sponsors]') as HTMLElement).style.flexShrink).toBe('0');
+    expect(bottom.textContent).toContain('Join WiFi: Net');
+    expect(container.textContent).not.toContain('secret');
+  });
+  it('no sponsor row without logos', () => {
+    const { container } = render(<TableTentPage paper="a4" data={data} />);
+    expect(container.querySelector('[data-tent-sponsors]')).toBeNull();
+  });
+});
+
 describe('TableTentPage fit', () => {
   it('keeps at least 0.4in / 10mm from the edge and the fold', () => {
     expect(tentDims('letter').safe).toBeGreaterThanOrEqual(0.4);
