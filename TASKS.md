@@ -14,7 +14,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
 | neapolitan-48814 | Create Invoice, Receipt, and Media tabs on RSV.Pizza Profiles (could make specific host ones or make this available for the general public) | todo | P2 |  |  |  |  |  |  |
 | basil-48766 | Create template for gpp hosts | todo | P2 |  |  |  |  |  |  |
-| neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | review | P2 |  |  |  | plans/neapolitan-93690.md | #1385 | print/stickers app shipped in #228; 2026-11-17: phase 1 (badge + table tent builders in Print app) shipped in #1346; 2026-11-19: phase 2 (guest picker, first/last split, badge QR, 5392 + L4785 layouts, tent sponsor logos, wifi QR) in PR #1385; different back side added; L4785 margins unverified |
 | pepperoni-26709 | Real-Time Dashboard:<br>Task: Implement Supabase Realtime subscriptions on the Host Dashboard.<br>Why: So hosts can see RSVPs pop in live without refreshing the page. | todo | P2 |  |  |  |  |  |  |
 | truffle-59761 | Merch Implementation on RSVP pages | todo | P2 |  |  |  |  |  |  |
 | crust-55886 | natural language event creation and edits | todo | P2 |  |  |  |  |  |  |
@@ -91,6 +90,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | P2 | 2026-05-16 | #280, #314, #319 | /map made public via #325 |
 | diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | P2 | 2026-05-17 | #286, #303, #375 | follow-ups #303, #375 |
 |----|------|----------|------|----|-------|
+| neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | P2 | 2026-11-19 | #1346 #1385 | phase 1 #1346; phase 2 #1385 (guest picker, name split, badge QR, Avery 5392 + L4785 (margins unverified vs real stock), tent sponsor logos, wifi QR, different back) |
 | bellpepper-36121 | Create a verification tool for approved gpp cities rsvp page | P1 | 2026-10-30 | #1166 | Verification tab on /underboss; daily failure email is a follow-up |
 | funghi-91314 | Pull photos from Rsv.pizza host pages and upload it to Sauce to be played during the livestream. | P1 | 2026-10-29 | #1163 | 2026-10-29: back/pause/next on /photos/play; Sauce integration still open (need repo) |
 | truffle-83044 | add event search feature based by region, key words, could country, continent, etc | P1 | 2026-10-29 | #1160 |  |
