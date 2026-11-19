@@ -1143,6 +1143,8 @@ export const SENSITIVE_PARTY_COLUMNS: readonly string[] = [
   'payments_approved_usd', 'payments_approved_at', 'payments_approved_by',
   'agreement_accepted_at', 'agreement_version', 'wallet_reminder_sent_at',
   'photo_reminder_sent_at', 'attendance_reminder_sent_at', 'host_survey_sent_at',
+  // scam-flag-private: raw tags mix in admin-only ones; anon reads public_event_tags instead.
+  'event_tags',
 ];
 
 /**

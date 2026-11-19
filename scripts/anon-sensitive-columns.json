@@ -39,7 +39,8 @@
     "wallet_reminder_sent_at",
     "photo_reminder_sent_at",
     "attendance_reminder_sent_at",
-    "host_survey_sent_at"
+    "host_survey_sent_at",
+    "event_tags"
   ],
   "experiment_flags": [
     "updated_by"
