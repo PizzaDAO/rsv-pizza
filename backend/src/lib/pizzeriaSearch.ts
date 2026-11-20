@@ -9,6 +9,8 @@
  *   BLAND_API_KEY          when set, pizzerias with a phone get an `ai_phone` ordering option
  */
 
+import { brand } from '../config/brand.js';
+
 export interface OrderingOption {
   provider: string;
   available: boolean;
@@ -166,7 +168,7 @@ out center 20;`;
     // overpass-api.de answers 406 to requests without an identifying User-Agent (Node's default is rejected).
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'rsv.pizza/1.0 (+https://rsv.pizza)',
+      'User-Agent': `${brand.domain}/1.0 (+${brand.url})`,
       Accept: 'application/json',
     },
     body: `data=${encodeURIComponent(query)}`,
