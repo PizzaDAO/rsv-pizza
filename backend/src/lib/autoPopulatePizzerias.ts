@@ -83,10 +83,18 @@ export async function autoPopulatePizzerias({ partyId, lat, lng, address }: Args
     if (effectiveLat == null || effectiveLng == null) return;
 
     // Direct call into the shared search lib (no HTTP hop). 8s ceiling, like before.
-    const found = await Promise.race([
-      searchPizzerias(effectiveLat, effectiveLng, 5000),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('search timed out')), 8000)),
-    ]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let found: Awaited<ReturnType<typeof searchPizzerias>>;
+    try {
+      found = await Promise.race([
+        searchPizzerias(effectiveLat, effectiveLng, 5000),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('search timed out')), 8000);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     const pizzerias = found.slice(0, 20) as unknown as Prisma.InputJsonArray;
     if (pizzerias.length === 0) return;
 

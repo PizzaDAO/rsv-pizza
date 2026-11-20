@@ -75,6 +75,24 @@ function setCached(key: string, payload: Pizzeria[]): void {
   responseCache.set(key, { payload, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+/** fetch with an abort timeout; a timeout becomes PizzeriaSearchError(504) with no upstream text. */
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err: any) {
+    if (controller.signal.aborted || err?.name === 'AbortError') {
+      throw new PizzeriaSearchError('Pizzeria search timed out', 504);
+    }
+    throw new PizzeriaSearchError('Pizzeria search provider error', 502);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const toRad = (deg: number) => deg * (Math.PI / 180);
 
 /** Haversine distance in meters. */
@@ -96,7 +114,7 @@ const PRICE_LEVELS: Record<string, number> = {
 };
 
 async function searchGooglePlaces(lat: number, lng: number, radius: number, apiKey: string): Promise<Pizzeria[]> {
-  const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+  const response = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -143,7 +161,7 @@ async function searchOverpassPizzerias(lat: number, lng: number, radius: number)
   way ["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng}); );
 out center 20;`;
 
-  const response = await fetch('https://overpass-api.de/api/interpreter', {
+  const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(query)}`,

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * scripts/backfill-auto-pizzerias.js — backfill parties.selected_pizzerias
- * by calling the search-pizzerias edge function for each event with an
+ * by calling the backend /api/ordering/search-pizzerias route for each event with an
  * address and an empty list. Idempotent. Dry-run by default.
  *
  * prosciutto-58472: pairs with backend auto-populate so existing events
@@ -64,14 +64,12 @@ async function nominatim(address) {
   }
 }
 
+const API_URL = process.env.API_URL || 'https://backend-pizza-dao.vercel.app';
+
 async function callEdge(lat, lng) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/search-pizzerias`, {
+  const res = await fetch(`${API_URL}/api/ordering/search-pizzerias`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      'apikey': SUPABASE_SERVICE_ROLE_KEY,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lat, lng, radius: 5000 }),
   });
   if (!res.ok) throw new Error(`edge ${res.status}`);

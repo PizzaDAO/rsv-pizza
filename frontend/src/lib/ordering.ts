@@ -1,8 +1,6 @@
 import { Pizzeria, OrderItem, OrderingProvider } from '../types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const ORDERING_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3006';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Search for nearby pizzerias
 export async function searchPizzerias(lat: number, lng: number, radius: number = 5000): Promise<Pizzeria[]> {
@@ -13,8 +11,10 @@ export async function searchPizzerias(lat: number, lng: number, radius: number =
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to search pizzerias');
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      err?.error?.message ?? (typeof err?.error === 'string' ? err.error : undefined) ?? 'Failed to search pizzerias'
+    );
   }
 
   const data = await response.json();
@@ -114,62 +114,12 @@ export async function createSquareOrder(
   });
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok && !data.error) return { success: false, error: `Order failed (${response.status})` };
-  return data;
-}
-
-// Virtual card details for AI payment
-export interface VirtualCardDetails {
-  cardId: string;
-  number: string;
-  cvc: string;
-  expMonth: number;
-  expYear: number;
-  last4: string;
-}
-
-// Place an order via AI phone call (Bland AI)
-export async function createAIPhoneOrder(
-  pizzeriaName: string,
-  pizzeriaPhone: string,
-  items: OrderItem[],
-  customerName: string,
-  customerPhone: string,
-  fulfillmentType: 'pickup' | 'delivery' = 'pickup',
-  deliveryAddress?: string,
-  partySize?: number,
-  paymentCard?: VirtualCardDetails
-): Promise<{ success: boolean; callId?: string; message?: string; error?: string }> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-phone-order`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      pizzeriaName,
-      pizzeriaPhone,
-      items,
-      customerName,
-      customerPhone,
-      fulfillmentType,
-      deliveryAddress,
-      partySize,
-      paymentCard,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    try {
-      const data = JSON.parse(text);
-      return { success: false, error: data.error || data.message || `Request failed with status ${response.status}` };
-    } catch {
-      return { success: false, error: `Request failed with status ${response.status}` };
-    }
+  // Backend AppErrors are { error: { message, code } }; always hand the UI a string.
+  const msg: string | undefined = typeof data.error === 'string' ? data.error : data.error?.message;
+  if (!response.ok || data.error) {
+    return { success: false, orderId: data.orderId, error: msg || `Order failed (${response.status})` };
   }
-
-  return response.json();
+  return data;
 }
 
 // Generate a phone order script

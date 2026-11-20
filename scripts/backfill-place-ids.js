@@ -21,8 +21,8 @@
  *                              The existing VITE_GOOGLE_MAPS_API_KEY is browser-
  *                              referrer-restricted and will not work from a Node
  *                              script — use a separate server-side / IP-restricted
- *                              key, or pull the value already used by the
- *                              search-pizzerias edge function from Supabase secrets.
+ *                              key, or reuse the GOOGLE_PLACES_API_KEY set on
+ *                              the backend (Vercel) project.
  *
  * Usage:
  *   GOOGLE_PLACES_API_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \

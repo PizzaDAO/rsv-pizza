@@ -16,7 +16,7 @@ vi.mock('../helpers/partyAccess.js', () => ({
 
 import router from './ordering.routes.js';
 import { errorHandler } from '../middleware/error.js';
-import { clearPizzeriaCache } from '../lib/pizzeriaSearch.js';
+import { clearPizzeriaCache, searchPizzerias, PizzeriaSearchError } from '../lib/pizzeriaSearch.js';
 
 const app = () => {
   const a = express();
@@ -99,6 +99,26 @@ describe('POST /api/ordering/search-pizzerias (public)', () => {
     expect(r.status).toBe(200);
     expect(r.body.pizzerias[0]).toMatchObject({ id: 'p1', name: 'Pie', priceLevel: 2 });
     expect(fetchMock.mock.calls[0][1].headers['X-Goog-Api-Key']).toBe('gk');
+  });
+
+  it('upstream timeout is a 504 without upstream text', async () => {
+    fetchMock.mockImplementation((_u: string, init: any) =>
+      new Promise((_res, rej) => init.signal.addEventListener('abort', () => rej(Object.assign(new Error('secret upstream'), { name: 'AbortError' }))))
+    );
+    vi.useFakeTimers();
+    try {
+      const p = searchPizzerias(42, -74).then(
+        () => null,
+        (e) => e
+      );
+      await vi.advanceTimersByTimeAsync(10_500);
+      const err = await p;
+      expect(err).toBeInstanceOf(PizzeriaSearchError);
+      expect(err.status).toBe(504);
+      expect(err.message).not.toContain('secret');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('upstream failure is a 502 without leaking provider details', async () => {
