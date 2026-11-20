@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
+import { searchPizzerias } from './pizzeriaSearch.js';
 
 interface Args {
   partyId: string;
@@ -40,7 +41,7 @@ async function nominatimGeocode(address: string): Promise<{ lat: number; lng: nu
 
 /**
  * Auto-populate `parties.selected_pizzerias` for a party by calling the
- * Supabase `search-pizzerias` edge function.
+ * shared `lib/pizzeriaSearch` (formerly the `search-pizzerias` edge function).
  *
  * HARD CONSTRAINTS (prosciutto-58472):
  * - Idempotent: never overwrite a host's preselected list.
@@ -81,37 +82,12 @@ export async function autoPopulatePizzerias({ partyId, lat, lng, address }: Args
     }
     if (effectiveLat == null || effectiveLng == null) return;
 
-    // Call edge function (server-side, uses service-role key so no CORS/anon issues)
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      console.warn('[autoPopulatePizzerias] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-      return;
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    let res: Response;
-    try {
-      res = await fetch(`${supabaseUrl}/functions/v1/search-pizzerias`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceKey}`,
-          'apikey': serviceKey,
-        },
-        body: JSON.stringify({ lat: effectiveLat, lng: effectiveLng, radius: 5000 }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res.ok) {
-      console.warn('[autoPopulatePizzerias] edge function returned', res.status);
-      return;
-    }
-    const data = await res.json();
-    const pizzerias = Array.isArray(data?.pizzerias) ? data.pizzerias.slice(0, 20) : [];
+    // Direct call into the shared search lib (no HTTP hop). 8s ceiling, like before.
+    const found = await Promise.race([
+      searchPizzerias(effectiveLat, effectiveLng, 5000),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('search timed out')), 8000)),
+    ]);
+    const pizzerias = found.slice(0, 20) as unknown as Prisma.InputJsonArray;
     if (pizzerias.length === 0) return;
 
     // Conditional update — only write if still empty (race-safe).

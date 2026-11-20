@@ -104,11 +104,17 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
       return;
     }
 
+    if (!partyId) {
+      setError('Sign in as the host to place this order');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       const result = await createSquareOrder(
+        partyId,
         orderingOption.merchantId!,
         orderItems,
         customerName,
