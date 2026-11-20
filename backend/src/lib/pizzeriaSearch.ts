@@ -163,7 +163,12 @@ out center 20;`;
 
   const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    // overpass-api.de answers 406 to requests without an identifying User-Agent (Node's default is rejected).
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'rsv.pizza/1.0 (+https://rsv.pizza)',
+      Accept: 'application/json',
+    },
     body: `data=${encodeURIComponent(query)}`,
   });
   if (!response.ok) {
