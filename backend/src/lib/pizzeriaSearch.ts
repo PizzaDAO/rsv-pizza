@@ -237,7 +237,8 @@ out center 20;`;
 
   const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
+    // overpass-api.de answers 406 to requests without an identifying User-Agent (Node's default is rejected).
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT, Accept: 'application/json' },
     body: `data=${encodeURIComponent(query)}`,
   }, OVERPASS_TIMEOUT_MS);
   if (!response.ok) {
