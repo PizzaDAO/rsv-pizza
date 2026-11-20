@@ -1,22 +1,20 @@
 import { Pizzeria, OrderItem, OrderingProvider } from '../types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const ORDERING_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 // Search for nearby pizzerias
 export async function searchPizzerias(lat: number, lng: number, radius: number = 5000): Promise<Pizzeria[]> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/search-pizzerias`, {
+  const response = await fetch(`${ORDERING_BACKEND_URL}/api/ordering/search-pizzerias`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lat, lng, radius }),
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to search pizzerias');
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      err?.error?.message ?? (typeof err?.error === 'string' ? err.error : undefined) ?? 'Failed to search pizzerias'
+    );
   }
 
   const data = await response.json();
@@ -85,6 +83,7 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
 
 // Create a Square order
 export async function createSquareOrder(
+  partyId: string,
   locationId: string,
   items: OrderItem[],
   customerName: string,
@@ -94,13 +93,15 @@ export async function createSquareOrder(
   deliveryAddress?: string,
   scheduledTime?: string
 ): Promise<{ success: boolean; orderId?: string; checkoutUrl?: string; error?: string }> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/square-order`, {
+  const token = localStorage.getItem('authToken');
+  const response = await fetch(`${ORDERING_BACKEND_URL}/api/ordering/square-order`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
+      partyId,
       locationId,
       items,
       customerName,
@@ -112,61 +113,13 @@ export async function createSquareOrder(
     }),
   });
 
-  return response.json();
-}
-
-// Virtual card details for AI payment
-export interface VirtualCardDetails {
-  cardId: string;
-  number: string;
-  cvc: string;
-  expMonth: number;
-  expYear: number;
-  last4: string;
-}
-
-// Place an order via AI phone call (Bland AI)
-export async function createAIPhoneOrder(
-  pizzeriaName: string,
-  pizzeriaPhone: string,
-  items: OrderItem[],
-  customerName: string,
-  customerPhone: string,
-  fulfillmentType: 'pickup' | 'delivery' = 'pickup',
-  deliveryAddress?: string,
-  partySize?: number,
-  paymentCard?: VirtualCardDetails
-): Promise<{ success: boolean; callId?: string; message?: string; error?: string }> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-phone-order`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      pizzeriaName,
-      pizzeriaPhone,
-      items,
-      customerName,
-      customerPhone,
-      fulfillmentType,
-      deliveryAddress,
-      partySize,
-      paymentCard,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    try {
-      const data = JSON.parse(text);
-      return { success: false, error: data.error || data.message || `Request failed with status ${response.status}` };
-    } catch {
-      return { success: false, error: `Request failed with status ${response.status}` };
-    }
+  const data = await response.json().catch(() => ({}));
+  // Backend AppErrors are { error: { message, code } }; always hand the UI a string.
+  const msg: string | undefined = typeof data.error === 'string' ? data.error : data.error?.message;
+  if (!response.ok || data.error) {
+    return { success: false, orderId: data.orderId, error: msg || `Order failed (${response.status})` };
   }
-
-  return response.json();
+  return data;
 }
 
 // Generate a phone order script
