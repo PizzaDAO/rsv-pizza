@@ -9,6 +9,8 @@
  *   BLAND_API_KEY          when set, pizzerias with a phone get an `ai_phone` ordering option
  */
 
+import { brand } from '../config/brand.js';
+
 export interface OrderingOption {
   provider: string;
   available: boolean;
@@ -163,7 +165,12 @@ out center 20;`;
 
   const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    // overpass-api.de answers 406 to requests without an identifying User-Agent (Node's default is rejected).
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': `${brand.domain}/1.0 (+${brand.url})`,
+      Accept: 'application/json',
+    },
     body: `data=${encodeURIComponent(query)}`,
   });
   if (!response.ok) {
