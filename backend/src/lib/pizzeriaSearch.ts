@@ -78,11 +78,15 @@ function setCached(key: string, payload: Pizzeria[]): void {
 }
 
 const FETCH_TIMEOUT_MS = 10_000;
+// The public Overpass server is frequently overloaded; fail fast and fall back to Photon.
+const OVERPASS_TIMEOUT_MS = 6_000;
+const PHOTON_TIMEOUT_MS = 6_000;
+const MAX_RESULTS = 20;
 
 /** fetch with an abort timeout; a timeout becomes PizzeriaSearchError(504) with no upstream text. */
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (err: any) {
@@ -155,10 +159,78 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number, apiK
     }));
 }
 
+const USER_AGENT = `${brand.domain}/1.0 (+${brand.url})`;
+
+// Photon (komoot, OSM data) fallback when Overpass is slow/down. Same id format as the Overpass mapper.
+const PHOTON_OSM_TYPES: Record<string, string> = { N: 'node', W: 'way', R: 'relation' };
+
+async function searchPhotonPizzerias(lat: number, lng: number, radius: number): Promise<Pizzeria[]> {
+  const dLat = radius / 111_320;
+  const dLng = radius / (111_320 * Math.max(Math.cos(toRad(lat)), 0.01));
+  const bbox = [
+    Math.max(lng - dLng, -180),
+    Math.max(lat - dLat, -90),
+    Math.min(lng + dLng, 180),
+    Math.min(lat + dLat, 90),
+  ].join(',');
+  const url =
+    `https://photon.komoot.io/api/?q=pizza&lat=${lat}&lon=${lng}&limit=40&bbox=${bbox}` +
+    `&osm_tag=amenity:restaurant&osm_tag=amenity:fast_food`;
+  const response = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } }, PHOTON_TIMEOUT_MS);
+  if (!response.ok) {
+    console.error('Photon API error:', response.status);
+    throw new PizzeriaSearchError('Pizzeria search provider error');
+  }
+  const data: any = await response.json();
+
+  return (data.features || [])
+    .filter((f: any) => {
+      const c = f?.geometry?.coordinates;
+      return f?.properties?.name && Array.isArray(c) && typeof c[0] === 'number' && typeof c[1] === 'number';
+    })
+    .map((f: any): Pizzeria => {
+      const props = f.properties;
+      const [fLng, fLat] = f.geometry.coordinates;
+      const type = PHOTON_OSM_TYPES[props.osm_type] || 'node';
+      const street = [props.housenumber, props.street].filter(Boolean).join(' ');
+      const regionPart = [props.state, props.postcode].filter(Boolean).join(' ');
+      const address = [street, props.city, regionPart].filter(Boolean).join(', ');
+      return {
+        id: `osm/${type}/${props.osm_id}`,
+        placeId: `osm/${type}/${props.osm_id}`,
+        name: props.name,
+        address,
+        phone: undefined,
+        url: undefined,
+        distance: Math.round(calculateDistance(lat, lng, fLat, fLng)),
+        location: { lat: fLat, lng: fLng },
+        orderingOptions: [],
+      };
+    })
+    .filter((p: Pizzeria) => p.distance <= radius)
+    .sort((a: Pizzeria, b: Pizzeria) => a.distance - b.distance)
+    .slice(0, MAX_RESULTS);
+}
+
+async function searchOsmPizzerias(lat: number, lng: number, radius: number): Promise<Pizzeria[]> {
+  try {
+    const results = await searchOverpassPizzerias(lat, lng, radius);
+    if (results.length > 0) return results;
+  } catch (err) {
+    console.warn('Overpass failed, falling back to Photon:', (err as Error)?.message);
+  }
+  try {
+    return await searchPhotonPizzerias(lat, lng, radius);
+  } catch (err) {
+    // Overpass returned zero results and Photon failed: surface Photon's error.
+    throw err instanceof PizzeriaSearchError ? err : new PizzeriaSearchError('Pizzeria search provider error');
+  }
+}
+
 // napoletana-58547: keyless OpenStreetMap search via Overpass. lat/lng/radius are validated
 // numbers (see parseSearchInput), so interpolating them into the query is safe.
 async function searchOverpassPizzerias(lat: number, lng: number, radius: number): Promise<Pizzeria[]> {
-  const query = `[out:json][timeout:15];
+  const query = `[out:json][timeout:6];
 ( node["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng});
   way ["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng}); );
 out center 20;`;
@@ -166,13 +238,9 @@ out center 20;`;
   const response = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     // overpass-api.de answers 406 to requests without an identifying User-Agent (Node's default is rejected).
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': `${brand.domain}/1.0 (+${brand.url})`,
-      Accept: 'application/json',
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT, Accept: 'application/json' },
     body: `data=${encodeURIComponent(query)}`,
-  });
+  }, OVERPASS_TIMEOUT_MS);
   if (!response.ok) {
     console.error('Overpass API error:', response.status);
     throw new PizzeriaSearchError('Pizzeria search provider error');
@@ -247,7 +315,7 @@ export async function searchPizzerias(lat: number, lng: number, radius: number =
   const pizzerias =
     provider === 'google'
       ? await searchGooglePlaces(lat, lng, radius, apiKey)
-      : await searchOverpassPizzerias(lat, lng, radius);
+      : await searchOsmPizzerias(lat, lng, radius);
 
   for (const p of pizzerias) p.orderingOptions.push(...generateOrderingOptions(p));
 

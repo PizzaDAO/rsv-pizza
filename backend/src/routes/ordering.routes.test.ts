@@ -111,7 +111,7 @@ describe('POST /api/ordering/search-pizzerias (public)', () => {
         () => null,
         (e) => e
       );
-      await vi.advanceTimersByTimeAsync(10_500);
+      await vi.advanceTimersByTimeAsync(13_000);
       const err = await p;
       expect(err).toBeInstanceOf(PizzeriaSearchError);
       expect(err.status).toBe(504);
