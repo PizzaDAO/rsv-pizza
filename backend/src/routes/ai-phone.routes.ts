@@ -2,16 +2,97 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { verifyBlandWebhook } from '../middleware/webhookAuth.js';
 import { AppError } from '../middleware/error.js';
+import { canUserEditParty } from '../helpers/partyAccess.js';
+import { prisma } from '../config/database.js';
+import { blandCallHadCard, safeTranscript } from '../lib/cardRedact.js';
 import {
   initiateCall,
   processWebhook,
   getCallById,
   retryCall,
+  fetchBlandCall,
+  fetchBlandRecording,
   InitiateCallRequest,
   BlandWebhookPayload,
 } from '../services/blandAI.service.js';
 
 const router = Router();
+
+function notConfigured(): AppError {
+  return new AppError('AI phone calls are not configured yet. Please try again later.', 503, 'BLAND_NOT_CONFIGURED');
+}
+
+/**
+ * sec-edge-functions: looks a call up by our id or the Bland call id; 404 if missing, 403 unless
+ * the caller placed it or can edit its party. Replaces the anon-callable `ai-call-status` /
+ * `ai-call-recording` edge functions, which served any call id to anyone.
+ */
+async function loadViewableCall(ref: string, req: AuthRequest) {
+  if (!ref || ref === 'pending' || ref.length > 100) throw new AppError('Call not found', 404, 'NOT_FOUND');
+  const call =
+    (await prisma.aIPhoneCall.findUnique({ where: { id: ref } })) ??
+    (await prisma.aIPhoneCall.findUnique({ where: { callId: ref } }));
+  if (!call) throw new AppError('Call not found', 404, 'NOT_FOUND');
+  const allowed = call.userId === req.userId || (await canUserEditParty(call.partyId, req.userId, req.userEmail));
+  if (!allowed) throw new AppError('Not authorized', 403, 'FORBIDDEN');
+  return call;
+}
+
+// GET /api/ai-phone/calls/:ref/live - live status + (redacted) transcript from Bland
+router.get('/calls/:ref/live', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const call = await loadViewableCall(req.params.ref, req);
+    if (call.callId === 'pending') {
+      return res.json({ status: 'queued', transcript: '', callLength: null, answeredBy: 'unknown', endedReason: null, recordingAvailable: false });
+    }
+    const bland = await fetchBlandCall(call.callId);
+    if (!bland.ok) {
+      if (bland.status === 503) throw notConfigured();
+      throw new AppError('Failed to get call status', bland.status === 404 ? 404 : 502, 'BLAND_ERROR');
+    }
+    const data = bland.data;
+    let transcript = '';
+    if (data.concatenated_transcript) {
+      transcript = data.concatenated_transcript;
+    } else if (Array.isArray(data.transcripts)) {
+      transcript = data.transcripts.map((t) => `${t.user}: ${t.text}`).join('\n');
+    }
+    res.set('Cache-Control', 'private, no-store');
+    res.json({
+      status: data.status || data.call_status || 'unknown',
+      transcript: safeTranscript(transcript, data) ?? '',
+      callLength: data.call_length ?? null,
+      answeredBy: data.answered_by || 'unknown',
+      endedReason: data.ended_reason || null,
+      recordingAvailable: !blandCallHadCard(data),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/ai-phone/calls/:ref/recording - audio proxy; withheld for calls that carried a card
+router.get('/calls/:ref/recording', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const call = await loadViewableCall(req.params.ref, req);
+    if (call.callId === 'pending') throw new AppError('Recording not available', 404, 'NOT_FOUND');
+    const details = await fetchBlandCall(call.callId);
+    if (details.status === 503) throw notConfigured();
+    if (!details.ok) throw new AppError('Recording not available', 404, 'NOT_FOUND');
+    if (blandCallHadCard(details.data)) {
+      throw new AppError('Recordings are not available for calls that included payment details', 404, 'NOT_FOUND');
+    }
+    const audio = await fetchBlandRecording(call.callId);
+    if (!audio) throw notConfigured();
+    if (!audio.ok) throw new AppError('Failed to fetch recording', 502, 'BLAND_ERROR');
+    const buf = Buffer.from(await audio.arrayBuffer());
+    res.set('Content-Type', audio.headers.get('Content-Type') || 'audio/mpeg');
+    res.set('Cache-Control', 'private, no-store');
+    res.send(buf);
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * basil-14648: placing or retrying a legacy Bland call is retired. AI ordering now goes through pizza-mcp

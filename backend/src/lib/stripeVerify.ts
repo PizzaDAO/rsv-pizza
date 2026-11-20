@@ -6,7 +6,7 @@ import crypto from 'crypto';
  *
  * Env: STRIPE_SECRET_KEY (API), STRIPE_WEBHOOK_SECRET (whsec_..., Stripe dashboard webhook).
  *
- * PaymentIntent metadata we rely on (set where the intent is created, supabase/functions/stripe-payment):
+ * PaymentIntent metadata we rely on (set where the intent is created: routes/stripe-payments.routes.ts):
  *   - donations: metadata.type = 'donation', metadata.partyId = <party uuid>
  *   - invoices:  metadata.type = 'invoice_payment', metadata.invoiceId = <invoice uuid>
  */

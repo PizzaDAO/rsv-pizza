@@ -81,6 +81,7 @@ import funnelRoutes from './routes/funnel.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
+import stripePaymentsRoutes from './routes/stripe-payments.routes.js';
 import pizzaOrderRoutes from './routes/pizza-order.routes.js'; // basil-14648: AI ordering through pizza-mcp (OPOP), allowlisted parties only
 import pizzaMcpWebhookRoutes from './routes/pizza-mcp-webhook.routes.js'; // basil-14648: signed order.updated webhook (raw body)
 import jwksRoutes from './routes/jwks.routes.js'; // basil-14648: public JWKS for the tokens we mint for pizza-mcp
@@ -161,6 +162,8 @@ app.use('/api/webhooks/stripe', stripeWebhookRouter);
 // mounts before express.json() too. JWKS is public and static.
 app.use('/api/pizza-mcp', pizzaMcpWebhookRoutes);
 app.use('/.well-known', jwksRoutes);
+// sec-edge-functions: the Bland webhook HMAC covers the raw bytes, so keep them (before express.json()).
+app.use('/api/ai-phone/webhook', express.raw({ type: () => true, limit: '1mb' }));
 
 // Logo-cleanup upload accepts base64-encoded images up to ~5 MB raw
 // (~6.7 MB base64). Must be registered BEFORE the global express.json()
@@ -355,6 +358,7 @@ app.use('/api/v1', v1Routes);
 // Swagger documentation
 setupSwagger(app);
 app.use('/api/ai-phone', aiPhoneRoutes);
+app.use('/api/stripe-payments', stripePaymentsRoutes); // sec-edge-functions: donation/invoice/setup intents
 
 // Health check — calabrese-58204: now includes a DB round-trip so external
 // uptime monitors can detect connection-pool exhaustion / DB-saturation

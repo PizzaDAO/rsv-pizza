@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { brand } from '../config/brand.js';
+import { blandCallHadCard, redactCardNumbers, safeTranscript } from '../lib/cardRedact.js';
 
 const BLAND_API_URL = 'https://api.bland.ai/v1';
 
@@ -462,6 +463,12 @@ export async function processWebhook(payload: BlandWebhookPayload): Promise<void
     summary = generateSummary(payload.concatenated_transcript, orderConfirmed, orderTotal, estimatedTime);
   }
 
+  // sec-edge-functions: never store card data from a call; no transcript or recording URL for
+  // calls that may have carried a card.
+  const hadCard = blandCallHadCard(payload);
+  const transcript = safeTranscript(payload.concatenated_transcript, payload);
+  if (summary) summary = redactCardNumbers(summary);
+
   // Update the record
   await prisma.aIPhoneCall.update({
     where: { id: aiPhoneCall.id },
@@ -470,9 +477,9 @@ export async function processWebhook(payload: BlandWebhookPayload): Promise<void
       orderConfirmed,
       confirmedTotal,
       estimatedTime,
-      transcript: payload.concatenated_transcript,
+      transcript,
       summary,
-      recordingUrl: payload.recording_url,
+      recordingUrl: hadCard ? null : payload.recording_url,
       callDuration: payload.corrected_duration,
       callEndedAt: completed ? new Date() : undefined,
     },
@@ -602,5 +609,37 @@ export async function retryCall(aiPhoneCallId: string): Promise<CallResponse> {
     fulfillmentType: originalCall.fulfillmentType as 'pickup' | 'delivery',
     deliveryAddress: originalCall.deliveryAddress ?? undefined,
     estimatedTotal: originalCall.estimatedTotal ?? undefined,
+  });
+}
+
+export interface BlandCallDetails {
+  status?: string;
+  call_status?: string;
+  recording_url?: string | null;
+  concatenated_transcript?: string;
+  transcripts?: Array<{ user: string; text: string }>;
+  call_length?: number | null;
+  answered_by?: string;
+  ended_reason?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+/** sec-edge-functions: GET /v1/calls/:id from Bland (server-side, our API key). 503 when unconfigured. */
+export async function fetchBlandCall(callId: string): Promise<{ ok: boolean; status: number; data: BlandCallDetails }> {
+  const apiKey = process.env.BLAND_API_KEY;
+  if (!apiKey) return { ok: false, status: 503, data: {} };
+  const res = await fetch(`${BLAND_API_URL}/calls/${encodeURIComponent(callId)}`, {
+    headers: { Authorization: apiKey },
+  });
+  const data = (await res.json().catch(() => ({}))) as BlandCallDetails;
+  return { ok: res.ok, status: res.status, data };
+}
+
+/** sec-edge-functions: GET /v1/calls/:id/recording from Bland (server-side). null when unconfigured. */
+export async function fetchBlandRecording(callId: string): Promise<Response | null> {
+  const apiKey = process.env.BLAND_API_KEY;
+  if (!apiKey) return null;
+  return fetch(`${BLAND_API_URL}/calls/${encodeURIComponent(callId)}/recording`, {
+    headers: { Authorization: apiKey },
   });
 }

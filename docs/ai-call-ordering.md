@@ -4,7 +4,18 @@ RSVPizza can use AI voice agents to automatically call pizzerias and place order
 
 ## Current Implementation
 
-We use **Bland AI** for AI phone calls. The Edge Function `ai-phone-order` handles the integration.
+We use **Bland AI** for AI phone calls.
+
+> **sec-edge-functions (2026-11):** the `ai-phone-order`, `ai-call-status`, `ai-call-recording` and
+> `stripe-payment` edge functions were removed (anyone with the public anon key could start calls,
+> mint virtual cards and read their PAN/CVC). Placing calls is retired (basil-14648: AI ordering
+> goes through pizza-mcp, **no card by voice**; `/api/ai-phone/initiate` and `/:id/retry` answer
+> 410). What remains is in the Express backend: `GET /api/ai-phone/calls/:ref/live` and
+> `/recording` (call owner or party editors; card numbers masked, transcript and recording withheld
+> for calls that carried a card), `POST /api/ai-phone/webhook` (Bland `X-Webhook-Signature` HMAC
+> required), and `/api/stripe-payments/{donation-intent,invoice-intent,setup-intent}`.
+> Backend env: `BLAND_API_KEY`, `BLAND_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY` (optional
+> `DONATION_MAX_CENTS`). The sections below are historical.
 
 ### How It Works
 

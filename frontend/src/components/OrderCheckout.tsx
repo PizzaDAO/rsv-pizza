@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Pizzeria, OrderingOption, PizzaRecommendation, OrderItem } from '../types';
 import {
   createSquareOrder,
-  createAIPhoneOrder,
   initiateAIPhoneCall,
   retryAIPhoneCall,
   generatePhoneOrderScript,
@@ -16,10 +15,6 @@ import {
   hasStoredPaymentMethod,
   estimateOrderTotal,
   formatCurrency,
-  createVirtualCard,
-  getVirtualCardDetails,
-  createPaymentIntent,
-  getStoredCustomerId,
   getStoredCustomerEmail,
 } from '../lib/stripe';
 import { PaymentForm } from './PaymentForm';
@@ -174,87 +169,34 @@ export const OrderCheckout: React.FC<OrderCheckoutProps> = ({
 
     const partySize = recommendations.reduce((sum, pizza) => sum + pizza.guestCount, 0);
 
+    // sec-edge-functions: the browser no longer creates or reads virtual cards, and there is no
+    // edge-function fallback. The backend route is retired (410, basil-14648: ordering moved to
+    // pizza-mcp, no card by voice), so this shows its message.
+    if (!partyId) {
+      setError('Save your party first, then place the AI order from its host page');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Try backend API first if partyId is available (enables call tracking)
-      let useEdgeFunctionFallback = !partyId;
+      const result = await initiateAIPhoneCall(
+        partyId,
+        pizzeria.name,
+        pizzeria.phone,
+        orderItems,
+        customerName,
+        customerPhone,
+        fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
+        deliveryAddress || undefined,
+        partySize,
+        estimatedTotal
+      );
 
-      if (partyId) {
-        const result = await initiateAIPhoneCall(
-          partyId,
-          pizzeria.name,
-          pizzeria.phone,
-          orderItems,
-          customerName,
-          customerPhone,
-          fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
-          deliveryAddress || undefined,
-          partySize,
-          estimatedTotal
-        );
-
-        if (result.success && result.aiPhoneCallId) {
-          setAiPhoneCallId(result.aiPhoneCallId);
-          setStep('calling');
-        } else if (result.error && result.error.includes('non-JSON response')) {
-          // Backend route not deployed yet, fall back to edge function
-          console.warn('Backend ai-phone route not available, falling back to edge function');
-          useEdgeFunctionFallback = true;
-        } else {
-          setError(result.error || 'Failed to initiate AI call');
-        }
-      }
-
-      if (useEdgeFunctionFallback) {
-        // Fallback to Supabase edge function (works without backend deployment)
-        let virtualCardDetails = undefined;
-
-        // If paying with card, create virtual card
-        if (payWithCard && hasPaymentMethod) {
-          const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-          // Create pre-authorization on customer's card
-          const customerId = getStoredCustomerId();
-          if (customerId) {
-            await createPaymentIntent(
-              estimatedTotal,
-              customerId,
-              customerEmail,
-              {
-                orderId,
-                pizzeriaName: pizzeria.name,
-                pizzeriaPhone: pizzeria.phone,
-              }
-            );
-          }
-
-          // Create virtual card for this order
-          const card = await createVirtualCard(
-            estimatedTotal,
-            orderId,
-            pizzeria.name
-          );
-
-          // Get full card details for AI
-          virtualCardDetails = await getVirtualCardDetails(card.cardId);
-        }
-
-        const result = await createAIPhoneOrder(
-          pizzeria.name,
-          pizzeria.phone,
-          orderItems,
-          customerName,
-          customerPhone,
-          fulfillmentType.toLowerCase() as 'pickup' | 'delivery',
-          deliveryAddress || undefined,
-          partySize,
-          virtualCardDetails
-        );
-
-        if (result.success && result.callId) {
-          onOrderComplete(result.callId, undefined);
-        } else {
-          setError(result.error || 'Failed to initiate AI call');
-        }
+      if (result.success && result.aiPhoneCallId) {
+        setAiPhoneCallId(result.aiPhoneCallId);
+        setStep('calling');
+      } else {
+        setError(result.error || 'Failed to initiate AI call');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initiate AI call');

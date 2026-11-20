@@ -1,8 +1,7 @@
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
 
 // Singleton stripe instance
 let stripePromise: Promise<Stripe | null> | null = null;
@@ -14,109 +13,55 @@ export function getStripe() {
   return stripePromise;
 }
 
-// Helper to call Stripe Edge Function
-async function callStripeFunction<T>(body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/stripe-payment`, {
+// sec-edge-functions: every Stripe server call goes through the backend
+// (/api/stripe-payments/*), which validates amounts and sets metadata itself.
+// Virtual cards, card reveal and payment capture are no longer callable from
+// the browser at all: the backend issues the card for an AI call and reads it
+// to the pizzeria directly.
+async function callPaymentsApi<T>(path: string, body: Record<string, unknown>, auth = false): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (auth) {
+    const token = localStorage.getItem('authToken');
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_URL}/api/stripe-payments/${path}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
-
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || 'Stripe request failed');
+    // backend errors are { error: { message, code } }; e.g. 503 STRIPE_NOT_CONFIGURED
+    const msg =
+      (data?.error && typeof data.error === 'object' && data.error.message) ||
+      (typeof data?.error === 'string' && data.error) ||
+      data?.message ||
+      'Payment request failed';
+    throw new Error(msg);
   }
-  return data;
+  return data as T;
 }
 
-// Create a Stripe customer
-export async function createStripeCustomer(email: string, name?: string): Promise<{ customerId: string }> {
-  return callStripeFunction({
-    action: 'create_customer',
-    email,
-    name,
-  });
+// Get a SetupIntent (and the caller's own Stripe customer) for saving a card. Login required.
+export async function createSetupIntent(): Promise<{ customerId: string; clientSecret: string }> {
+  return callPaymentsApi('setup-intent', {}, true);
 }
 
-// Get a SetupIntent for saving payment method
-export async function getSetupIntent(customerId: string): Promise<{ clientSecret: string }> {
-  return callStripeFunction({
-    action: 'get_setup_intent',
-    customerId,
-  });
+// Create a donation PaymentIntent. The server checks the party and bounds the amount.
+export async function createDonationIntent(params: {
+  partyId: string;
+  amount: number; // cents
+  customerEmail?: string;
+  customerName?: string;
+}): Promise<{ paymentIntentId: string; clientSecret: string; status: string }> {
+  return callPaymentsApi('donation-intent', { ...params, currency: 'usd' });
 }
 
-// Create a pre-authorized payment intent
-export async function createPaymentIntent(
-  amount: number, // in cents
-  customerId?: string,
-  customerEmail?: string,
-  metadata?: Record<string, string>
-): Promise<{
-  paymentIntentId: string;
-  clientSecret: string;
-  status: string;
-}> {
-  return callStripeFunction({
-    action: 'create_payment_intent',
-    amount,
-    customerId,
-    customerEmail,
-    metadata,
-  });
-}
-
-// Capture a pre-authorized payment
-export async function capturePayment(
-  paymentIntentId: string,
-  amount?: number // Optional: capture different amount than authorized
-): Promise<{
-  paymentIntentId: string;
-  status: string;
-  amount: number;
-}> {
-  return callStripeFunction({
-    action: 'capture_payment',
-    paymentIntentId,
-    amount,
-  });
-}
-
-// Create a virtual card for order payment
-export async function createVirtualCard(
-  spendingLimit: number, // in cents
-  orderId: string,
-  pizzeriaName: string
-): Promise<{
-  cardId: string;
-  last4: string;
-  expMonth: number;
-  expYear: number;
-}> {
-  return callStripeFunction({
-    action: 'create_virtual_card',
-    spendingLimit,
-    orderId,
-    pizzeriaName,
-  });
-}
-
-// Get virtual card details (including full number for AI to use)
-export async function getVirtualCardDetails(cardId: string): Promise<{
-  cardId: string;
-  number: string;
-  cvc: string;
-  expMonth: number;
-  expYear: number;
-  last4: string;
-}> {
-  return callStripeFunction({
-    action: 'get_virtual_card',
-    cardId,
-  });
+// Create an invoice PaymentIntent. Amount and currency come from the invoice on the server.
+export async function createInvoiceIntent(
+  viewToken: string
+): Promise<{ paymentIntentId: string; clientSecret: string; status: string }> {
+  return callPaymentsApi('invoice-intent', { viewToken });
 }
 
 // Estimate order total based on pizzas (rough estimate)
