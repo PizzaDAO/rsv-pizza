@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { BRAND } from '../config/brand';
 import { useNavigate } from 'react-router';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
+import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff, Clock } from 'lucide-react';
 import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
 import { prepareSquareImage } from '../lib/squareImage';
@@ -329,15 +329,12 @@ export const PartyHeader: React.FC = () => {
 
             <form onSubmit={handleCreate} className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
               <div>
-                <label className="block text-sm font-medium text-theme-text mb-2">
-                  Party Name *
-                </label>
-                <input
+                <IconInput
+ icon={PartyPopper}
                   type="text"
                   value={partyName}
                   onChange={(e) => setPartyName(e.target.value)}
-                  placeholder="e.g., Friday Night Pizza"
-                  className="w-full"
+                  placeholder="Party Name (e.g., Friday Night Pizza)"
                   required
                   autoFocus
                 />
@@ -346,46 +343,38 @@ export const PartyHeader: React.FC = () => {
               {/* Date and Duration on same line */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-theme-text mb-2">
-                    Party Date
-                  </label>
                   <IconInput
                     icon={Calendar}
                     type="date"
                     value={partyDate}
                     onChange={(e) => setPartyDate(e.target.value)}
-                  />
+                  
+ aria-label="Party Date"
+/>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-theme-text mb-2">
-                    Duration (hrs)
-                  </label>
-                  <input
+                  <IconInput
+ icon={Clock}
                     type="number"
                     step="0.5"
                     min="0.5"
                     max="12"
                     value={partyDuration}
                     onChange={(e) => setPartyDuration(e.target.value)}
-                    placeholder="2.5"
-                    className="w-full"
+                    placeholder="Duration (hrs) (2.5)"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-theme-text mb-2">
-                  <Users size={14} className="inline mr-1" />
-                  Expected Guests *
-                </label>
-                <input
+                <IconInput
+ icon={Users}
                   type="number"
                   min="1"
                   value={expectedGuests}
                   onChange={(e) => setExpectedGuests(e.target.value)}
-                  placeholder="e.g., 12"
-                  className="w-full"
+                  placeholder="Expected Guests (e.g., 12)"
                   required
                 />
                 <p className="text-xs text-theme-text-muted mt-1">
@@ -413,30 +402,22 @@ export const PartyHeader: React.FC = () => {
               {showOptionalFields && (
                 <div className="space-y-3 border-l-2 border-theme-stroke pl-4">
                   <div>
-                    <label className="block text-sm font-medium text-theme-text mb-2">
-                      <User size={14} className="inline mr-1" />
-                      Host Name
-                    </label>
-                    <input
+                    <IconInput
+ icon={User}
                       type="text"
                       value={hostName}
                       onChange={(e) => setHostName(e.target.value)}
-                      placeholder="e.g., John"
-                      className="w-full"
+                      placeholder="Host Name (e.g., John)"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-theme-text mb-2">
-                      <MapPin size={14} className="inline mr-1" />
-                      Party Address
-                    </label>
-                    <input
+                    <IconInput
+ icon={MapPin}
                       type="text"
                       value={partyAddress}
                       onChange={(e) => setPartyAddress(e.target.value)}
-                      placeholder="e.g., 123 Main St, New York, NY"
-                      className="w-full"
+                      placeholder="Party Address (e.g., 123 Main St, New York, NY)"
                     />
                     <p className="text-xs text-theme-text-muted mt-1">
                       Used to find nearby pizzerias for ordering
@@ -444,16 +425,12 @@ export const PartyHeader: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-theme-text mb-2">
-                      <Lock size={14} className="inline mr-1" />
-                      Event Password
-                    </label>
-                    <input
+                    <IconInput
+ icon={Lock}
                       type="password"
                       value={partyPassword}
                       onChange={(e) => setPartyPassword(e.target.value)}
-                      placeholder="Password to protect event page"
-                      className="w-full"
+                      placeholder="Event Password (Password to protect event page)"
                     />
                     <p className="text-xs text-theme-text-muted mt-1">
                       Guests will need this password to view event details
@@ -461,10 +438,10 @@ export const PartyHeader: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-theme-text mb-2">
-                      <Image size={14} className="inline mr-1" />
-                      Square Image
-                    </label>
+                    <p className="text-xs text-theme-text-muted mb-2">
+                      <Image size={12} className="inline mr-1" />
+                      Square image (URL or upload)
+                    </p>
 
                     {/* Image URL Input */}
                     <div className="mb-3">
@@ -548,15 +525,12 @@ export const PartyHeader: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-theme-text mb-2">
-                      <FileText size={14} className="inline mr-1" />
-                      Event Description (Optional)
-                    </label>
-                    <textarea
+                    <IconInput
+                      multiline
+                      icon={FileText}
                       value={eventDescription}
                       onChange={(e) => setEventDescription(e.target.value)}
-                      placeholder="Tell guests about your event..."
-                      className="w-full"
+                      placeholder="Event description (optional): tell guests about your event"
                       rows={3}
                     />
                     <p className="text-xs text-theme-text-muted mt-1">
@@ -565,16 +539,13 @@ export const PartyHeader: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-theme-text mb-2">
-                      <LinkIcon size={14} className="inline mr-1" />
-                      Custom URL
-                    </label>
-                    <input
+                    <IconInput
+ icon={LinkIcon}
                       type="text"
                       value={customUrl}
                       onChange={(e) => setCustomUrl(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                      placeholder="my-awesome-party"
-                      className="w-full font-mono"
+                      placeholder="Custom URL (my-awesome-party)"
+                      className="font-mono"
                       pattern="[a-z0-9-]+"
                       minLength={3}
                       maxLength={50}

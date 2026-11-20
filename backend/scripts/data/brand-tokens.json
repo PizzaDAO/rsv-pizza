@@ -1,5 +1,76 @@
 {
-  "_comment": "tagline / metaDescription / faviconUrl equal the rsvpizza-doge VITE_BRAND_TAGLINE / _DESCRIPTION / _FAVICON_URL exactly, so title, meta description and OG do not change. Per-brand theme tokens for backend/scripts/apply-brand-tokens.cjs (self-serve brands PRs 9-12). Each entry is what event_series.theme_class and event_series.theme_tokens should hold. Validated against backend/src/lib/themeTokens.ts (contrast, mode-vs-bg) by the runner and by apply-brand-tokens.test.ts.",
+  "_comment": "tagline / metaDescription / faviconUrl equal each brand project's VITE_BRAND_TAGLINE / _DESCRIPTION / _FAVICON_URL exactly (the favicon falls back to VITE_BRAND_LOGO_URL when no _FAVICON_URL is set: team1, monad), so title, meta description, favicon and OG do not change. Per-brand theme tokens for backend/scripts/apply-brand-tokens.cjs (self-serve brands PRs 9-12). Each entry is what event_series.theme_class and event_series.theme_tokens should hold. Validated against backend/src/lib/themeTokens.ts (contrast, mode-vs-bg) by the runner and by apply-brand-tokens.test.ts.",
+  "team1": {
+    "themeClass": "brand-team1",
+    "tagline": "Pizza parties for the Team1 community",
+    "metaDescription": "RSVP and plan pizza parties for the Team1 community.",
+    "faviconUrl": "/brands/team1/logo.png",
+    "themeTokens": {
+      "mode": "dark",
+      "bg": "#000000",
+      "surface": "#1a1b1c",
+      "text": "#ffffff",
+      "textMuted": "#9ca3af",
+      "accent": "#e6212f",
+      "onAccent": "#ffffff",
+      "border": "#2a2d31",
+      "radius": "pill",
+      "fontHeading": "kanit",
+      "fontBody": "kanit",
+      "hideHeaderName": true,
+      "hideHeroLogo": true,
+      "overrides": {
+        "--bg-card-hover": "#222324",
+        "--bg-surface": "#161617",
+        "--bg-surface-hover": "#1f2021",
+        "--bg-overlay": "rgba(0, 0, 0, 0.72)",
+        "--bg-input-focus": "#222324",
+        "--bg-header": "rgba(0, 0, 0, 0.9)",
+        "--text-secondary": "#e5e7eb",
+        "--text-faint": "rgba(255, 255, 255, 0.55)",
+        "--text-inverted": "#1a1a1a",
+        "--stroke-hover": "#3d4147",
+        "--stroke-strong": "#565b63",
+        "--accent-hover": "#ff4d5a",
+        "--error": "#ff4d5a"
+      }
+    }
+  },
+  "monad": {
+    "themeClass": "brand-monad",
+    "tagline": "Pizza parties for the Monad community",
+    "metaDescription": "RSVP and plan pizza parties for the Monad community.",
+    "faviconUrl": "/brands/monad/logo.png",
+    "themeTokens": {
+      "mode": "light",
+      "bg": "#fafafa",
+      "surface": "#ffffff",
+      "text": "#111111",
+      "textMuted": "#5f5f5f",
+      "accent": "#6e54ff",
+      "onAccent": "#ffffff",
+      "border": "#e5e3ec",
+      "radius": "soft",
+      "fontHeading": "inter",
+      "fontBody": "inter",
+      "hideHeaderName": true,
+      "hideHeroLogo": true,
+      "overrides": {
+        "--bg-card-hover": "#f6f4ff",
+        "--bg-surface-hover": "#f6f4ff",
+        "--bg-overlay": "rgba(14, 9, 28, 0.55)",
+        "--bg-input-focus": "#ffffff",
+        "--bg-header": "#fdfcfb",
+        "--text-secondary": "rgba(17, 17, 17, 0.78)",
+        "--text-muted": "rgba(17, 17, 17, 0.66)",
+        "--text-faint": "rgba(17, 17, 17, 0.64)",
+        "--text-inverted": "#ffffff",
+        "--stroke-hover": "#c9c2f5",
+        "--stroke-strong": "#6e54ff",
+        "--accent-hover": "#5a41e8"
+      }
+    }
+  },
   "doge": {
     "themeClass": "brand-doge",
     "tagline": "Pizza parties for Doge Day, Nov 2 2027",
@@ -32,6 +103,41 @@
         "--stroke-hover": "rgba(48, 45, 37, 0.6)",
         "--stroke-strong": "#302d25",
         "--accent-hover": "#4a463b"
+      }
+    }
+  },
+  "swc": {
+    "themeClass": "brand-swc",
+    "tagline": "Crypto meetups",
+    "metaDescription": "Host or join a Stand With Crypto meetup. Pizza, community and crypto advocacy.",
+    "faviconUrl": "/brands/swc/favicon.png",
+    "themeTokens": {
+      "mode": "light",
+      "bg": "#ffffff",
+      "surface": "#f2f5f9",
+      "text": "#020817",
+      "textMuted": "#52607a",
+      "accent": "#6c11ff",
+      "onAccent": "#ffffff",
+      "border": "#dbe4f0",
+      "radius": "pill",
+      "fontHeading": "satoshi",
+      "fontBody": "satoshi",
+      "hideHeaderName": true,
+      "hideHeroLogo": true,
+      "overrides": {
+        "--bg-card-hover": "#eaeff6",
+        "--bg-surface-hover": "#eaeff6",
+        "--bg-overlay": "rgba(19, 0, 59, 0.55)",
+        "--bg-input": "#ffffff",
+        "--bg-input-focus": "#ffffff",
+        "--bg-header": "#ffffff",
+        "--text-secondary": "rgba(2, 8, 23, 0.8)",
+        "--text-faint": "rgba(2, 8, 23, 0.64)",
+        "--text-inverted": "#ffffff",
+        "--stroke-hover": "#caabff",
+        "--stroke-strong": "#6c11ff",
+        "--accent-hover": "#5a0de0"
       }
     }
   }

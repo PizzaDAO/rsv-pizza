@@ -1,7 +1,7 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import sharp from 'sharp';
+import { loadSharp } from '../lib/lazySharp.js';
 import { AppError } from '../middleware/error.js';
 
 /**
@@ -47,6 +47,7 @@ export async function heicToJpeg(
     }
     try {
       const { width, height, data } = await first.decode();
+      const sharp = await loadSharp();
       return await sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } })
         .resize({
           width: opts.maxSide,

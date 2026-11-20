@@ -8,6 +8,7 @@ import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useGuestsRealtime } from '../hooks/useGuestsRealtime';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { LoadingState } from '../components/StateViews';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
 import { GuestList } from '../components/GuestList';
@@ -18,7 +19,6 @@ import { EventDetailsTab } from '../components/EventDetailsTab';
 import { EventAssistant, isEventAssistantEnabled } from '../components/EventAssistant';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
-import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
 import { PhotoGallery, ReelMaker } from '../components/photos';
 import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
@@ -292,9 +292,7 @@ function HostPageContent() {
   if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-        </div>
+        <LoadingState className="!min-h-[60vh]" />
       </Layout>
     );
   }
@@ -319,9 +317,7 @@ function HostPageContent() {
   if (!canEdit) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-        </div>
+        <LoadingState className="!min-h-[60vh]" />
       </Layout>
     );
   }
@@ -529,7 +525,6 @@ function HostPageContent() {
                   </div>
 
                   <PizzaOrderSummary />
-                  <AiCallHistory partyId={party.id} />
                   <PizzaStyleAndToppings firstSection={<PizzeriaSelection embedded />} />
                   <BeverageSettings />
                   <DietarySettings />
@@ -637,7 +632,10 @@ function HostPageContent() {
               )}
 
               {activeTab === 'print' && party && (
-                <PrintTab canViewGuests={allowedTabs === 'all' || allowedTabs.includes('guests')} />
+                <PrintTab
+                  canViewGuests={allowedTabs === 'all' || allowedTabs.includes('guests')}
+                  canViewSponsors={allowedTabs === 'all' || allowedTabs.includes('partners')}
+                />
               )}
 
               {activeTab === 'payments' && party && isApproved && (() => {

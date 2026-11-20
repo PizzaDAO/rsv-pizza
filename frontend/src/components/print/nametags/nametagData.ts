@@ -12,7 +12,8 @@ export interface Badge {
   blank?: boolean;
 }
 
-export type GuestSource = 'going' | 'approved' | 'checkedIn' | 'none';
+/** 'pick' starts from "everyone going"; the builder then filters it by the checklist. */
+export type GuestSource = 'going' | 'approved' | 'checkedIn' | 'pick' | 'none';
 
 export interface BuildBadgesOptions {
   source: GuestSource;
@@ -94,6 +95,25 @@ export function typedBadges(text: string): Badge[] {
       counts.set(name, n);
       return { key: `t-${name}-${n}`, name };
     });
+}
+
+/** Letters we are confident about splitting on: Latin script (with marks, apostrophes, hyphens, dots). */
+const LATIN_NAME_RE = /^[\p{Script=Latin}\p{M}'’.\-\s]+$/u;
+
+/**
+ * "First name big, last name small". Splits on the first space for Latin-script names with
+ * at least two words. Single names, names in other scripts (CJK, Arabic, ...) and anything
+ * unclear return null, meaning "print the name whole".
+ */
+export function splitName(name: string): { first: string; last: string } | null {
+  const n = name.trim().replace(/\s+/g, ' ');
+  if (!n || !LATIN_NAME_RE.test(n)) return null;
+  const i = n.indexOf(' ');
+  if (i < 1) return null;
+  const first = n.slice(0, i);
+  const last = n.slice(i + 1).trim();
+  if (!/\p{L}/u.test(first) || !/\p{L}/u.test(last)) return null;
+  return { first, last };
 }
 
 export function blankBadges(n: number): Badge[] {

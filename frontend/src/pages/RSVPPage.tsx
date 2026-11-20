@@ -3,8 +3,11 @@ import { useParams, useNavigate } from 'react-router';
 import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
 import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, getMyGuest, findApprovedGppPartyInCity, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DonationForm } from '../components/DonationForm';
-import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
+import { lazyComponent } from '../lib/lazyComponent';
+
+// Stripe.js + payment UI load only once the donation form is shown.
+const DonationForm = lazyComponent(() => import('../components/DonationForm').then((m) => ({ default: m.DonationForm })));
+import { PublicEvent, getDonationStats, trackRsvpFunnel, checkEventHost } from '../lib/api';
 import { BRAND_FEATURES } from '../config/brandScope';
 import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
@@ -130,20 +133,7 @@ export function RSVPPage() {
             const userIsGuest = user?.email && !!(await getMyGuest(foundParty.id));
             let userIsHost = false;
             if (!userIsGuest && user?.email && inviteCode) {
-              try {
-                const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-                const resp = await fetch(`${apiUrl}/api/events/${inviteCode}/check-host`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email: user.email }),
-                });
-                if (resp.ok) {
-                  const data = await resp.json();
-                  userIsHost = data.isHost;
-                }
-              } catch (e) {
-                console.warn('Could not check host status:', e);
-              }
+              userIsHost = (await checkEventHost(inviteCode)).isHost;
             }
 
             if (userIsGuest || userIsHost) {

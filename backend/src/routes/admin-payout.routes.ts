@@ -17,7 +17,7 @@
 import { notBrandOnlyApproved } from '../lib/partyApproval.js';
 import { Router, Request, Response, NextFunction } from 'express';
 import { customAlphabet } from 'nanoid';
-import sharp from 'sharp';
+import { loadSharp } from '../lib/lazySharp.js';
 import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -6695,6 +6695,7 @@ router.post(
       // Rotate clockwise by `degrees` and bake it into the pixels. No format
       // method preserves the input format.
       const inputBuf = Buffer.from(await resp.arrayBuffer());
+      const sharp = await loadSharp();
       const rotated = await sharp(inputBuf).rotate(degrees).toBuffer();
 
       // Upload a NEW object (do NOT overwrite — a fresh path avoids CDN/browser

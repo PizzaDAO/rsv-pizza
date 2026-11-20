@@ -252,6 +252,7 @@ describe('Field Mapping Consistency', () => {
       region: null,
       event_type: null,
       event_tags: [],
+      labels: ['dj', 'outdoor'],
       luma_url: null,
       meetup_url: null,
       eventbrite_url: null,
@@ -266,5 +267,7 @@ describe('Field Mapping Consistency', () => {
     expect(party.donationEnabled).toBe(false);
     expect(party.pinnedApps).toEqual([]);
     expect(party.eventTags).toEqual([]);
+    // blackolive-70521: public host tags map separately from eventTags
+    expect(party.labels).toEqual(['dj', 'outdoor']);
   });
 });

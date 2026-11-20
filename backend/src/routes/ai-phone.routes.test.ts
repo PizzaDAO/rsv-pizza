@@ -64,3 +64,19 @@ describe('legacy /api/ai-phone call placing is retired (basil-14648)', () => {
     expect(r.status).toBe(401);
   });
 });
+
+describe('/api/ai-phone/:id/status and /transcript are owner-only', () => {
+  for (const path of ['status', 'transcript']) {
+    it(`${path}: 401 without sign-in`, async () => {
+      expect((await request(app()).get(`/api/ai-phone/a1/${path}`)).status).toBe(401);
+    });
+    it(`${path}: 403 for a signed-in user who does not own the call`, async () => {
+      const r = await request(app()).get(`/api/ai-phone/a1/${path}`).set('x-user-id', 'u2');
+      expect(r.status).toBe(403);
+    });
+    it(`${path}: 200 for the owner`, async () => {
+      const r = await request(app()).get(`/api/ai-phone/a1/${path}`).set('x-user-id', 'u1');
+      expect(r.status).toBe(200);
+    });
+  }
+});

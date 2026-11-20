@@ -10,6 +10,20 @@
  * could not be fetched here. They are self-consistent (8.5" and 11" both sum exactly) but are
  * NOT verified against Avery's official template -- hosts should run the alignment test page
  * on plain paper before using real label stock.
+ *
+ * Avery 5392 (Phase 2): 3" x 4" name badge inserts, 6 per Letter sheet (2 columns x 3 rows,
+ * 4" wide x 3" tall, no gaps, 1" top/bottom and 0.25" side margins). Figures from the geometry
+ * table at https://makemystickers.app/guides/avery-label-sizes (third party; avery.com's help
+ * page for this product could not be fetched). Sums are exact (8.5" and 11"). Unverified
+ * against Avery's own template.
+ *
+ * Avery L4785 (Phase 2): Avery Zweckform name badge labels, 80 x 50 mm, 10 per A4 sheet
+ * (2 x 5). Label size and count are confirmed by listings (e.g.
+ * https://hlabels.com/print/avery/Avery-Zweckform-L4785 and retailer pages). Avery's template
+ * pages (avery.co.uk / avery.de / avery-zweckform.com) returned 403 and no public source gave
+ * the margins or pitch, so they are NOT sourced: the grid below is the centred, gap-free
+ * arrangement that exactly fills A4 (25 mm sides, 23.5 mm top/bottom). Verify against Avery's
+ * L4785 template (Design & Print) and use the alignment test page on plain paper first.
  */
 
 export type PaperSize = 'letter' | 'a4';
@@ -68,6 +82,40 @@ export const BADGE_LAYOUTS: SheetLayout[] = [
     labelH: 60,
     marginTop: (A4.h - 4 * 60) / 2,
     marginLeft: (A4.w - 2 * 90) / 2,
+    gapX: 0,
+    gapY: 0,
+  },
+  {
+    id: 'avery-5392',
+    labelKey: 'print.nametags.layoutAvery5392',
+    kind: 'label-stock',
+    page: 'letter',
+    unit: 'in',
+    pageW: LETTER.w,
+    pageH: LETTER.h,
+    cols: 2,
+    rows: 3,
+    labelW: 4,
+    labelH: 3,
+    marginTop: 1,
+    marginLeft: 0.25,
+    gapX: 0,
+    gapY: 0,
+  },
+  {
+    id: 'avery-l4785',
+    labelKey: 'print.nametags.layoutAveryL4785',
+    kind: 'label-stock',
+    page: 'a4',
+    unit: 'mm',
+    pageW: A4.w,
+    pageH: A4.h,
+    cols: 2,
+    rows: 5,
+    labelW: 80,
+    labelH: 50,
+    marginTop: (A4.h - 5 * 50) / 2, // UNVERIFIED, see header comment
+    marginLeft: (A4.w - 2 * 80) / 2,
     gapX: 0,
     gapY: 0,
   },

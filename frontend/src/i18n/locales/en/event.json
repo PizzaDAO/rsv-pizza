@@ -93,5 +93,33 @@
     "enterPasswordPlaceholder": "Enter password",
     "incorrectPassword": "Incorrect password",
     "viewReport": "View Report"
+  },
+  "labels": {
+    "title": "Tags",
+    "helper": "Pick up to {{max}}",
+    "maxReached": "Maximum of {{max}} tags reached",
+    "filterAll": "All tags",
+    "keys": {
+      "family-friendly": "Family friendly",
+      "kid-friendly": "Kid friendly",
+      "all-ages": "All ages",
+      "21-plus": "21+",
+      "outdoor": "Outdoor",
+      "live-music": "Live music",
+      "dj": "DJ",
+      "workshop": "Workshop",
+      "talks": "Talks",
+      "networking": "Networking",
+      "hackathon": "Hackathon",
+      "meetup": "Meetup",
+      "students": "Students",
+      "women-in-web3": "Women in Web3",
+      "vegan-options": "Vegan options",
+      "gluten-free-options": "Gluten-free options",
+      "free": "Free",
+      "wheelchair-accessible": "Wheelchair accessible",
+      "art": "Art",
+      "gaming": "Gaming"
+    }
   }
 }

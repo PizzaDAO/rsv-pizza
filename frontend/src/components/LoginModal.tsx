@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
-import { X, Mail, Loader2 } from 'lucide-react';
+import { Mail, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from './IconInput';
+import { Modal } from './Modal';
+import { authErrorKey } from '../lib/authErrors';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       onClose();
       navigate('/auth/verify');
     } catch (err: any) {
-      setError(err.message || t('loginModal.failedToSend'));
+      setError(t(authErrorKey(err?.message, 'send', err?.code)));
       setLoading(false);
     }
   };
@@ -51,25 +52,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     onClose();
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={handleClose}
-    >
-      <div
-        className="card p-8 max-w-md w-full relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close button */}
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text transition-colors"
-        >
-          <X size={24} />
-        </button>
-
+  return (
+    <Modal onClose={handleClose} labelledBy="login-modal-title">
+      <div>
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-theme-text mb-2">{t('loginModal.title')}</h2>
+          <h2 id="login-modal-title" className="text-2xl font-bold text-theme-text mb-2">{t('loginModal.title')}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -105,7 +92,6 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </button>
         </form>
       </div>
-    </div>,
-    document.body
+    </Modal>
   );
 }

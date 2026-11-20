@@ -789,7 +789,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
     res.setHeader('X-Photo-Count', String(filtered.length));
 
-    const archive = createZipArchive();
+    const archive = await createZipArchive();
     archive.on('error', (err: Error) => {
       console.error('[salame-58291] archive error:', err);
       if (!res.headersSent) res.status(500).end();

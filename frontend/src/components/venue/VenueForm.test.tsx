@@ -1,6 +1,6 @@
 import '../../i18n';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { VenueForm } from './VenueForm';
 
@@ -132,6 +132,7 @@ describe('VenueForm', () => {
 
       const searchInput = await screen.findByPlaceholderText(SEARCH_PLACEHOLDER);
       expect(searchInput).toBeTruthy();
+      fireEvent.focus(searchInput); // Google autocomplete loads on first focus
 
       await waitFor(() => {
         expect(autocompleteConstructorCalls.length).toBeGreaterThan(0);
@@ -146,6 +147,7 @@ describe('VenueForm', () => {
         <VenueForm onSave={mockOnSave} onClose={mockOnClose} />
       );
 
+      fireEvent.focus(await screen.findByPlaceholderText(SEARCH_PLACEHOLDER));
       await waitFor(() => {
         expect(autocompleteConstructorCalls.length).toBeGreaterThan(0);
       });
@@ -202,6 +204,8 @@ describe('VenueForm', () => {
       );
 
       // Trigger the place_changed callback (simulates user selecting a suggestion)
+      // The Google script/autocomplete now loads on first focus, not on mount.
+      fireEvent.focus(screen.getAllByRole('textbox')[0]);
       await waitFor(() => {
         expect(placesChangedCallback).toBeTruthy();
       });
@@ -243,6 +247,8 @@ describe('VenueForm', () => {
         }
       );
 
+      // The Google script/autocomplete now loads on first focus, not on mount.
+      fireEvent.focus(screen.getAllByRole('textbox')[0]);
       await waitFor(() => {
         expect(placesChangedCallback).toBeTruthy();
       });
@@ -277,6 +283,8 @@ describe('VenueForm', () => {
         }
       );
 
+      // The Google script/autocomplete now loads on first focus, not on mount.
+      fireEvent.focus(screen.getAllByRole('textbox')[0]);
       await waitFor(() => {
         expect(placesChangedCallback).toBeTruthy();
       });

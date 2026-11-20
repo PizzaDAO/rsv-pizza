@@ -20,10 +20,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, className = '', style 
     >
       {theme === 'gpp' && <GPPClouds />}
 
+      <a href="#content" className="skip-link">Skip to content</a>
+
       <Header />
 
       {/* Main content */}
-      <main className="flex-1 relative z-[1]">
+      <main id="content" tabIndex={-1} className="flex-1 relative z-[1] focus:outline-none">
         {children}
       </main>
 

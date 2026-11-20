@@ -18,6 +18,17 @@ describe('badge layouts', () => {
     expect(slotPosition(l, 8)).toEqual(slotPosition(l, 0)); // next page
   });
 
+  it('Avery 5392 and L4785 slots', () => {
+    const a = getBadgeLayout('avery-5392');
+    expect(perPage(a)).toBe(6);
+    expect(slotPosition(a, 0)).toEqual({ x: 0.25, y: 1 });
+    expect(slotPosition(a, 5)).toEqual({ x: 4.25, y: 7 });
+    const b = getBadgeLayout('avery-l4785');
+    expect(perPage(b)).toBe(10);
+    expect(b.page).toBe('a4');
+    expect(slotPosition(b, 9).y + b.labelH).toBeLessThanOrEqual(b.pageH);
+  });
+
   it('paginates ceil(N / perPage) pages', () => {
     const l = getBadgeLayout('avery-5395');
     expect(perPage(l)).toBe(8);

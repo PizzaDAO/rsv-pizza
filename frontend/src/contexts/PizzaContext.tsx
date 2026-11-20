@@ -188,6 +188,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     // scam-flag-private: anon rows carry only public_event_tags (aliased to event_tags); for
     // editors getPartyWithGuests merges the raw list from GET /api/parties/:id first.
     eventTags: (dbParty.event_tags || []).filter((t) => t !== REFUND_TAG),
+    labels: dbParty.labels || [],
     eventSeriesId: dbParty.event_series_id || null,
     canEdit: dbParty.can_edit || false,
     rawEventTagsLoaded: dbParty.raw_event_tags_loaded === true,

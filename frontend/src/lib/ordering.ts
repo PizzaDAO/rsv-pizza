@@ -115,9 +115,59 @@ export async function createSquareOrder(
   return response.json();
 }
 
-// sec-edge-functions: AI phone orders (with or without card payment) go through the backend
-// only — see initiateAIPhoneCall below. The anon-callable `ai-phone-order` edge function and the
-// browser-side virtual-card flow are gone.
+// Virtual card details for AI payment
+export interface VirtualCardDetails {
+  cardId: string;
+  number: string;
+  cvc: string;
+  expMonth: number;
+  expYear: number;
+  last4: string;
+}
+
+// Place an order via AI phone call (Bland AI)
+export async function createAIPhoneOrder(
+  pizzeriaName: string,
+  pizzeriaPhone: string,
+  items: OrderItem[],
+  customerName: string,
+  customerPhone: string,
+  fulfillmentType: 'pickup' | 'delivery' = 'pickup',
+  deliveryAddress?: string,
+  partySize?: number,
+  paymentCard?: VirtualCardDetails
+): Promise<{ success: boolean; callId?: string; message?: string; error?: string }> {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-phone-order`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      pizzeriaName,
+      pizzeriaPhone,
+      items,
+      customerName,
+      customerPhone,
+      fulfillmentType,
+      deliveryAddress,
+      partySize,
+      paymentCard,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      return { success: false, error: data.error || data.message || `Request failed with status ${response.status}` };
+    } catch {
+      return { success: false, error: `Request failed with status ${response.status}` };
+    }
+  }
+
+  return response.json();
+}
 
 // Generate a phone order script
 export function generatePhoneOrderScript(
@@ -162,56 +212,6 @@ export function generateCheckOrderScript(items: OrderItem[], customerName: strin
     lines.push(`- ${item.quantity}x ${item.size} ${item.name}${item.toppings.length > 0 ? ` with ${item.toppings.join(', ')}` : ''}`);
   });
   return lines.join('\n');
-}
-
-// Live call status from the backend (GET /api/ai-phone/calls/:ref/live). The transcript has
-// card data masked; recordings are withheld for card-paid calls.
-
-// Backend errors are `{ error: { message, code } }` (older routes: `{ error: string }` or `{ message }`).
-// Always return a string, so a 503 "not configured" shows as a readable message.
-export function apiErrorMessage(data: unknown, fallback: string): string {
-  const d = data as { error?: unknown; message?: unknown } | null;
-  if (d && typeof d.error === 'object' && d.error && typeof (d.error as { message?: unknown }).message === 'string') {
-    return (d.error as { message: string }).message;
-  }
-  if (d && typeof d.error === 'string') return d.error;
-  if (d && typeof d.message === 'string') return d.message;
-  return fallback;
-}
-
-export interface CallStatus {
-  status: 'queued' | 'in-progress' | 'completed' | 'failed' | 'unknown';
-  recordingAvailable: boolean;
-  transcript: string;
-  callLength: number | null;
-  answeredBy: 'human' | 'voicemail' | 'unknown';
-  endedReason: string | null;
-}
-
-// Get AI call status. `callRef` is our AI call id or the Bland call id.
-export async function getCallStatus(callRef: string): Promise<CallStatus> {
-  const token = localStorage.getItem('authToken');
-  const response = await fetch(`${BACKEND_URL}/api/ai-phone/calls/${encodeURIComponent(callRef)}/live`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(apiErrorMessage(error, 'Failed to get call status'));
-  }
-
-  return response.json();
-}
-
-// Fetch the call recording through the authenticated backend proxy and return a blob: URL for
-// <audio src>. The caller must URL.revokeObjectURL it when done.
-export async function fetchCallRecordingObjectUrl(callRef: string): Promise<string | null> {
-  const token = localStorage.getItem('authToken');
-  const response = await fetch(`${BACKEND_URL}/api/ai-phone/calls/${encodeURIComponent(callRef)}/recording`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) return null;
-  return URL.createObjectURL(await response.blob());
 }
 
 // Calculate distance (Haversine, returns miles)
@@ -334,7 +334,7 @@ export async function initiateAIPhoneCall(
   if (!response.ok || data.message || data.error) {
     return {
       success: false,
-      error: apiErrorMessage(data, 'Failed to initiate AI call'),
+      error: data.message || data.error || 'Failed to initiate AI call',
     };
   }
 
@@ -367,7 +367,7 @@ export async function retryAIPhoneCall(
     const data = await response.json();
     return {
       success: false,
-      error: apiErrorMessage(data, 'Failed to retry call'),
+      error: data.message || data.error || 'Failed to retry call',
     };
   }
 

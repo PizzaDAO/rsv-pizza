@@ -56,6 +56,8 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setIsLoaded] = useState(false);
+  // Google path only: the Maps script (~470KB) loads when the input is first focused, not on mount.
+  const [googleRequested, setGoogleRequested] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   // napoletana-58547: keyless (`osm`) autocomplete state.
   const [suggestions, setSuggestions] = useState<AddressResult[]>([]);
@@ -85,6 +87,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       setIsLoaded(true);
       return;
     }
+    if (!googleRequested) return;
 
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -273,7 +276,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         window.google?.maps?.event?.clearInstanceListeners(autocomplete);
       }
     };
-  }, []);
+  }, [googleRequested]);
 
   // ── osm: debounced, abortable keyless search on the controlled `value` ───────
   useEffect(() => {
@@ -387,6 +390,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setGoogleRequested(true)}
         placeholder={placeholder}
         disabled={disabled}
         className={`w-full !pl-11 text-left ${className}`}

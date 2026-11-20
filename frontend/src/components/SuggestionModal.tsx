@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { Modal } from './Modal';
 import { X, Loader2, ImagePlus, Lightbulb, User, Mail } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { useAuth } from '../contexts/AuthContext';
@@ -47,16 +47,6 @@ export function SuggestionModal({ open, onClose }: SuggestionModalProps) {
       if (imagePreview) URL.revokeObjectURL(imagePreview);
     };
   }, [imagePreview]);
-
-  // ESC closes
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -114,15 +104,8 @@ export function SuggestionModal({ open, onClose }: SuggestionModalProps) {
     }
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white text-gray-900 shadow-2xl p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
+  return (
+    <Modal onClose={onClose} ariaLabel="Suggest an improvement" panelClassName="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white text-gray-900 shadow-2xl p-6" backdropClassName="z-50 bg-black/60 backdrop-blur-sm" showClose={false}>
         {/* Close button */}
         <button
           type="button"
@@ -226,8 +209,6 @@ export function SuggestionModal({ open, onClose }: SuggestionModalProps) {
             </div>
           </>
         )}
-      </div>
-    </div>,
-    document.body
+    </Modal>
   );
 }

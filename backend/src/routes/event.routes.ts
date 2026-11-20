@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin } from '../middleware/auth.js';
@@ -12,7 +13,109 @@ import { isBoothGloballyOn } from '../lib/boothSettings.js';
 
 const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
 
+const EVENT_SELECT = {
+    id: true,
+    name: true,
+    inviteCode: true,
+    customUrl: true,
+    date: true,
+    duration: true,
+    timezone: true,
+    pizzaStyle: true,
+    availableBeverages: true,
+    availableToppings: true,
+    availableDietaryOptions: true,
+    showToppingsOnRsvp: true,
+    address: true,
+    latitude: true,
+    longitude: true,
+    placeId: true,
+    venueName: true,
+    country: true,
+    city: true,
+    region: true, // soppressata-50927: needed for the GPP27 pre-launch scope gate
+    maxGuests: true,
+    hideGuests: true,
+    eventImageUrl: true,
+    description: true,
+    rsvpClosedAt: true,
+    // porchetta-81402: public event page renders a cancelled banner +
+    // disables the RSVP form when cancelledAt is non-null. The optional
+    // free-text reason is shown below the banner.
+    cancelledAt: true,
+    cancellationReason: true,
+    coHosts: true,
+    selectedPizzerias: true,
+    eventType: true,
+    eventSeriesId: true,
+    eventTags: true,
+    labels: true,
+    donationEnabled: true,
+    donationRecipient: true,
+    donationRecipientUrl: true,
+    donationGoal: true,
+    donationMessage: true,
+    suggestedAmounts: true,
+    donationEthAddress: true,
+    shareToUnlock: true,
+    shareTweetText: true,
+    photoModeration: true,
+    nftEnabled: true,
+    nftChain: true,
+    quizEnabled: true,
+    photosEnabled: true,
+    photosPublic: true,
+    hiddenGppPhotos: true,
+    extraGppPhotos: true,
+    telegramGroup: true,
+    turtleRolesEnabled: true,
+    underbossStatus: true,
+    reimbursementCapUsd: true,
+    oneSheetConfig: true, // focaccina-58550
+    hackathon: { select: { publishedAt: true, disabledAt: true } }, // hackathon PR 2: section flag only
+    password: true, // Just to check if it exists
+    userId: true,
+    user: {
+      select: {
+        name: true,
+        profilePictureUrl: true,
+        website: true,
+        twitter: true,
+        instagram: true,
+        youtube: true,
+        tiktok: true,
+        linkedin: true,
+      },
+    },
+    _count: {
+      // mushroom-31723: exclude rejected guests (approved=false) from the public count.
+      // anchovy-59118: see rsvp.routes.ts capacity-gate comment for why we use OR/null.
+      select: { guests: { where: { OR: [{ approved: true }, { approved: null }] } } },
+    },
+} satisfies Prisma.PartySelect;
+
 const router = Router();
+
+// In-process cache for the one-sheet page-view stats (two COUNT queries per event load otherwise).
+const PAGE_VIEW_STATS_TTL_MS = 60_000;
+const pageViewStatsCache = new Map<string, { at: number; value: { totalViews: number; uniqueVisitors: number } }>();
+
+async function getPageViewStats(partyId: string) {
+  const hit = pageViewStatsCache.get(partyId);
+  if (hit && Date.now() - hit.at < PAGE_VIEW_STATS_TTL_MS) return hit.value;
+  const [totalViews, uniqueVisitorsResult] = await Promise.all([
+    prisma.pageView.count({ where: { partyId } }),
+    prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(DISTINCT visitor_hash) as count
+      FROM page_views
+      WHERE party_id = ${partyId}::uuid AND visitor_hash IS NOT NULL
+    `,
+  ]);
+  const value = { totalViews, uniqueVisitors: Number(uniqueVisitorsResult[0]?.count ?? 0) };
+  if (pageViewStatsCache.size > 500) pageViewStatsCache.clear();
+  pageViewStatsCache.set(partyId, { at: Date.now(), value });
+  return value;
+}
 
 // GET /api/events/:slug - Get public event details with host profile (public)
 // soppressata-50927: optionalAuth so the pre-launch GPP27 gate can recognize
@@ -54,173 +157,14 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
 
     const lookupSlug = resolvedSlugOverride || slug;
 
-    // Find party by invite code OR custom URL
-    let party = await prisma.party.findUnique({
-      where: { inviteCode: lookupSlug },
-      select: {
-        id: true,
-        name: true,
-        inviteCode: true,
-        customUrl: true,
-        date: true,
-        duration: true,
-        timezone: true,
-        pizzaStyle: true,
-        availableBeverages: true,
-        availableToppings: true,
-        availableDietaryOptions: true,
-        showToppingsOnRsvp: true,
-        address: true,
-        latitude: true,
-        longitude: true,
-        placeId: true,
-        venueName: true,
-        country: true,
-        city: true,
-        region: true, // soppressata-50927: needed for the GPP27 pre-launch scope gate
-        maxGuests: true,
-        hideGuests: true,
-        eventImageUrl: true,
-        description: true,
-        rsvpClosedAt: true,
-        // porchetta-81402: public event page renders a cancelled banner +
-        // disables the RSVP form when cancelledAt is non-null. The optional
-        // free-text reason is shown below the banner.
-        cancelledAt: true,
-        cancellationReason: true,
-        coHosts: true,
-        selectedPizzerias: true,
-        eventType: true,
-        eventSeriesId: true,
-        eventTags: true,
-        donationEnabled: true,
-        donationRecipient: true,
-        donationRecipientUrl: true,
-        donationGoal: true,
-        donationMessage: true,
-        suggestedAmounts: true,
-        donationEthAddress: true,
-        shareToUnlock: true,
-        shareTweetText: true,
-        photoModeration: true,
-        nftEnabled: true,
-        nftChain: true,
-        quizEnabled: true,
-        photosEnabled: true,
-        photosPublic: true,
-        hiddenGppPhotos: true,
-        extraGppPhotos: true,
-        telegramGroup: true,
-        turtleRolesEnabled: true,
-        underbossStatus: true,
-        reimbursementCapUsd: true,
-        oneSheetConfig: true, // focaccina-58550
-        hackathon: { select: { publishedAt: true, disabledAt: true } }, // hackathon PR 2: section flag only
-        password: true, // Just to check if it exists
-        userId: true,
-        user: {
-          select: {
-            name: true,
-            profilePictureUrl: true,
-            website: true,
-            twitter: true,
-            instagram: true,
-            youtube: true,
-            tiktok: true,
-            linkedin: true,
-          },
-        },
-        _count: {
-          // mushroom-31723: exclude rejected guests (approved=false) from the public count.
-          // anchovy-59118: see rsvp.routes.ts capacity-gate comment for why we use OR/null.
-          select: { guests: { where: { OR: [{ approved: true }, { approved: null }] } } },
-        },
-      },
+    // Find party by invite code OR custom URL in one query (invite code wins if both match
+    // different parties, same precedence as the old two-step lookup).
+    const candidates = await prisma.party.findMany({
+      where: { OR: [{ inviteCode: lookupSlug }, { customUrl: lookupSlug }] },
+      select: EVENT_SELECT,
+      take: 2,
     });
-
-    // If not found by invite code, try custom URL
-    if (!party) {
-      party = await prisma.party.findUnique({
-        where: { customUrl: lookupSlug },
-        select: {
-          id: true,
-          name: true,
-          inviteCode: true,
-          customUrl: true,
-          date: true,
-          duration: true,
-          timezone: true,
-          pizzaStyle: true,
-          availableBeverages: true,
-          availableToppings: true,
-          availableDietaryOptions: true,
-          showToppingsOnRsvp: true,
-          address: true,
-          latitude: true,
-          longitude: true,
-          placeId: true,
-          venueName: true,
-          country: true,
-          city: true,
-          region: true, // soppressata-50927: needed for the GPP27 pre-launch scope gate
-          maxGuests: true,
-          hideGuests: true,
-          eventImageUrl: true,
-          description: true,
-          rsvpClosedAt: true,
-          // porchetta-81402: same as the invite-code branch — include cancel
-          // columns so the public event page can render the cancelled banner
-          // when reached via a customUrl.
-          cancelledAt: true,
-          cancellationReason: true,
-          coHosts: true,
-          selectedPizzerias: true,
-          eventType: true,
-          eventSeriesId: true,
-          eventTags: true,
-          donationEnabled: true,
-          donationRecipient: true,
-          donationRecipientUrl: true,
-          donationGoal: true,
-          donationMessage: true,
-          suggestedAmounts: true,
-          donationEthAddress: true,
-          shareToUnlock: true,
-          shareTweetText: true,
-          photoModeration: true,
-          nftEnabled: true,
-          nftChain: true,
-          quizEnabled: true,
-          photosEnabled: true,
-          photosPublic: true,
-          hiddenGppPhotos: true,
-          extraGppPhotos: true,
-          telegramGroup: true,
-          turtleRolesEnabled: true,
-          underbossStatus: true,
-          reimbursementCapUsd: true,
-          oneSheetConfig: true, // focaccina-58550
-          hackathon: { select: { publishedAt: true, disabledAt: true } }, // hackathon PR 2: section flag only
-          password: true,
-          userId: true,
-          user: {
-            select: {
-              name: true,
-              profilePictureUrl: true,
-              website: true,
-              twitter: true,
-              instagram: true,
-              youtube: true,
-              tiktok: true,
-              linkedin: true,
-            },
-          },
-          _count: {
-            select: { guests: true },
-          },
-        },
-      });
-    }
+    const party = candidates.find((c) => c.inviteCode === lookupSlug) ?? candidates[0] ?? null;
 
     // If not found by either method, check slug_aliases for a redirect
     if (!party) {
@@ -248,8 +192,29 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
-    // Fetch confirmed sponsors with descriptions or logos for public display
-    const sponsors = await prisma.sponsor.findMany({
+    // Enrich coHosts with user profile data (avatar, socials) then strip emails
+    // mushroom-48468: User.email is canonical lowercase. Co-host emails come from
+    // user-typed JSONB and may be mixed-case — lowercase before query + lookup.
+    const rawCoHosts = (party.coHosts as any[] || []);
+    const coHostEmailsLc = rawCoHosts.map((h: any) => h.email).filter(Boolean).map((e: string) => e.toLowerCase());
+
+    // Independent reads run in parallel: sponsors (confirmed, with descriptions or logos),
+    // one-sheet page-view stats (cached 60s), co-host user profiles, and the booth flag.
+    // Booth: global rollout flag AND the host's per-party toggle (no row = on) AND not cancelled.
+    // Looked up on its own (not in the party select) so a deploy before the party_booths migration
+    // can only turn the booth off, never break event pages.
+    const loadBooth = async (): Promise<boolean> => {
+      if (party.cancelledAt || !(await isBoothGloballyOn())) return false;
+      try {
+        const row = await prisma.partyBooth.findUnique({ where: { partyId: party.id }, select: { enabled: true } });
+        return row?.enabled !== false;
+      } catch (err) {
+        console.warn('[booth] party_booths lookup failed; booth off for this request.', err);
+        return false;
+      }
+    };
+    const [sponsors, pageViewStats, coHostUsers, boothEnabled] = await Promise.all([
+      prisma.sponsor.findMany({
       where: {
         partyId: party.id,
         status: { in: ['yes', 'billed', 'paid'] },
@@ -267,36 +232,17 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         brandTwitter: true,
       },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    });
-
-    // Page view stats for one-sheet
-    const [totalViews, uniqueVisitorsResult] = await Promise.all([
-      prisma.pageView.count({ where: { partyId: party.id } }),
-      prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(DISTINCT visitor_hash) as count
-        FROM page_views
-        WHERE party_id = ${party.id}::uuid AND visitor_hash IS NOT NULL
-      `,
+    }),
+      getPageViewStats(party.id),
+      coHostEmailsLc.length > 0
+        ? prisma.user.findMany({
+            where: { email: { in: coHostEmailsLc } },
+            select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
+          })
+        : Promise.resolve([] as { email: string; profilePictureUrl: string | null; twitter: string | null; website: string | null; instagram: string | null }[]),
+      loadBooth(),
     ]);
-    const pageViewStats = {
-      totalViews,
-      uniqueVisitors: Number(uniqueVisitorsResult[0]?.count ?? 0),
-    };
-
-    // Enrich coHosts with user profile data (avatar, socials) then strip emails
-    // mushroom-48468: User.email is canonical lowercase. Co-host emails come from
-    // user-typed JSONB and may be mixed-case — lowercase before query + lookup.
-    const rawCoHosts = (party.coHosts as any[] || []);
-    const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
-    const coHostEmailsLc = coHostEmails.map((e: string) => e.toLowerCase());
-    let profilesByEmail: Record<string, any> = {};
-    if (coHostEmailsLc.length > 0) {
-      const users = await prisma.user.findMany({
-        where: { email: { in: coHostEmailsLc } },
-        select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
-      });
-      profilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
-    }
+    const profilesByEmail: Record<string, any> = Object.fromEntries(coHostUsers.map(u => [u.email, u]));
     const sanitizedCoHosts = rawCoHosts.map(({ email, ...rest }: any) => {
       const profile = email ? profilesByEmail[email.toLowerCase()] : null;
       if (profile) {
@@ -338,19 +284,15 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
       } : null;
     }
 
-    // Photo booth: global rollout flag AND the host's per-party toggle (no row = on) AND not cancelled.
-    // Looked up on its own (not in the party select) so a deploy before the party_booths migration
-    // can only turn the booth off, never break event pages.
-    let boothEnabled = false;
-    if (!party.cancelledAt && (await isBoothGloballyOn())) {
-      try {
-        const row = await prisma.partyBooth.findUnique({ where: { partyId: party.id }, select: { enabled: true } });
-        boothEnabled = row?.enabled !== false;
-      } catch (err) {
-        console.warn('[booth] party_booths lookup failed; booth off for this request.', err);
-      }
+    // Anonymous responses are identical for every caller, so let the CDN cache them briefly.
+    // Anything with an Authorization header (hosts, admins, pre-launch previews) is never
+    // publicly cached. Error/404/redirect responses above never set this header.
+    res.vary('Authorization');
+    if (!req.headers.authorization) {
+      res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
+    } else {
+      res.set('Cache-Control', 'private, no-store');
     }
-
     res.json({
       event: {
         id: party.id,
@@ -388,6 +330,8 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         underbossStatus: party.underbossStatus,
         // calzone-50114: strip internal control tags from the public payload.
         eventTags: publicTags(party.eventTags),
+        // blackolive-70521: host-chosen public tags (curated keys; public by construction)
+        labels: party.labels ?? [],
         donationEnabled: party.donationEnabled,
         donationRecipient: party.donationRecipient,
         donationRecipientUrl: party.donationRecipientUrl,
@@ -433,14 +377,17 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// POST /api/events/:slug/check-host - Check if an email belongs to a co-host (public, no auth)
-router.post('/:slug/check-host', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/events/:slug/check-host - Is the signed-in caller a host/co-host of this event?
+// The caller is derived from the JWT (optionalAuth); a body email is ignored so the endpoint can't be
+// used to probe whether arbitrary emails are hosts or admins. Unauthenticated -> not a host.
+router.post('/:slug/check-host', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const slug = req.params.slug.toLowerCase();
-    const { email } = req.body;
+    const email = req.userEmail;
+    res.set('Cache-Control', 'private, no-store');
 
     if (!email || typeof email !== 'string') {
-      return res.json({ isHost: false });
+      return res.json({ isHost: false, canEdit: false });
     }
 
     // Find party by invite code or custom URL
@@ -468,7 +415,7 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
       }
     }
     if (!party) {
-      return res.json({ isHost: false });
+      return res.json({ isHost: false, canEdit: false });
     }
 
     const coHosts = (party.coHosts as any[]) || [];

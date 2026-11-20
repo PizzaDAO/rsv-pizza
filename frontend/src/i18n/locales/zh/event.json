@@ -92,5 +92,33 @@
     "reasonLabel": "Reason",
     "noticeTitle": "Event Cancelled",
     "noticeBody": "RSVPs are closed for this event."
+  },
+  "labels": {
+    "title": "标签",
+    "helper": "最多选择 {{max}} 个",
+    "maxReached": "最多只能选择 {{max}} 个标签",
+    "filterAll": "全部标签",
+    "keys": {
+      "family-friendly": "适合家庭",
+      "kid-friendly": "适合儿童",
+      "all-ages": "不限年龄",
+      "21-plus": "21岁以上",
+      "outdoor": "户外",
+      "live-music": "现场音乐",
+      "dj": "DJ",
+      "workshop": "工作坊",
+      "talks": "演讲",
+      "networking": "社交交流",
+      "hackathon": "黑客松",
+      "meetup": "聚会",
+      "students": "学生",
+      "women-in-web3": "Web3 女性",
+      "vegan-options": "纯素选项",
+      "gluten-free-options": "无麸质选项",
+      "free": "免费",
+      "wheelchair-accessible": "无障碍通道",
+      "art": "艺术",
+      "gaming": "游戏"
+    }
   }
 }

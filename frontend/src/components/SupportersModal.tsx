@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { Modal } from './Modal';
 import { useTranslation } from 'react-i18next';
 import { X, User } from 'lucide-react';
 import { DonationPublicStats } from '../types';
@@ -76,28 +77,13 @@ export const DonorAvatar: React.FC<AvatarProps> = ({ displayName, avatarUrl, siz
 export const SupportersModal: React.FC<SupportersModalProps> = ({ stats, onClose }) => {
   const { t } = useTranslation('event');
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   const donors = stats.donors ?? [];
   const recipient = stats.recipient || t('thisEvent');
   const donorCount = stats.donorCount ?? donors.length;
   const showAmounts = stats.amountsPublic === true;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="card p-6 max-w-md w-full relative max-h-[85vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} labelledBy="supporters-title" panelClassName="card p-6 max-w-md w-full relative max-h-[85vh] flex flex-col" backdropClassName="z-50 bg-black/60 backdrop-blur-sm" showClose={false}>
         {/* Close button */}
         <button
           onClick={onClose}
@@ -109,7 +95,7 @@ export const SupportersModal: React.FC<SupportersModalProps> = ({ stats, onClose
 
         {/* Header */}
         <div className="mb-4 pr-8">
-          <h2 className="text-xl font-bold text-theme-text">
+          <h2 id="supporters-title" className="text-xl font-bold text-theme-text">
             {t('supportersOf', { recipient })}
           </h2>
           <p className="text-theme-text-muted text-sm mt-1">
@@ -148,7 +134,6 @@ export const SupportersModal: React.FC<SupportersModalProps> = ({ stats, onClose
             );
           })}
         </ul>
-      </div>
-    </div>
+    </Modal>
   );
 };

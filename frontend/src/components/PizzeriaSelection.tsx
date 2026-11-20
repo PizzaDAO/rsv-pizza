@@ -9,11 +9,12 @@ import { Pizzeria, OrderingOption } from '../types';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
-import { OrderCheckout } from './OrderCheckout';
+import { lazyComponent } from '../lib/lazyComponent';
+
+const OrderCheckout = lazyComponent(() => import('./OrderCheckout').then((m) => ({ default: m.OrderCheckout })));
 import { PizzaOrderFlow } from './PizzaOrderFlow';
 import { AiOrderDialog } from './AiOrderDialog';
 import { usePizzaOrderingEnabled } from '../lib/pizzaOrder';
-import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { uuid } from '../lib/utils';
 
 interface PizzeriaSelectionProps {
@@ -851,11 +852,6 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 Calling {orderComplete.pizzeriaName}
               </p>
             </div>
-
-            <CallRecordingPlayer
-              callId={orderComplete.callId}
-              pizzeriaName={orderComplete.pizzeriaName}
-            />
 
             <button
               onClick={() => setOrderComplete(null)}
