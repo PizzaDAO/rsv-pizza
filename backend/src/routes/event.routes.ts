@@ -4,7 +4,6 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin } from '../middleware/auth.js';
 import { getGppGlobalEditors } from '../lib/privateConfig.js';
-import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveGppByYear, isGpp27Hidden } from '../helpers/gpp27.js';
 import { isEventHiddenFrom } from '../helpers/eventVisibility.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
@@ -70,7 +69,6 @@ const EVENT_SELECT = {
     telegramGroup: true,
     turtleRolesEnabled: true,
     underbossStatus: true,
-    reimbursementCapUsd: true,
     oneSheetConfig: true, // focaccina-58550
     hackathon: { select: { publishedAt: true, disabledAt: true } }, // hackathon PR 2: section flag only
     password: true, // Just to check if it exists
@@ -359,17 +357,12 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         userId: party.userId,
         sponsors,
         pageViewStats,
-        reimbursementCapUsd: party.reimbursementCapUsd != null ? Number(party.reimbursementCapUsd) : null,
         // focaccina-58550: host-customizable one-sheet config (read-only on public page).
         oneSheetConfig: party.oneSheetConfig ?? null,
         // Hackathon platform: the event page fetches GET /api/parties/:id/hackathon only when true.
         hasHackathon: !!(party.hackathon?.publishedAt && !party.hackathon.disabledAt),
-        // arugula-38633 v2 follow-up: numeric-tag fallback when no
-        // underboss-validated cap exists. See helpers/reimbursementCap.ts.
-        effectiveReimbursementCapUsd: computeEffectiveCapUsd({
-          reimbursementCapUsd: party.reimbursementCapUsd,
-          eventTags: party.eventTags,
-        }),
+        // capers-11903: reimbursement caps (raw + effective) are host/admin-only and are NOT
+        // returned here; hosts read them from GET /api/parties/:id.
       },
     });
   } catch (error) {
