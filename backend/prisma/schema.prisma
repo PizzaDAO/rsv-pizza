@@ -3596,3 +3596,17 @@ model PartyBooth {
 
   @@map("party_booths")
 }
+
+// marinara-32633: one row per member lookup for printed name tags (who asked, for which event, how many guests).
+// Doubles as the per-user / per-party rate-limit counter. Holds no emails, hashes or names.
+model NametagLookupAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  partyId    String   @map("party_id") @db.Uuid
+  userId     String   @map("user_id")
+  guestCount Int      @map("guest_count")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([partyId, createdAt(sort: Desc)])
+  @@map("nametag_lookup_audit")
+}
