@@ -62,6 +62,15 @@ describe('parties anon column allowlist', () => {
     expect(allow).toContain('public_event_tags');
   });
 
+  it('capers-11903: reimbursement_cap_usd is never selected/granted to anon and is listed sensitive', () => {
+    expect(safe).not.toContain('reimbursement_cap_usd');
+    expect(JSON.parse(read('scripts/parties-anon-columns.json'))).not.toContain('reimbursement_cap_usd');
+    // Added to the sensitive lists in a follow-up PR once the prod REVOKE is applied (like event_tags).
+    expect(read('backend/prisma/migrations/20261121_revoke_anon_reimbursement_cap_usd/migration.sql')).toMatch(
+      /REVOKE SELECT \(reimbursement_cap_usd\) ON public\.parties FROM anon, authenticated/,
+    );
+  });
+
   it('partyColumnNames maps alias:column to the column', () => {
     expect(partyColumnNames('id, event_tags:public_event_tags ,name')).toEqual(['id', 'public_event_tags', 'name']);
   });
@@ -167,6 +176,15 @@ describe('mergeHostOnlyPartyFields', () => {
     expect(p.raw_event_tags_loaded).toBeUndefined();
   });
 
+  it('capers-11903: editors get reimbursement_cap_usd from the API; non-editors never do', () => {
+    const p = base();
+    mergeHostOnlyPartyFields(p, { canEdit: true, reimbursementCapUsd: 250 });
+    expect(p.reimbursement_cap_usd).toBe(250);
+    const q = base();
+    mergeHostOnlyPartyFields(q, { canEdit: false, reimbursementCapUsd: 250 });
+    expect(q.reimbursement_cap_usd).toBeUndefined();
+  });
+
   it('does not merge host-only fields when canEdit is not true', () => {
     const p = base();
     mergeHostOnlyPartyFields(p, { canEdit: false, hostTelegramChatId: '1', reimbursementCapAppealNote: 'n' });
@@ -191,6 +209,13 @@ describe('preserveHostOnlyFields', () => {
     expect(next.hostTelegramLinkToken).toBe('t');
     expect(next.reimbursementCapAppealNote).toBe('n');
     expect(next.cancelledBy).toBe('e');
+  });
+
+  it('capers-11903: keeps the editor-loaded reimbursement cap across a SAFE re-read', () => {
+    const prev = { reimbursementCapUsd: 250 } as Party;
+    const next = { reimbursementCapUsd: null } as Party;
+    preserveHostOnlyFields(next, prev);
+    expect(next.reimbursementCapUsd).toBe(250);
   });
 
   it('scam-flag-private: keeps the raw event tags and derived cap across a SAFE re-read', () => {

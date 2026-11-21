@@ -1152,14 +1152,8 @@ export interface PublicEvent {
   turtleRolesEnabled?: boolean;
   sponsors?: PublicEventSponsor[];
   pageViewStats?: { totalViews: number; uniqueVisitors: number };
-  // Reimbursement cap (arugula-38633 v2) — public so the host-facing payout
-  // banner can render before re-loading the Party context. NULL when an
-  // underboss has not validated yet.
-  reimbursementCapUsd?: number | null;
-  // arugula-38633 v2 follow-up: precedence resolution of
-  // reimbursementCapUsd → max(numeric event_tags) → null. Host-facing UI
-  // reads this; /underboss still uses the raw reimbursementCapUsd.
-  effectiveReimbursementCapUsd?: number | null;
+  // capers-11903: reimbursement caps are no longer on the public event response; hosts get
+  // them from GET /api/parties/:id (merged into the Party context).
   // porchetta-81402: soft-cancel state. cancelledAt non-null = EventPage
   // shows a cancelled banner + replaces the RSVP button with a notice card.
   cancelledAt?: string | null;

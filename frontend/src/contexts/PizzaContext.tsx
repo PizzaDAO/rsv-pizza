@@ -114,6 +114,8 @@ export function preserveHostOnlyFields(next: Party, prev: Party): void {
   next.hostTelegramLinkToken = prev.hostTelegramLinkToken;
   next.reimbursementCapAppealNote = prev.reimbursementCapAppealNote;
   next.cancelledBy = prev.cancelledBy;
+  // capers-11903: a SAFE re-read no longer carries reimbursement_cap_usd; keep the editor's copy.
+  next.reimbursementCapUsd = prev.reimbursementCapUsd;
   // scam-flag-private: a SAFE re-read only carries public_event_tags; keep the raw tags (and the
   // cap derived from numeric/k tags) the editor loaded from the API.
   next.eventTags = prev.eventTags;

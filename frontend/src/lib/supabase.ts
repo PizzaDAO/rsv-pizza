@@ -1107,7 +1107,7 @@ export const SAFE_PARTY_COLUMNS = `
   flyer_config,
   poster_image_url, poster_generated_at,
   rollup_image_url, rollup_generated_at,
-  reimbursement_cap_usd, reimbursement_cap_appealed_at,
+  reimbursement_cap_appealed_at,
   tax_form_required,
   one_sheet_config,
   cancelled_at, cancellation_reason,
@@ -1600,6 +1600,8 @@ export function mergeHostOnlyPartyFields(party: DbParty, apiParty: any): void {
     if ('hostTelegramLinkToken' in apiParty) party.host_telegram_link_token = apiParty.hostTelegramLinkToken ?? null;
     if ('reimbursementCapAppealNote' in apiParty) party.reimbursement_cap_appeal_note = apiParty.reimbursementCapAppealNote ?? null;
     if ('cancelledBy' in apiParty) party.cancelled_by = apiParty.cancelledBy ?? null;
+    // capers-11903: anon can't read reimbursement_cap_usd; editors get it from the API.
+    if ('reimbursementCapUsd' in apiParty) party.reimbursement_cap_usd = apiParty.reimbursementCapUsd ?? null;
     // scam-flag-private: anon rows carry only the public tags (event_tags:public_event_tags).
     // Host flows need the raw list (prepay checkbox, 'go' gate, nonhub, numeric/k caps), and a
     // privileged PATCH of a stripped list would wipe internal tags, so editors get it from the API.

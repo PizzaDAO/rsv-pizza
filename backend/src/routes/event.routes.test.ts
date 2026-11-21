@@ -86,6 +86,19 @@ describe('GET /api/events/:slug', () => {
     expect((await request(app).get('/api/events/abc123')).body.event.labels).toEqual([]);
   });
 
+  it('capers-11903: never exposes reimbursement caps, for anonymous or authenticated callers', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([{ ...PARTY, reimbursementCapUsd: 250, eventTags: ['k40'] }]);
+    for (const authed of [false, true]) {
+      const req = request(app).get('/api/events/abc123');
+      const res = await (authed ? req.set('Authorization', 'Bearer x') : req);
+      expect(res.status).toBe(200);
+      expect(res.body.event).not.toHaveProperty('reimbursementCapUsd');
+      expect(res.body.event).not.toHaveProperty('effectiveReimbursementCapUsd');
+      expect(JSON.stringify(res.body)).not.toContain('250');
+    }
+    expect(mockPrisma.party.findMany.mock.calls[0][0].select).not.toHaveProperty('reimbursementCapUsd');
+  });
+
   it('prefers the invite-code match when both columns match different parties', async () => {
     mockPrisma.party.findMany.mockResolvedValue([
       { ...PARTY, id: 'by-custom', inviteCode: 'zzz', customUrl: 'dup' },
