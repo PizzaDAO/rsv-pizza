@@ -4,7 +4,9 @@
  *
  * An event is returned only when ALL hold:
  *   - it is curated: underboss_status is 'approved' or 'listed', and it is a Global Pizza Party (event_type
- *     'gpp') or belongs to an event series (kind 'gpp' / 'series')
+ *     'gpp') or belongs to an ACTIVE event series whose id is in UPCOMING_EVENTS_SERIES_IDS (comma-separated
+ *     series ids, default empty: outside brand admins approving their own events never trigger member DMs)
+ *   - it is not a test/probe party (isTestParty)
  *   - it is public: not event_type 'private', no password
  *   - it is not cancelled, starts after now and no later than `until`, and has coordinates
  *
@@ -15,6 +17,7 @@
 import { prisma } from '../config/database.js';
 import { brandUrl } from '../config/brand.js';
 import { IdentifierError } from './gppHostLookup.js';
+import { isTestParty } from './testParty.js';
 
 export const UPCOMING_STATUSES = ['approved', 'listed'] as const;
 export const MAX_UPCOMING_EVENTS = 500;
@@ -67,7 +70,14 @@ export function parseUpcomingQuery(body: unknown, now = new Date()): UpcomingQue
 }
 
 /** The visibility predicate, exported so the tests pin it. */
-export function upcomingWhere(now: Date, until: Date) {
+export function allowedSeriesIds(env: NodeJS.ProcessEnv = process.env): string[] {
+  return (env.UPCOMING_EVENTS_SERIES_IDS ?? '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+}
+
+export function upcomingWhere(now: Date, until: Date, seriesIds: string[] = allowedSeriesIds()) {
   return {
     underbossStatus: { in: [...UPCOMING_STATUSES] },
     cancelledAt: null,
@@ -77,9 +87,20 @@ export function upcomingWhere(now: Date, until: Date) {
     longitude: { not: null },
     AND: [
       { OR: [{ eventType: null }, { eventType: { not: 'private' } }] },
-      { OR: [{ eventType: 'gpp' }, { eventSeriesId: { not: null } }] },
+      {
+        OR: [
+          { eventType: 'gpp' },
+          ...(seriesIds.length ? [{ eventSeriesId: { in: seriesIds }, eventSeries: { is: { isActive: true } } }] : []),
+        ],
+      },
     ],
   };
+}
+
+function eventUrl(p: { customUrl: string | null; inviteCode: string; eventType: string | null; eventSeries: { siteUrl: string | null } | null }): string {
+  const slug = p.customUrl || p.inviteCode;
+  const site = p.eventType !== 'gpp' ? p.eventSeries?.siteUrl?.trim().replace(/\/+$/, '') : '';
+  return site && /^https:\/\//i.test(site) ? `${site}/${slug}` : brandUrl(slug);
 }
 
 export async function findUpcomingEvents(q: UpcomingQuery, now = new Date(), db = prisma): Promise<UpcomingEvent[]> {
@@ -101,6 +122,7 @@ export async function findUpcomingEvents(q: UpcomingQuery, now = new Date(), db 
       maxGuests: true,
       rsvpClosedAt: true,
       eventType: true,
+      eventSeries: { select: { siteUrl: true } },
     },
   });
 
@@ -122,10 +144,10 @@ export async function findUpcomingEvents(q: UpcomingQuery, now = new Date(), db 
 
   const out: UpcomingEvent[] = [];
   for (const p of parties) {
-    if (!p.date || p.latitude === null || p.longitude === null) continue;
+    if (!p.date || p.latitude === null || p.longitude === null || isTestParty(p.name)) continue;
     out.push({
       eventId: p.id,
-      url: brandUrl(p.customUrl || p.inviteCode),
+      url: eventUrl(p),
       name: p.name,
       date: p.date.toISOString(),
       timezone: p.timezone ?? null,

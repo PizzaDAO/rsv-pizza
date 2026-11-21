@@ -16,7 +16,7 @@ vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 import serviceRouter from './service.routes.js';
 import { errorHandler } from '../middleware/error.js';
 import { brandUrl } from '../config/brand.js';
-import { upcomingWhere } from '../lib/upcomingEvents.js';
+import { allowedSeriesIds, upcomingWhere } from '../lib/upcomingEvents.js';
 
 const KEY = 'test-service-key-0123456789abcdef';
 
@@ -48,6 +48,7 @@ const party = (o: Record<string, unknown> = {}) => ({
   maxGuests: null,
   rsvpClosedAt: null,
   eventType: 'gpp',
+  eventSeries: null,
   ...o,
 });
 
@@ -89,7 +90,28 @@ describe('POST /api/service/upcoming-events', () => {
     expect(w.longitude).toEqual({ not: null });
     expect(JSON.stringify(w.AND)).toContain('"private"');
     expect(JSON.stringify(w.AND)).toContain('"gpp"');
-    expect(JSON.stringify(w.AND)).toContain('eventSeriesId');
+    expect(JSON.stringify(w.AND)).not.toContain('eventSeriesId'); // series need an allowlist
+    const SID = '11111111-1111-4111-8111-111111111111';
+    const withSeries = JSON.stringify(upcomingWhere(now, until, [SID]).AND);
+    expect(withSeries).toContain(SID);
+    expect(withSeries).toContain('"isActive":true');
+  });
+
+  it('series allowlist comes from UPCOMING_EVENTS_SERIES_IDS (default empty, junk ignored)', () => {
+    expect(allowedSeriesIds({})).toEqual([]);
+    expect(allowedSeriesIds({ UPCOMING_EVENTS_SERIES_IDS: ' 11111111-1111-4111-8111-111111111111 ,nope,' } as unknown as NodeJS.ProcessEnv)).toEqual(['11111111-1111-4111-8111-111111111111']);
+  });
+
+  it('drops test parties and uses the series site for series events', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([
+      party({ id: 't', name: 'TEST - Invoice' }),
+      party({ id: 's', eventType: 'standard', customUrl: 'x', eventSeries: { siteUrl: 'https://series.example/' } }),
+      party({ id: 'g', eventType: 'gpp', eventSeries: { siteUrl: 'https://series.example' } }),
+    ]);
+    const r = await post({});
+    expect(r.body.events.map((e: { eventId: string }) => e.eventId)).toEqual(['s', 'g']);
+    expect(r.body.events[0].url).toBe('https://series.example/x');
+    expect(r.body.events[1].url).toBe(brandUrl('lisbon'));
   });
 
   it('queries with that predicate, soonest first, and selects no host or guest or address column', async () => {
