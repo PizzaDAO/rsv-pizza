@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Printer, Type, Hash, Image as ImageIcon, Tag, Search, Link as LinkIcon } from 'lucide-react';
 import { usePizza } from '../../../contexts/PizzaContext';
@@ -11,7 +11,8 @@ import { PrintPortal, PrintPreview, usePrintSheets } from '../printSheet';
 import { BADGE_LAYOUTS, fillSheetBlanks, getBadgeLayout, pageCount, paginate } from '../layouts';
 import { useQrDataUrl } from '../useQrDataUrl';
 import { isHttpUrl, tentQrUrl } from '../tents/tentPresets';
-import { blankBadges, buildBadges, typedBadges, type GuestSource } from './nametagData';
+import { blankBadges, buildBadges, typedBadges, type GuestSource, type NametagMember } from './nametagData';
+import { fetchNametagMembers, fetchNametagStatus } from '../../../lib/nametagsApi';
 import { AlignmentTestPage, NametagPage, NametagSheet } from './NametagSheet';
 
 type LogoChoice = 'event' | 'brand' | 'none';
@@ -57,6 +58,36 @@ function NametagBuilderBody({ canViewGuests, guests }: { canViewGuests: boolean;
   const [job, setJob] = useState<'sheet' | 'align'>('sheet');
   const { printing, print } = usePrintSheets();
 
+  // PizzaDAO member tags: offered only with Guests access and when the global setting allows this event.
+  const [memberTagsAvailable, setMemberTagsAvailable] = useState(false);
+  const [memberTags, setMemberTags] = useState(false);
+  const [memberState, setMemberState] = useState<'idle' | 'loading' | 'ok' | 'unavailable'>('idle');
+  const [members, setMembers] = useState<Record<string, NametagMember>>({});
+  const partyId = party?.id;
+  useEffect(() => {
+    if (!canViewGuests || !partyId) return;
+    let cancelled = false;
+    fetchNametagStatus(partyId)
+      .then((ok) => !cancelled && setMemberTagsAvailable(ok))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewGuests, partyId]);
+  // Fetched once, the first time the host ticks the box (never on page load).
+  const memberFetchStarted = useRef(false);
+  useEffect(() => {
+    if (!memberTags || !partyId || memberFetchStarted.current) return;
+    memberFetchStarted.current = true;
+    setMemberState('loading');
+    fetchNametagMembers(partyId)
+      .then((r) => {
+        setMembers(r.members ?? {});
+        setMemberState(r.memberLookup === 'ok' ? 'ok' : 'unavailable');
+      })
+      .catch(() => setMemberState('unavailable'));
+  }, [memberTags, partyId]);
+
   const layout = getBadgeLayout(layoutId);
   const effectiveSource: SourceChoice = canViewGuests ? source : 'none';
 
@@ -69,8 +100,9 @@ function NametagBuilderBody({ canViewGuests, guests }: { canViewGuests: boolean;
         roleLabels: { host: t('print.nametags.roleHost'), coHost: t('print.nametags.roleCoHost'), partner: t('print.nametags.rolePartner') },
         hostName: party?.hostName,
         locale: i18n.language,
+        members: memberTags && memberTagsAvailable ? members : undefined,
       }),
-    [canViewGuests, guests, party?.coHosts, party?.hostName, effectiveSource, includeWaitlist, roleLine, i18n.language, t],
+    [canViewGuests, guests, party?.coHosts, party?.hostName, effectiveSource, includeWaitlist, roleLine, i18n.language, t, memberTags, memberTagsAvailable, members],
   );
 
   const badges = useMemo(() => {
@@ -96,7 +128,7 @@ function NametagBuilderBody({ canViewGuests, guests }: { canViewGuests: boolean;
   const eventImage = party.eventImageUrl || null;
   const logoUrl = logo === 'event' ? eventImage : logo === 'brand' ? BRAND.logoUrl : null;
   const customInvalid = qr === 'custom' && !!customUrl && !isHttpUrl(customUrl);
-  const header = { title: headerText.trim() || party.name, logoUrl, splitName: splitNames, qrUrl, qrSrc: qrUrl ? qrSrc : undefined };
+  const header = { title: headerText.trim() || party.name, logoUrl, splitName: splitNames, qrUrl, qrSrc: qrUrl ? qrSrc : undefined, levelLabel: t('print.nametags.memberLevel') };
   const cutLines = cutOverride ?? layout.kind === 'plain-paper';
   const pages = pageCount(badges.length, layout);
   const named = badges.filter((b) => !b.blank);
@@ -150,6 +182,15 @@ function NametagBuilderBody({ canViewGuests, guests }: { canViewGuests: boolean;
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <Checkbox checked={includeWaitlist} onChange={() => setIncludeWaitlist((v) => !v)} label={t('print.nametags.includeWaitlist')} />
             <Checkbox checked={roleLine} onChange={() => setRoleLine((v) => !v)} label={t('print.nametags.roleLine')} />
+          </div>
+        )}
+        {canViewGuests && effectiveSource !== 'none' && memberTagsAvailable && (
+          <div className="space-y-1" data-testid="member-tags">
+            <Checkbox checked={memberTags} onChange={() => setMemberTags((v) => !v)} label={t('print.nametags.memberTags')} />
+            <p className="text-xs text-white/40">{t('print.nametags.memberTagsHelp')}</p>
+            {memberTags && memberState === 'loading' && <p className="text-xs text-white/40">{t('print.nametags.memberTagsLoading')}</p>}
+            {memberTags && memberState === 'ok' && <p className="text-xs text-white/40">{t('print.nametags.memberTagsFound', { count: Object.keys(members).length })}</p>}
+            {memberTags && memberState === 'unavailable' && <p className="text-xs text-red-400">{t('print.nametags.memberTagsUnavailable')}</p>}
           </div>
         )}
         {canViewGuests && effectiveSource === 'pick' && (
