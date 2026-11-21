@@ -56,10 +56,10 @@ router.get('/:partyId/nametags', requireAuth, async (req: AuthRequest, res: Resp
 
     const guests = await prisma.guest.findMany({
       where: { partyId },
-      select: { id: true, email: true, submittedVia: true, status: true, approved: true, emailVerifiedAt: true },
+      select: { id: true, email: true, ethereumAddress: true, submittedVia: true, status: true, approved: true },
     });
     const ids = collectIdentifiers(guests);
-    if (ids.emailHashes.length === 0) return res.json({ memberLookup: 'ok', members: {} });
+    if (ids.emailHashes.length === 0 && ids.wallets.length === 0) return res.json({ memberLookup: 'ok', members: {} });
 
     // Per-user and per-event budgets (settings), counted from the audit table; each lookup leaves a row.
     const userId = req.userId as string;
@@ -75,7 +75,7 @@ router.get('/:partyId/nametags', requireAuth, async (req: AuthRequest, res: Resp
       res.set('Retry-After', '600');
       throw new AppError('Too many name tag lookups. Try again later.', 429, 'RATE_LIMITED');
     }
-    await prisma.nametagLookupAudit.create({ data: { partyId, userId, guestCount: ids.emailHashes.length } });
+    await prisma.nametagLookupAudit.create({ data: { partyId, userId, guestCount: Math.max(ids.emailHashes.length, ids.wallets.length) } });
 
     const matches = await lookupNametagMembers(ids, { maxIdentifiers: cfg.maxIdentifiers });
     if (matches === null) return res.json({ memberLookup: 'unavailable', members: {} });

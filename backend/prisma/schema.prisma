@@ -601,8 +601,6 @@ model Guest {
   id                  String   @id @default(uuid()) @db.Uuid
   name                String
   email               String?  @db.VarChar
-  // marinara-32633: set when the RSVP was made signed in as this exact address (the mailbox is proven).
-  emailVerifiedAt     DateTime? @map("email_verified_at") @db.Timestamptz
   ethereumAddress     String?  @map("ethereum_address") @db.VarChar
   roles               String[]
   role                String? // Single role for report chart: "dev", "designer", "artist", etc.

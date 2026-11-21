@@ -57,7 +57,7 @@ function setting(scope: number | null, max?: number) {
   mockPrisma.appConfig.findMany.mockResolvedValue(rows);
 }
 
-const guest = (id: string, o: Record<string, unknown> = {}) => ({ id, email: null, submittedVia: 'link', status: 'CONFIRMED', approved: null, emailVerifiedAt: new Date('2026-01-01'), ...o });
+const guest = (id: string, o: Record<string, unknown> = {}) => ({ id, email: null, submittedVia: 'link', status: 'CONFIRMED', approved: null, ethereumAddress: null, ...o });
 const memberA = { memberId: '1', name: 'Pat', pfpUrl: 'https://img.example/p.png' };
 
 beforeEach(() => {
@@ -135,16 +135,16 @@ describe('GET /api/parties/:id/nametags', () => {
     res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
     expect(res.body.memberLookup).toBe('ok');
   });
-  it('looks up only eligible guests (self-RSVP, confirmed, proven email) and audits the lookup', async () => {
+  it('looks up only eligible guests (self-RSVP, confirmed) and audits the lookup', async () => {
     mockPrisma.guest.findMany.mockResolvedValue([
       guest('g1', { email: 'a@example.com' }),
       guest('g2', { email: 'imported@example.com', submittedVia: 'import-csv' }),
       guest('g3', { email: 'wait@example.com', status: 'WAITLISTED' }),
-      guest('g4', { email: 'unproven@example.com', emailVerifiedAt: null }),
+      guest('g4', { email: null, ethereumAddress: '0x' + 'cd'.repeat(20) }),
     ]);
     await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
     expect(lookup.mock.calls[0][0].emailHashes).toEqual([hashEmail('a@example.com')]);
-    expect(lookup.mock.calls[0][0].wallets).toEqual([]);
+    expect(lookup.mock.calls[0][0].wallets).toEqual(['0x' + 'cd'.repeat(20)]);
     expect(mockPrisma.nametagLookupAudit.create).toHaveBeenCalledWith({ data: { partyId: PARTY, userId: 'u-host', guestCount: 1 } });
   });
   it('429 when the per-user hour, per-user day or per-event budget is used up (no lookup, no audit row)', async () => {
