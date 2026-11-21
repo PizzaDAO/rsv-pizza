@@ -177,6 +177,8 @@ function computeReceiptsTotalUsd(row: PartyPayoutsRow): number {
 }
 
 export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPageProps = {}) {
+  // Tax-form data is super_admin only (backend is the real gate).
+  const isSuperAdmin = useIsSuperAdmin();
   // argentina-92103: stable region list to thread into API calls + filter
   // defaults. `undefined` when running as the unscoped /payments dashboard.
   const regions = useMemo(
@@ -1124,8 +1126,6 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const pageTitle = portalLabel ? `${portalLabel} Payments` : 'Host Payments';
   const viewerKind = role.viewerKind;
   const isUnderboss = viewerKind === 'underboss';
-  // Tax-form data is super_admin only (backend is the real gate).
-  const isSuperAdmin = useIsSuperAdmin();
 
   // Count of the rows actually rendered in the active table: cities in the
   // by-city view, individual payouts in the by-payment / payments views. Sits
