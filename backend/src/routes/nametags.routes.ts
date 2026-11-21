@@ -124,7 +124,7 @@ nametagsAdminRouter.put('/settings', requireSuperAdmin, async (req: AuthRequest,
   try {
     const { key, value, note } = (req.body ?? {}) as { key?: unknown; value?: unknown; note?: unknown };
     if (key === NAMETAG_HOST_IDS_KEY) {
-      // A list of rsv.pizza user ids (the owning-host accounts that make an event a PizzaDAO event).
+      // A list of user ids in this app (the owning-host accounts that make an event a PizzaDAO event).
       const ids = parseHostUserIds(value);
       if (!ids) throw new AppError('hostUserIds must be a list of up to 20 user ids', 400, 'OUT_OF_RANGE');
       await prisma.appConfig.upsert({

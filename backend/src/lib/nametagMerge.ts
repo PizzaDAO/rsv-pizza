@@ -21,8 +21,8 @@ const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
 /**
  * Only guests who RSVP'd themselves (link), are confirmed and not declined are looked up. Host-added, imported,
  * invited, checked-in-at-the-door and waitlisted rows never leave this app, so a host cannot use the lookup to
- * probe arbitrary addresses. rsv.pizza does not prove the email or wallet on an RSVP; pizzadao.org does the proving
- * (it matches only a member's verified email, linked rsv.pizza account or linked wallet).
+ * probe arbitrary addresses. this app does not prove the email or wallet on an RSVP; pizzadao.org does the proving
+ * (it matches only a member's verified email, linked account for this app or linked wallet).
  */
 export const eligible = (g: TagGuest): boolean => g.submittedVia === 'link' && g.status === 'CONFIRMED' && g.approved !== false;
 

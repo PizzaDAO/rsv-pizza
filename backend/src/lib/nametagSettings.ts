@@ -8,7 +8,7 @@
  *  nametags.maxIdentifiers  Most email hashes sent to pizzadao.org per request (larger lists are chunked).
  *  nametags.rateUserPerHour / rateUserPerDay / ratePartyPerHour  Lookup limits per signed-in user and per party.
  *
- * Not an integer, so outside the registry: app_config `nametags.hostUserIds` (JSON array of rsv.pizza user ids).
+ * Not an integer, so outside the registry: app_config `nametags.hostUserIds` (JSON array of user ids in this app).
  * An event whose OWNING host is one of these accounts counts as a PizzaDAO event (co-hosts do not count).
  * Default empty: it matches nothing until set.
  */
