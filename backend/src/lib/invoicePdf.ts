@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, PageSizes, PDFString, PDFName } from 'pdf-lib';
+import { embedSafeStandard } from './pdfFonts.js';
 import { loadSharp } from './lazySharp.js';
 import { PIZZADAO_LOGO_SVG } from '../assets/pizzadaoLogoSvg.js';
 
@@ -76,9 +77,9 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   const doc = await PDFDocument.create();
 
   // ── Fonts (monospace = typewriter look) ─────────────────────────────────────
-  const fontRegular = await doc.embedFont(StandardFonts.Courier);
-  const fontBold    = await doc.embedFont(StandardFonts.CourierBold);
-  const fontFallback = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fontRegular = await embedSafeStandard(doc, StandardFonts.Courier);
+  const fontBold    = await embedSafeStandard(doc, StandardFonts.CourierBold);
+  const fontFallback = await embedSafeStandard(doc, StandardFonts.HelveticaBold);
 
   // ── Colours ──────────────────────────────────────────────────────────────────
   const orange     = rgb(0.9098, 0.3647, 0.3647); // #E85D5D
