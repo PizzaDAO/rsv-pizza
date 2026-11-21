@@ -7,7 +7,7 @@
  *   POST   /api/tax-forms/draft                Upsert my draft for a form type
  *   POST   /api/tax-forms/submit               Finalize current draft → generate PDF → status='submitted'
  *
- * Admin endpoints (admin / payment_admin / super_admin):
+ * Admin endpoints (super_admin ONLY; admin / payment_admin get 403):
  *   GET    /api/admin/tax-forms                List with filters (status, form_type, user_id, expiring)
  *   GET    /api/admin/tax-forms/:id            Detail (includes form_data jsonb)
  *   POST   /api/admin/tax-forms/:id/verify     Stamp verified_at + verified_by
@@ -19,7 +19,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isPaymentAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, canViewTaxForms } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { getSignedTaxFormUrl, TaxFormType } from '../services/taxFormStorage.service.js';
 import {
@@ -149,7 +149,7 @@ adminTaxFormRouter.use(requireAuth);
 
 async function requireAnyAdmin(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
-    if (!(await isPaymentAdmin(req.userEmail))) {
+    if (!(await canViewTaxForms(req.userEmail))) {
       throw new AppError('Forbidden', 403, 'FORBIDDEN');
     }
     next();

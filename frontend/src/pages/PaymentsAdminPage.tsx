@@ -63,6 +63,7 @@ import {
   MarkPartyPaidModal,
 } from '../components/payments-admin';
 import type { BulkSendResult } from '../lib/api';
+import { useIsSuperAdmin } from '../hooks/useIsSuperAdmin';
 // panuozzo-92114: URL <-> filter/view-mode (de)serializer so a refresh / shared
 // link restores the exact filtered view.
 import {
@@ -176,6 +177,8 @@ function computeReceiptsTotalUsd(row: PartyPayoutsRow): number {
 }
 
 export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPageProps = {}) {
+  // Tax-form data is super_admin only (backend is the real gate).
+  const isSuperAdmin = useIsSuperAdmin();
   // argentina-92103: stable region list to thread into API calls + filter
   // defaults. `undefined` when running as the unscoped /payments dashboard.
   const regions = useMemo(
@@ -1191,7 +1194,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         </div>
 
         {/* calzone-70821: standalone tax-form requests (admin-only). */}
-        {!isUnderboss && <TaxFormRequestsSection />}
+        {!isUnderboss && isSuperAdmin && <TaxFormRequestsSection />}
 
         {/* coppa-91827: hot wallet address + ETH/USDC balances so admins know
             where to deposit funds and can verify they landed. Self-fetches.

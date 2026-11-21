@@ -515,7 +515,7 @@ describe('(e) submit claims the lock before upload', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('(f) admin routes require a payment admin', () => {
+describe('(f) admin routes require a super_admin', () => {
   const adminPaths: Array<['get' | 'post', string]> = [
     ['get', '/api/admin/tax-form-requests'],
     ['post', '/api/admin/tax-form-requests'],
@@ -535,10 +535,12 @@ describe('(f) admin routes require a payment admin', () => {
     }
   });
 
-  it('403 for a logged-in non-payment-admin', async () => {
+  it('403 for a logged-in non-super-admin (incl. admin and payment_admin)', async () => {
     const app = createApp();
     db.admins.push({ email: 'helper@example.com', role: 'underboss' });
-    for (const email of ['nobody@example.com', 'helper@example.com']) {
+    db.admins.push({ email: 'admin@example.com', role: 'admin' });
+    db.admins.push({ email: 'pay@example.com', role: 'payment_admin' });
+    for (const email of ['nobody@example.com', 'helper@example.com', 'admin@example.com', 'pay@example.com']) {
       for (const [m, p] of adminPaths) {
         const res = await request(app)[m](p).set('Authorization', bearer('u-x', email)).send({ label: 'X' });
         expect(res.status, `${email} ${m} ${p}`).toBe(403);
@@ -547,9 +549,34 @@ describe('(f) admin routes require a payment admin', () => {
     expect(db.requests).toHaveLength(0);
   });
 
-  it('payment admin list is metadata only: no form_data, TINs or PDF paths/urls', async () => {
+  it('GET /api/admin/tax-forms/:id: 403 for admin/payment_admin, 200 for super_admin', async () => {
     const app = createApp();
+    db.admins.push({ email: 'admin@example.com', role: 'admin' });
     db.admins.push({ email: 'pay@example.com', role: 'payment_admin' });
+    db.admins.push({ email: 'root@example.com', role: 'super_admin' });
+    const f = seedForm({ status: 'submitted', formData: FULL_W9, pdfUrl: 'requests/r/w9-1.pdf' });
+    for (const email of ['admin@example.com', 'pay@example.com']) {
+      const res = await request(app).get(`/api/admin/tax-forms/${f.id}`).set('Authorization', bearer('u-x', email));
+      expect(res.status, email).toBe(403);
+      expect(JSON.stringify(res.body)).not.toContain(FULL_W9.ssn);
+    }
+    const ok = await request(app).get(`/api/admin/tax-forms/${f.id}`).set('Authorization', bearer('u-r', 'root@example.com'));
+    expect(ok.status).toBe(200);
+    expect(ok.body.taxForm.id).toBe(f.id);
+  });
+
+  it('super_admin gets 200 on the admin lists', async () => {
+    const app = createApp();
+    db.admins.push({ email: 'root@example.com', role: 'super_admin' });
+    for (const p of ['/api/admin/tax-form-requests', '/api/admin/tax-forms']) {
+      const res = await request(app).get(p).set('Authorization', bearer('u-r', 'root@example.com'));
+      expect(res.status, p).toBe(200);
+    }
+  });
+
+  it('super_admin list is metadata only: no form_data, TINs or PDF paths/urls', async () => {
+    const app = createApp();
+    db.admins.push({ email: 'pay@example.com', role: 'super_admin' });
     const req = seedRequest({ status: 'submitted' });
     const f = seedForm({ requestId: req.id, status: 'submitted', formData: FULL_W9, pdfUrl: 'requests/r/w9-1.pdf' });
     req.taxFormId = f.id;
@@ -568,7 +595,7 @@ describe('(f) admin routes require a payment admin', () => {
 
   it('bulk create skips existing (non-revoked) and in-batch duplicates and reports them', async () => {
     const app = createApp();
-    db.admins.push({ email: 'pay@example.com', role: 'payment_admin' });
+    db.admins.push({ email: 'pay@example.com', role: 'super_admin' });
     seedRequest({ payeeLabel: 'Alice', payeeEmail: 'Alice@Example.com' });
     seedRequest({ payeeLabel: 'Revoked Rita', payeeEmail: 'rita@example.com', revokedAt: new Date() });
     const res = await request(app)
