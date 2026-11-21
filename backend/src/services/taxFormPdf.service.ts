@@ -11,7 +11,8 @@
  * Each generator returns a `Buffer` so the caller can hand it straight to the
  * storage service.
  */
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
+import { embedUnicodeFonts } from '../lib/pdfFonts.js';
 
 // ---------- helpers ----------
 
@@ -182,8 +183,7 @@ function formatW8CityLine(
 export async function generateW9PDF(data: W9FormData, refId: string): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]); // US Letter
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const { font, bold } = await embedUnicodeFonts(doc);
   const W = 612;
 
   // Header
@@ -525,8 +525,7 @@ export interface W8BENFormData {
 export async function generateW8BENPDF(data: W8BENFormData, refId: string): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const { font, bold } = await embedUnicodeFonts(doc);
   const W = 612;
   const HEADER = rgb(0.05, 0.25, 0.45);
 
@@ -925,8 +924,7 @@ export interface W8BENEFormData {
 export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const { font, bold } = await embedUnicodeFonts(doc);
   const W = 612;
   // Slightly darker blue than W-8BEN so the two foreign forms are visually
   // distinguishable at a glance in the admin reviewer.
