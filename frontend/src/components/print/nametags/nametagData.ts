@@ -4,9 +4,21 @@ import type { Guest, CoHost } from '../../../types';
  * A printable badge. Deliberately has NO email field: guest emails are only read inside
  * buildBadges (to detect co-hosts) and can never reach the DOM through a Badge.
  */
+export interface NametagMember {
+  memberId: string;
+  name: string;
+  pfpUrl: string;
+  crews?: { id: string; label: string; emoji?: string }[];
+  city?: string;
+  levelCompleted?: number;
+  levelTitle?: string;
+}
+
 export interface Badge {
   key: string;
   name: string;
+  /** PizzaDAO member details (from the member lookup). Never carries an email or wallet. */
+  member?: NametagMember;
   /** Host / Co-host / Partner / RSVP role. */
   role?: string;
   blank?: boolean;
@@ -24,6 +36,8 @@ export interface BuildBadgesOptions {
   hostName?: string | null;
   sort?: 'name' | 'rsvp';
   locale?: string;
+  /** guest id -> PizzaDAO member (from GET /api/parties/:id/nametags). Matched guests print as member tags. */
+  members?: Record<string, NametagMember>;
 }
 
 const EMAIL_RE = /\S+@\S+\.\S+/;
@@ -47,7 +61,7 @@ function included(g: Guest, source: GuestSource, includeWaitlist: boolean): bool
 }
 
 export function buildBadges(guests: Guest[], coHosts: CoHost[], opts: BuildBadgesOptions): Badge[] {
-  const { source, includeWaitlist = false, roleLine = false, roleLabels, hostName, sort = 'name', locale } = opts;
+  const { source, includeWaitlist = false, roleLine = false, roleLabels, hostName, sort = 'name', locale, members } = opts;
   const coHostByEmail = new Map<string, CoHost>();
   for (const c of coHosts) if (c.email) coHostByEmail.set(c.email.trim().toLowerCase(), c);
   const host = (hostName ?? '').trim().toLowerCase();
@@ -59,7 +73,8 @@ export function buildBadges(guests: Guest[], coHosts: CoHost[], opts: BuildBadge
     const id = g.id ?? `idx-${i}`;
     if (seen.has(id)) return;
     seen.add(id);
-    const name = safeName(g.name);
+    const member = g.id ? members?.[g.id] : undefined;
+    const name = (member && safeName(member.name)) || safeName(g.name);
     if (!name) return;
 
     let role: string | undefined;
@@ -70,7 +85,7 @@ export function buildBadges(guests: Guest[], coHosts: CoHost[], opts: BuildBadge
       else if (host && name.toLowerCase() === host) role = roleLabels.host;
       else if (g.roles?.[0]) role = safeName(g.roles[0]);
     }
-    rows.push({ badge: { key: `g-${id}`, name, role }, at: g.submittedAt ? Date.parse(g.submittedAt) || 0 : 0 });
+    rows.push({ badge: { key: `g-${id}`, name, role, ...(member ? { member } : {}) }, at: g.submittedAt ? Date.parse(g.submittedAt) || 0 : 0 });
   });
 
   if (sort === 'rsvp') rows.sort((a, b) => a.at - b.at);
@@ -119,4 +134,11 @@ export function splitName(name: string): { first: string; last: string } | null 
 export function blankBadges(n: number): Badge[] {
   const count = Math.max(0, Math.min(48, Math.floor(n) || 0));
   return Array.from({ length: count }, (_, i) => ({ key: `b-${i}`, name: '', blank: true }));
+}
+
+/** Info lines printed under a member's name: "#12 · Level 3 Sous Chef" and "Crew, Crew · City". */
+export function memberInfoLines(member: NametagMember, levelLabel = 'Level'): string[] {
+  const level = typeof member.levelCompleted === 'number' ? `${levelLabel} ${member.levelCompleted}${member.levelTitle ? ` ${member.levelTitle}` : ''}` : '';
+  const crews = (member.crews ?? []).map((c) => `${c.emoji ? `${c.emoji} ` : ''}${c.label}`).join(', ');
+  return [[`#${member.memberId}`, level].filter(Boolean).join(' · '), [crews, member.city].filter(Boolean).join(' · ')].filter(Boolean);
 }

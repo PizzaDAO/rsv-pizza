@@ -3,7 +3,7 @@ import { SheetPage } from '../printSheet';
 import { fitText, PRINT_FONT_STACK } from '../fitText';
 import { paginate, slotPosition, toPt, type SheetLayout } from '../layouts';
 import { qrCaption } from '../tents/tentPresets';
-import { splitName, type Badge } from './nametagData';
+import { memberInfoLines, splitName, type Badge } from './nametagData';
 
 export interface BadgeHeader {
   title: string;
@@ -14,6 +14,8 @@ export interface BadgeHeader {
   qrUrl?: string | null;
   /** Pre-rendered QR image shared by every badge (null while generating). Omit to render per badge. */
   qrSrc?: string | null;
+  /** Word before the level number on member tags (translated by the caller). */
+  levelLabel?: string;
 }
 
 export type OutlineMode = 'cut' | 'preview' | 'none';
@@ -48,7 +50,13 @@ export function BadgeLabel({
   const qrSize = inch ? 0.8 : 20;
   const qrCaptionH = inch ? 0.13 : 3.3;
   const qrReserve = header.qrUrl ? qrSize + qrCaptionH + (inch ? 0.04 : 1) : 0;
-  const availBody = toPt(layout.labelH - headerH - qrReserve - (inch ? 0.1 : 2.5), layout.unit);
+  const member = !badge.blank ? badge.member : undefined;
+  const infoLines = member ? memberInfoLines(member, header.levelLabel) : [];
+  const pfpSize = inch ? 0.55 : 13;
+  const infoSize = 7.5;
+  // A member tag spends height on the picture and the info lines; the name gets what is left.
+  const memberH = member ? toPt(pfpSize + (inch ? 0.05 : 1.2), layout.unit) + infoLines.length * infoSize * 1.25 + 2 : 0;
+  const availBody = toPt(layout.labelH - headerH - qrReserve - (inch ? 0.1 : 2.5), layout.unit) - memberH;
   const roleBase = 12;
   const roleH = second ? roleBase * 1.25 + 4 : 0;
   const availPt = availBody - roleH;
@@ -112,6 +120,18 @@ export function BadgeLabel({
           overflow: 'hidden',
         }}
       >
+        {member && (
+          <img
+            data-badge-pfp
+            src={member.pfpUrl}
+            alt=""
+            loading="eager"
+            onError={(e) => {
+              e.currentTarget.style.visibility = 'hidden';
+            }}
+            style={{ width: u(pfpSize, layout), height: u(pfpSize, layout), borderRadius: '50%', objectFit: 'cover', marginBottom: u(inch ? 0.05 : 1.2, layout), flex: 'none' }}
+          />
+        )}
         {fit ? (
           <>
             <div data-badge-name style={{ fontSize: `${fit.size}pt`, fontWeight: 700, lineHeight: 1.1 }}>
@@ -130,6 +150,11 @@ export function BadgeLabel({
         ) : (
           <div data-blank-line style={{ width: '85%', borderBottom: '1pt solid #000', height: header.qrUrl ? u(inch ? 0.3 : 7, layout) : '0.5in', marginTop: header.qrUrl ? 0 : '0.3in' }} />
         )}
+        {member && fit && infoLines.map((l, i) => (
+          <div key={i} data-badge-member-info style={{ fontSize: `${infoSize}pt`, lineHeight: 1.25, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {l}
+          </div>
+        ))}
         {second && fit && <div style={{ fontSize: `${roleSize}pt`, marginTop: '0.05in', fontWeight: 500 }}>{second}</div>}
       </div>
       {header.qrUrl && (
