@@ -276,6 +276,25 @@ describe('RSVP Routes', () => {
       expect(res.body.waitlisted).toBe(false);
     });
 
+    it('marks the RSVP email proven only when signed in as that address (name tags)', async () => {
+      const app = createTestApp();
+      mockPrisma.party.findUnique.mockResolvedValue({ ...BASE_PARTY, _count: { guests: 0 } });
+      mockPrisma.guest.count.mockResolvedValue(0);
+      mockPrisma.guest.create.mockResolvedValue({ id: 'guest-001', name: 'New Guest', status: 'CONFIRMED' });
+      const body = { name: 'New Guest', email: 'Guest@Example.com' };
+
+      await request(app).post(`/api/rsvp/${INVITE_CODE}/guest`).send(body);
+      expect(mockPrisma.guest.create.mock.calls[0][0].data.emailVerifiedAt).toBeUndefined();
+
+      const other = jwt.sign({ userId: 'u2', email: 'someone-else@example.com' }, process.env.JWT_SECRET!);
+      await request(app).post(`/api/rsvp/${INVITE_CODE}/guest`).set('Authorization', `Bearer ${other}`).send(body);
+      expect(mockPrisma.guest.create.mock.calls[1][0].data.emailVerifiedAt).toBeUndefined();
+
+      const same = jwt.sign({ userId: 'u1', email: 'guest@example.com' }, process.env.JWT_SECRET!);
+      await request(app).post(`/api/rsvp/${INVITE_CODE}/guest`).set('Authorization', `Bearer ${same}`).send(body);
+      expect(mockPrisma.guest.create.mock.calls[2][0].data.emailVerifiedAt).toBeInstanceOf(Date);
+    });
+
     it('validates name is required', async () => {
       const app = createTestApp();
 

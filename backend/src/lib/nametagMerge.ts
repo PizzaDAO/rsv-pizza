@@ -8,50 +8,38 @@ import type { NametagMatch, NametagMember } from '../services/pizzadaoNametags.j
 export interface TagGuest {
   id: string;
   email: string | null;
-  ethereumAddress: string | null;
-  submittedAt: Date;
+  submittedVia: string;
+  status: string;
   approved: boolean | null;
+  emailVerifiedAt: Date | null;
 }
-
-const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export const hashEmail = emailSha256;
 
-/** Declined guests never get a tag. */
-export const eligible = (g: Pick<TagGuest, 'approved'>): boolean => g.approved !== false;
+/**
+ * Only guests who RSVP'd themselves (link), are confirmed and not declined, and PROVED their email (the RSVP was
+ * made signed in as that address) are looked up. Host-added, imported, invited, waitlisted and unproven rows
+ * never leave this app, so a host cannot use the lookup to probe arbitrary addresses. Wallets are never sent:
+ * a typed-in wallet is unproven.
+ */
+export const eligible = (g: TagGuest): boolean =>
+  g.submittedVia === 'link' && g.status === 'CONFIRMED' && g.approved !== false && !!g.emailVerifiedAt && !!g.email?.includes('@');
 
 export function collectIdentifiers(guests: TagGuest[]): { emailHashes: string[]; wallets: string[] } {
   const hashes = new Set<string>();
-  const wallets = new Set<string>();
-  for (const g of guests) {
-    if (!eligible(g)) continue;
-    if (g.email?.includes('@')) hashes.add(hashEmail(g.email));
-    if (g.ethereumAddress && EVM_RE.test(g.ethereumAddress.trim())) wallets.add(g.ethereumAddress.trim().toLowerCase());
-  }
-  return { emailHashes: [...hashes], wallets: [...wallets] };
+  for (const g of guests) if (eligible(g)) hashes.add(hashEmail(g.email as string));
+  return { emailHashes: [...hashes], wallets: [] };
 }
 
-/**
- * guest id -> member. An email match wins over a wallet match. A member who RSVP'd more than once
- * (two guest rows) is attached to the earliest RSVP only, so they get one member tag.
- */
+/** guest id -> member (email hash match). Several guests may map to the same member; the client prints one tag per member. */
 export function assignMembers(guests: TagGuest[], matches: NametagMatch[]): Record<string, NametagMember> {
   const byHash = new Map<string, NametagMember>();
-  const byWallet = new Map<string, NametagMember>();
-  for (const m of matches) {
-    if (m.emailHash && !byHash.has(m.emailHash)) byHash.set(m.emailHash, m.member);
-    if (m.wallet && !byWallet.has(m.wallet)) byWallet.set(m.wallet, m.member);
-  }
-  const ordered = guests.filter(eligible).sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime());
-  const taken = new Set<string>();
+  for (const m of matches) if (m.emailHash && !byHash.has(m.emailHash)) byHash.set(m.emailHash, m.member);
   const out: Record<string, NametagMember> = {};
-  for (const g of ordered) {
-    const member =
-      (g.email?.includes('@') ? byHash.get(hashEmail(g.email)) : undefined) ??
-      (g.ethereumAddress ? byWallet.get(g.ethereumAddress.trim().toLowerCase()) : undefined);
-    if (!member || taken.has(member.memberId)) continue;
-    taken.add(member.memberId);
-    out[g.id] = member;
+  for (const g of guests) {
+    if (!eligible(g)) continue;
+    const member = byHash.get(hashEmail(g.email as string));
+    if (member) out[g.id] = member;
   }
   return out;
 }

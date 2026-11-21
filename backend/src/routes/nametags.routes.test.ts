@@ -15,6 +15,7 @@ process.env.JWT_SECRET = JWT_SECRET;
 const mockPrisma = vi.hoisted(() => ({
   party: { findUnique: vi.fn() },
   guest: { findMany: vi.fn() },
+  nametagLookupAudit: { count: vi.fn(), create: vi.fn() },
   appConfig: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
   appConfigAudit: { create: vi.fn() },
   admin: { findUnique: vi.fn() },
@@ -56,7 +57,7 @@ function setting(scope: number | null, max?: number) {
   mockPrisma.appConfig.findMany.mockResolvedValue(rows);
 }
 
-const guest = (id: string, o: Record<string, unknown> = {}) => ({ id, email: null, ethereumAddress: null, submittedAt: new Date('2026-01-01'), approved: null, ...o });
+const guest = (id: string, o: Record<string, unknown> = {}) => ({ id, email: null, submittedVia: 'link', status: 'CONFIRMED', approved: null, emailVerifiedAt: new Date('2026-01-01'), ...o });
 const memberA = { memberId: '1', name: 'Pat', pfpUrl: 'https://img.example/p.png' };
 
 beforeEach(() => {
@@ -66,7 +67,9 @@ beforeEach(() => {
   mockPrisma.admin.findUnique.mockResolvedValue(null);
   mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockPrisma));
   mockPrisma.appConfig.findUnique.mockResolvedValue(null);
-  mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY, eventSeriesId: null, eventType: 'standard', cancelledAt: null });
+  mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY, userId: 'owner-1', eventType: 'standard', cancelledAt: null });
+  mockPrisma.nametagLookupAudit.count.mockResolvedValue(0);
+  mockPrisma.nametagLookupAudit.create.mockResolvedValue({});
   mockPrisma.guest.findMany.mockResolvedValue([guest('g1', { email: 'a@example.com' }), guest('g2', { email: 'b@example.com' })]);
   lookup.mockResolvedValue([{ emailHash: hashEmail('a@example.com'), member: memberA }]);
 });
@@ -106,13 +109,59 @@ describe('GET /api/parties/:id/nametags', () => {
     expect(lookup).not.toHaveBeenCalled();
     expect(mockPrisma.guest.findMany).not.toHaveBeenCalled();
   });
-  it('scope 1 allows only events in a series', async () => {
+  it('scope 1: GPP events count (setting), and events owned by a listed account; co-hosted or other events do not', async () => {
     setting(1);
     let res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
     expect(res.body.memberLookup).toBe('disabled');
-    mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY, eventSeriesId: 'series-1', eventType: 'gpp', cancelledAt: null });
+    // a series event that is not GPP and not owned by a listed account stays out
+    mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY, userId: 'owner-1', eventType: 'standard', cancelledAt: null, eventSeriesId: 'brand-series' });
+    res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
+    expect(res.body.memberLookup).toBe('disabled');
+    // GPP counts by default
+    mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY, userId: 'owner-1', eventType: 'gpp', cancelledAt: null });
     res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
     expect(res.body.memberLookup).toBe('ok');
+    // ...unless the boolean is switched off
+    mockPrisma.appConfig.findMany.mockResolvedValue([{ key: 'nametags.scope', value: '1' }, { key: 'nametags.gppCounts', value: '0' }]);
+    res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
+    expect(res.body.memberLookup).toBe('disabled');
+  });
+  it('scope 1: owned by a listed host account counts; empty list matches nothing', async () => {
+    setting(1);
+    mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY, userId: 'hello-account', eventType: 'standard', cancelledAt: null });
+    let res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
+    expect(res.body.memberLookup).toBe('disabled');
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(['hello-account']) });
+    res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
+    expect(res.body.memberLookup).toBe('ok');
+  });
+  it('looks up only eligible guests (self-RSVP, confirmed, proven email) and audits the lookup', async () => {
+    mockPrisma.guest.findMany.mockResolvedValue([
+      guest('g1', { email: 'a@example.com' }),
+      guest('g2', { email: 'imported@example.com', submittedVia: 'import-csv' }),
+      guest('g3', { email: 'wait@example.com', status: 'WAITLISTED' }),
+      guest('g4', { email: 'unproven@example.com', emailVerifiedAt: null }),
+    ]);
+    await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
+    expect(lookup.mock.calls[0][0].emailHashes).toEqual([hashEmail('a@example.com')]);
+    expect(lookup.mock.calls[0][0].wallets).toEqual([]);
+    expect(mockPrisma.nametagLookupAudit.create).toHaveBeenCalledWith({ data: { partyId: PARTY, userId: 'u-host', guestCount: 1 } });
+  });
+  it('429 when the per-user hour, per-user day or per-event budget is used up (no lookup, no audit row)', async () => {
+    for (const counts of [[20, 0, 0], [0, 100, 0], [0, 0, 20]]) {
+      lookup.mockClear();
+      mockPrisma.nametagLookupAudit.count.mockReset();
+      mockPrisma.nametagLookupAudit.count.mockResolvedValueOnce(counts[0]).mockResolvedValueOnce(counts[1]).mockResolvedValueOnce(counts[2]);
+      const res = await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth());
+      expect(res.status).toBe(429);
+      expect(lookup).not.toHaveBeenCalled();
+    }
+    expect(mockPrisma.nametagLookupAudit.create).not.toHaveBeenCalled();
+  });
+  it('budgets come from settings', async () => {
+    mockPrisma.appConfig.findMany.mockResolvedValue([{ key: 'nametags.scope', value: '2' }, { key: 'nametags.rateUserPerHour', value: '2' }]);
+    mockPrisma.nametagLookupAudit.count.mockResolvedValueOnce(2).mockResolvedValueOnce(2).mockResolvedValueOnce(0);
+    expect((await request(app()).get(`/api/parties/${PARTY}/nametags`).set('Authorization', auth())).status).toBe(429);
   });
   it('failed settings read fails closed', async () => {
     mockPrisma.appConfig.findMany.mockRejectedValue(new Error('db'));
@@ -149,7 +198,16 @@ describe('admin settings', () => {
     setting(null);
     const res = await request(app()).get('/api/admin/nametags/settings').set('Authorization', auth());
     expect(res.status).toBe(200);
-    expect(res.body.settings.map((s: any) => [s.key, s.value])).toEqual([['nametags.scope', 0], ['nametags.maxIdentifiers', 500]]);
+    expect(res.body.settings.map((s: any) => [s.key, s.value])).toEqual([['nametags.scope', 0], ['nametags.gppCounts', 1], ['nametags.maxIdentifiers', 500], ['nametags.rateUserPerHour', 20], ['nametags.rateUserPerDay', 100], ['nametags.ratePartyPerHour', 20]]);
+    expect(res.body.hostUserIds).toEqual([]);
+  });
+  it('stores the PizzaDAO host account list, validated', async () => {
+    superAdmin();
+    let res = await request(app()).put('/api/admin/nametags/settings').set('Authorization', auth()).send({ key: 'nametags.hostUserIds', value: ['abc123'] });
+    expect(res.body).toEqual({ ok: true, value: ['abc123'] });
+    expect(mockPrisma.appConfig.upsert).toHaveBeenCalled();
+    res = await request(app()).put('/api/admin/nametags/settings').set('Authorization', auth()).send({ key: 'nametags.hostUserIds', value: 'not-a-list' });
+    expect(res.status).toBe(400);
   });
   it('changes a setting (audited), refuses unknown keys and out-of-range values', async () => {
     superAdmin();

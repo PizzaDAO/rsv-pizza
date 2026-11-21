@@ -37,6 +37,22 @@ describe('buildBadges with members', () => {
     expect(plain.name).toBe('Plain Guest');
     expect(plain.member).toBeUndefined();
   });
+  it('a member who RSVP\'d twice gets the tag on the earliest row that prints under the filters', () => {
+    const dup = [
+      { id: 'early', name: 'Ada', email: 'a@x.example', approved: false, submittedAt: '2026-01-01T00:00:00Z' },
+      { id: 'mid', name: 'Ada', email: 'a2@x.example', approved: true, submittedAt: '2026-01-02T00:00:00Z' },
+      { id: 'late', name: 'Ada', email: 'a3@x.example', approved: true, submittedAt: '2026-01-03T00:00:00Z' },
+    ];
+    const badges = buildBadges(dup as never, [], { source: 'going', roleLabels: labels, members: { early: MEMBER, mid: MEMBER, late: MEMBER } });
+    expect(badges.filter((b) => b.member).map((b) => b.key)).toEqual(['g-mid']);
+    // waitlisted earliest row does not print, so the member moves to the next printing row
+    const wl = [
+      { id: 'w', name: 'Ada', status: 'WAITLISTED', submittedAt: '2026-01-01T00:00:00Z' },
+      { id: 'c', name: 'Ada', status: 'CONFIRMED', submittedAt: '2026-01-02T00:00:00Z' },
+    ];
+    const b2 = buildBadges(wl as never, [], { source: 'going', roleLabels: labels, members: { w: MEMBER, c: MEMBER } });
+    expect(b2.filter((b) => b.member).map((b) => b.key)).toEqual(['g-c']);
+  });
   it('without members everything is plain', () => {
     const badges = buildBadges(GUESTS as never, [], { source: 'going', roleLabels: labels });
     expect(badges.every((b) => !b.member)).toBe(true);

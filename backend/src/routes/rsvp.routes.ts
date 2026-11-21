@@ -545,6 +545,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
 
     // The one response shape every public "new RSVP" gets (201). The duplicate-email decoy
     // and an invite completion use it too, so the caller can't tell them apart.
+    const normalizedAddressEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     const requireApproval = party.requireApproval;
     const newRsvpResponse = (guestId: string, emailSent = false) => ({
       success: true,
@@ -626,7 +627,12 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       }
     };
 
+    // marinara-32633: the RSVP email counts as proven only when the caller is signed in (verified JWT,
+    // so they hold the mailbox) as that same address. Member name tags match on this and nothing weaker.
+    const callerProvedEmail = !!normalizedAddressEmail && req.userEmail?.trim().toLowerCase() === normalizedAddressEmail;
+
     const updateData = (existing: { status: string; submittedVia: string }) => ({
+      ...(callerProvedEmail ? { emailVerifiedAt: new Date() } : {}),
       name: name.trim(),
       ethereumAddress: normalizedAddress || null,
       ...(normalizedAddress ? { walletSource: 'manual' } : {}),
@@ -792,6 +798,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       data: {
         name: name.trim(),
         email: email?.trim().toLowerCase() || null,
+        ...(callerProvedEmail ? { emailVerifiedAt: new Date() } : {}),
         ethereumAddress: normalizedAddress || null,
         walletSource: normalizedAddress ? 'manual' : null,
         roles: roles || [],

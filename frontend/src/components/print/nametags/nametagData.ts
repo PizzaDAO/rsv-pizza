@@ -66,6 +66,21 @@ export function buildBadges(guests: Guest[], coHosts: CoHost[], opts: BuildBadge
   for (const c of coHosts) if (c.email) coHostByEmail.set(c.email.trim().toLowerCase(), c);
   const host = (hostName ?? '').trim().toLowerCase();
 
+  // A member who RSVP'd more than once gets their member tag on the earliest row that will actually print
+  // (after this list's own filters); any other row prints plain.
+  const memberFor = new Map<string, NametagMember>();
+  if (members) {
+    const taken = new Set<string>();
+    const byTime = [...guests].sort((x, y) => (x.submittedAt ? Date.parse(x.submittedAt) || 0 : 0) - (y.submittedAt ? Date.parse(y.submittedAt) || 0 : 0));
+    for (const g of byTime) {
+      const m = g.id ? members[g.id] : undefined;
+      if (!g.id || !m || !included(g, source, includeWaitlist) || taken.has(m.memberId)) continue;
+      if (!safeName(m.name) && !safeName(g.name)) continue;
+      taken.add(m.memberId);
+      memberFor.set(g.id, m);
+    }
+  }
+
   const seen = new Set<string>();
   const rows: { badge: Badge; at: number }[] = [];
   guests.forEach((g, i) => {
@@ -73,7 +88,7 @@ export function buildBadges(guests: Guest[], coHosts: CoHost[], opts: BuildBadge
     const id = g.id ?? `idx-${i}`;
     if (seen.has(id)) return;
     seen.add(id);
-    const member = g.id ? members?.[g.id] : undefined;
+    const member = g.id ? memberFor.get(g.id) : undefined;
     const name = (member && safeName(member.name)) || safeName(g.name);
     if (!name) return;
 
