@@ -549,6 +549,22 @@ describe('(f) admin routes require a super_admin', () => {
     expect(db.requests).toHaveLength(0);
   });
 
+  it('GET /api/admin/tax-forms/:id: 403 for admin/payment_admin, 200 for super_admin', async () => {
+    const app = createApp();
+    db.admins.push({ email: 'admin@example.com', role: 'admin' });
+    db.admins.push({ email: 'pay@example.com', role: 'payment_admin' });
+    db.admins.push({ email: 'root@example.com', role: 'super_admin' });
+    const f = seedForm({ status: 'submitted', formData: FULL_W9, pdfUrl: 'requests/r/w9-1.pdf' });
+    for (const email of ['admin@example.com', 'pay@example.com']) {
+      const res = await request(app).get(`/api/admin/tax-forms/${f.id}`).set('Authorization', bearer('u-x', email));
+      expect(res.status, email).toBe(403);
+      expect(JSON.stringify(res.body)).not.toContain(FULL_W9.ssn);
+    }
+    const ok = await request(app).get(`/api/admin/tax-forms/${f.id}`).set('Authorization', bearer('u-r', 'root@example.com'));
+    expect(ok.status).toBe(200);
+    expect(ok.body.taxForm.id).toBe(f.id);
+  });
+
   it('super_admin gets 200 on the admin lists', async () => {
     const app = createApp();
     db.admins.push({ email: 'root@example.com', role: 'super_admin' });

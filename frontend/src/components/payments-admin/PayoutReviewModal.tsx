@@ -2620,9 +2620,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 (default) the host's NewPayoutForm hides TaxFormSection and
                 the backend skips the TAX_FORM_REQUIRED 400. When ON, hosts
                 see TaxFormSection and must submit a W-9 / W-8BEN / W-8BEN-E
-                before they can submit a payout. The TaxFormReviewPanel
-                below still surfaces any historical snapshot regardless of
-                this flag. */}
+                before they can submit a payout. Super admins also see the
+                TaxFormReviewPanel below (historical snapshot regardless of
+                this flag); other admins get a status-only line. */}
             {(canEditTaxFormRequired || taxFormRequired) && (
               <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
                 <Checkbox
@@ -2644,11 +2644,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               </div>
             )}
 
-            {/* salame-92110: Tax form review panel (above Receipts). Shows the
-                W-9 / W-8BEN / W-8BEN-E snapshotted onto the payout, with
-                Verify / Reject. When `payout.taxFormId` is null we render an
-                amber "host has not submitted a tax form" banner. */}
-            {isSuperAdmin && <TaxFormReviewPanel taxFormId={payout.taxFormId ?? null} />}
+            {/* salame-92110: Tax form review panel (above Receipts), super_admin
+                ONLY (TINs / form data / PDF). Everyone else gets a
+                status-only line derived from `payout.taxFormId`. */}
+            {isSuperAdmin ? (
+              <TaxFormReviewPanel taxFormId={payout.taxFormId ?? null} />
+            ) : payout.taxFormId ? (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface text-xs text-theme-text-muted">
+                <span className="font-semibold">Tax form</span> — on file (details visible to super admins only).
+              </div>
+            ) : (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100 [.gpp-theme_&]:text-amber-900">
+                <span className="font-semibold">Tax form</span> — host has not submitted a tax form for this payment.
+              </div>
+            )}
 
             {/* Per-receipt OCR */}
             {receipts.length > 0 && (
