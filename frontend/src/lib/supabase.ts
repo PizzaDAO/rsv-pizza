@@ -1145,9 +1145,6 @@ export const SENSITIVE_PARTY_COLUMNS: readonly string[] = [
   'photo_reminder_sent_at', 'attendance_reminder_sent_at', 'host_survey_sent_at',
   // scam-flag-private: raw tags mix in admin-only ones; anon reads public_event_tags instead.
   'event_tags',
-  // capers-11903: validated reimbursement caps are host/admin-only; editors get them merged from
-  // GET /api/parties/:id (mergeHostOnlyPartyFields).
-  'reimbursement_cap_usd',
 ];
 
 /**

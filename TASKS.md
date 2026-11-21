@@ -19,7 +19,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | crust-55886 | natural language event creation and edits | todo | P2 |  |  |  |  |  |  |
 | capers-97579 | connect discord to pull in pizzadao status | todo | P2 |  |  |  |  |  |  |
 | buffalo-82324 | Support for specialty pizzas on the menu | todo | P2 |  |  |  |  |  |  |
-| capers-11903 | Reimbursement cap amounts are public (effectiveReimbursementCapUsd on /api/events/:slug + anon-readable reimbursement_cap_usd) | review | P2 |  |  | security |  | #1393 | Revoke migration 20261121_revoke_anon_reimbursement_cap_usd NOT applied; apply ~24h after frontend ships |
+| capers-11903 | Reimbursement cap amounts are public (effectiveReimbursementCapUsd on /api/events/:slug + anon-readable reimbursement_cap_usd) | review | P2 |  |  | security |  | #1393 | Revoke migration 20261121_revoke_anon_reimbursement_cap_usd NOT applied; apply ~24h after frontend ships; then follow-up PR adds reimbursement_cap_usd to anon-sensitive-columns.json + SENSITIVE_PARTY_COLUMNS |
 | basil-94900 | https://cerebralvalley.ai/auth/login | todo | P3 |  |  |  |  |  |  |
 | onion-83378 | graphics review dashboard that shows all generated flyers | todo | P3 |  |  |  |  |  |  |
 | quattro-formaggi-63954 | graphics generator that adds logos | todo | P3 |  |  |  |  |  |  |

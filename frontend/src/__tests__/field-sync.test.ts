@@ -170,7 +170,7 @@ describe('Field Mapping Consistency', () => {
     // GET /api/parties/:id (not DB columns).
     const computedOrExcluded = new Set([
       'host_name', 'has_password', 'password', 'host_profile',
-      'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by', 'reimbursement_cap_appeal_note',
+      'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by', 'reimbursement_cap_appeal_note', 'reimbursement_cap_usd',
       ...SENSITIVE_PARTY_COLUMNS,
       'can_edit', 'allowed_tabs', 'raw_event_tags_loaded',
     ]);
