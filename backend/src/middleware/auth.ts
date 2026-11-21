@@ -26,6 +26,12 @@ export async function isSuperAdmin(email?: string): Promise<boolean> {
   return admin?.role === 'super_admin';
 }
 
+// Tax-form data (TINs/SSNs/EINs, addresses, form PDFs) is restricted to super_admin
+// ONLY. Do not widen to admin / payment_admin: they must not see payee tax data.
+export async function canViewTaxForms(email?: string): Promise<boolean> {
+  return isSuperAdmin(email);
+}
+
 // Check if the user is allowed in the host-payments dashboard: returns true for
 // payment_admin, admin, OR super_admin. Full admins always get in too.
 export async function isPaymentAdmin(email?: string): Promise<boolean> {

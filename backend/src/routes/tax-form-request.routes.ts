@@ -22,7 +22,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isPaymentAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, canViewTaxForms } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import {
   isValidFormType,
@@ -258,7 +258,7 @@ publicTaxFormRequestRouter.post('/:token/submit', tokenLimiter, async (req: Requ
 adminTaxFormRequestRouter.use(requireAuth);
 adminTaxFormRequestRouter.use(async (req: AuthRequest, _res: Response, next: NextFunction) => {
   try {
-    if (!(await isPaymentAdmin(req.userEmail))) throw new AppError('Forbidden', 403, 'FORBIDDEN');
+    if (!(await canViewTaxForms(req.userEmail))) throw new AppError('Forbidden', 403, 'FORBIDDEN');
     next();
   } catch (e) {
     next(e);

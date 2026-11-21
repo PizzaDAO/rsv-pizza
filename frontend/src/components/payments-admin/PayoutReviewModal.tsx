@@ -9,6 +9,7 @@ import { isSwcHubParty } from '../../utils/swcHub';
 import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, rotatePayoutDocument, summarizePayoutDocument, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
+import { useIsSuperAdmin } from '../../hooks/useIsSuperAdmin';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
 import {
@@ -306,6 +307,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onDocumentsChanged,
   busy = false,
 }) => {
+  // Tax-form data is super_admin only (backend is the real gate).
+  const isSuperAdmin = useIsSuperAdmin();
   // argentina-92103: underbosses lose Execute/Mark-paid affordances. The
   // green Flag-ready button replaces them in the footer slot.
   const isAdminViewer = viewerRole === 'admin';
@@ -2645,7 +2648,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 W-9 / W-8BEN / W-8BEN-E snapshotted onto the payout, with
                 Verify / Reject. When `payout.taxFormId` is null we render an
                 amber "host has not submitted a tax form" banner. */}
-            <TaxFormReviewPanel taxFormId={payout.taxFormId ?? null} />
+            {isSuperAdmin && <TaxFormReviewPanel taxFormId={payout.taxFormId ?? null} />}
 
             {/* Per-receipt OCR */}
             {receipts.length > 0 && (

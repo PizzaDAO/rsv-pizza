@@ -63,6 +63,7 @@ import {
   MarkPartyPaidModal,
 } from '../components/payments-admin';
 import type { BulkSendResult } from '../lib/api';
+import { useIsSuperAdmin } from '../hooks/useIsSuperAdmin';
 // panuozzo-92114: URL <-> filter/view-mode (de)serializer so a refresh / shared
 // link restores the exact filtered view.
 import {
@@ -1123,6 +1124,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const pageTitle = portalLabel ? `${portalLabel} Payments` : 'Host Payments';
   const viewerKind = role.viewerKind;
   const isUnderboss = viewerKind === 'underboss';
+  // Tax-form data is super_admin only (backend is the real gate).
+  const isSuperAdmin = useIsSuperAdmin();
 
   // Count of the rows actually rendered in the active table: cities in the
   // by-city view, individual payouts in the by-payment / payments views. Sits
@@ -1191,7 +1194,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         </div>
 
         {/* calzone-70821: standalone tax-form requests (admin-only). */}
-        {!isUnderboss && <TaxFormRequestsSection />}
+        {!isUnderboss && isSuperAdmin && <TaxFormRequestsSection />}
 
         {/* coppa-91827: hot wallet address + ETH/USDC balances so admins know
             where to deposit funds and can verify they landed. Self-fetches.
