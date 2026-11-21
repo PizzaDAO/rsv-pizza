@@ -78,9 +78,10 @@ function setCached(key: string, payload: Pizzeria[]): void {
 }
 
 const FETCH_TIMEOUT_MS = 10_000;
-// The public Overpass server is frequently overloaded; fail fast and fall back to Photon.
-const OVERPASS_TIMEOUT_MS = 6_000;
-const PHOTON_TIMEOUT_MS = 6_000;
+// The public Overpass server is frequently overloaded (it often hangs instead of erroring),
+// so give it 3s before falling back to Photon, which answers in ~0.5s.
+const OVERPASS_TIMEOUT_MS = 3_000;
+const PHOTON_TIMEOUT_MS = 4_000;
 const MAX_RESULTS = 20;
 
 /** fetch with an abort timeout; a timeout becomes PizzeriaSearchError(504) with no upstream text. */
@@ -230,7 +231,7 @@ async function searchOsmPizzerias(lat: number, lng: number, radius: number): Pro
 // napoletana-58547: keyless OpenStreetMap search via Overpass. lat/lng/radius are validated
 // numbers (see parseSearchInput), so interpolating them into the query is safe.
 async function searchOverpassPizzerias(lat: number, lng: number, radius: number): Promise<Pizzeria[]> {
-  const query = `[out:json][timeout:6];
+  const query = `[out:json][timeout:3];
 ( node["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng});
   way ["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng}); );
 out center 20;`;
