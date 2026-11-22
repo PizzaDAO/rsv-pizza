@@ -28,11 +28,22 @@
  *     200: { ok:true, events:[{ eventId, name, date, city, url, matchedBy, hideGuestList }] }
  *     dryRun (emailHashes only, <=100): 200 { ok:true, dryRun:true, matchedMembers:n }
  *     No PII: never other guests, emails, names or wallets.
+ *
+ *   POST /api/service/upcoming-events
+ *     "Which curated public events are coming up?" Feeds nearby-event invites on pizzadao.org.
+ *     Logic: lib/upcomingEvents.ts. Same x-service-key auth and limiter, plus UPCOMING_EVENTS_ENABLED=1
+ *     (else 503 { ok:false, reason:'disabled' }).
+ *     Body: { until?: ISO date (default +45 days, max +120), limit?: 1..500 }
+ *     200: { ok:true, events:[{ eventId, url, name, date, timezone, city, latitude, longitude,
+ *            addressIsCityDefault, full, rsvpClosed, kind:'gpp'|'series' }] }  soonest first
+ *     Only approved/listed GPP and series events that are public (not private, no password, not cancelled,
+ *     in the future, with coordinates). No host or guest data, no street address.
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { rateLimit } from 'express-rate-limit';
 import { findGppHostEvents, IdentifierError, parseIdentifiers } from '../lib/gppHostLookup.js';
+import { findUpcomingEvents, parseUpcomingQuery } from '../lib/upcomingEvents.js';
 import { countMatchedMembers, findAttendedEvents, parseAttendanceQuery } from '../lib/guestAttendance.js';
 
 const router = Router();
@@ -110,6 +121,36 @@ router.post(
         return res.json({ ok: true, dryRun: true, matchedMembers: await countMatchedMembers(q) });
       }
       res.json({ ok: true, events: await findAttendedEvents(q) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/** Feature flag: 503 { ok:false, reason:'disabled' } unless the env var is `1`. */
+function requireUpcomingEventsEnabled(_req: Request, res: Response, next: NextFunction) {
+  if (process.env.UPCOMING_EVENTS_ENABLED?.trim() !== '1') {
+    return res.status(503).json({ ok: false, reason: 'disabled' });
+  }
+  next();
+}
+
+router.post(
+  '/upcoming-events',
+  serviceLimiter,
+  requireServiceKey,
+  requireUpcomingEventsEnabled,
+  async (req: Request, res: Response, next: NextFunction) => {
+    res.set('Cache-Control', 'private, no-store');
+    let q;
+    try {
+      q = parseUpcomingQuery(req.body);
+    } catch (e) {
+      if (e instanceof IdentifierError) return res.status(400).json({ ok: false, reason: e.message });
+      return next(e);
+    }
+    try {
+      res.json({ ok: true, events: await findUpcomingEvents(q) });
     } catch (error) {
       next(error);
     }
