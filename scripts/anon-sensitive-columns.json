@@ -8,6 +8,7 @@
     "host_telegram_link_token",
     "cancelled_by",
     "reimbursement_cap_appeal_note",
+    "reimbursement_cap_usd",
     "admin_notes",
     "underboss_notes",
     "underboss_approved",
