@@ -1133,7 +1133,7 @@ export function partyColumnNames(select: string = SAFE_PARTY_COLUMNS): string[] 
 export const SENSITIVE_PARTY_COLUMNS: readonly string[] = [
   'password', 'report_password', 'venue_report_password', 'co_hosts',
   'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by',
-  'reimbursement_cap_appeal_note', 'admin_notes', 'underboss_notes',
+  'reimbursement_cap_appeal_note', 'reimbursement_cap_usd', 'admin_notes', 'underboss_notes',
   'underboss_approved', 'host_status', 'host_tags', 'host_goals',
   'venue_status', 'venue_capacity', 'venue_cost', 'venue_point_person',
   'venue_contact_name', 'venue_contact_email', 'venue_contact_phone',

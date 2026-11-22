@@ -19,7 +19,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | crust-55886 | natural language event creation and edits | todo | P2 |  |  |  |  |  |  |
 | capers-97579 | connect discord to pull in pizzadao status | todo | P2 |  |  |  |  |  |  |
 | buffalo-82324 | Support for specialty pizzas on the menu | todo | P2 |  |  |  |  |  |  |
-| capers-11903 | Reimbursement cap amounts are public (effectiveReimbursementCapUsd on /api/events/:slug + anon-readable reimbursement_cap_usd) | review | P2 |  |  | security |  | #1393 | Revoke migration 20261121_revoke_anon_reimbursement_cap_usd NOT applied; apply ~24h after frontend ships; then follow-up PR adds reimbursement_cap_usd to anon-sensitive-columns.json + SENSITIVE_PARTY_COLUMNS |
 | basil-94900 | https://cerebralvalley.ai/auth/login | todo | P3 |  |  |  |  |  |  |
 | onion-83378 | graphics review dashboard that shows all generated flyers | todo | P3 |  |  |  |  |  |  |
 | quattro-formaggi-63954 | graphics generator that adds logos | todo | P3 |  |  |  |  |  |  |
@@ -69,6 +68,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 ## Done
 
+| capers-11903 | Reimbursement cap amounts are public (effectiveReimbursementCapUsd on /api/events/:slug + anon-readable reimbursement_cap_usd) | P2 | 2026-11-22 | #1393 | public API drops cap fields; anon/authenticated column SELECT revoked in prod 2026-11-22; column added to sensitive lists in follow-up PR |
 | blackolive-70521 | add event tags | P2 | 2026-11-18 | #1383 | public host-chosen tags in parties.labels (curated 20 keys, max 5); plan archived to plans/done/. Phase 0 done: #1349, #1368. Later: admin override, per-series vocab, /map + series chips, AI assistant field |
 | scam-flag-private | Stop anon reading admin-only parties.event_tags (public_event_tags column) | P1 | 2026-11-19 | #1369 | step 3 revoke applied to prod 2026-11-19 |
 | brick-oven-18875 | square image doesn't accept other kinds of images | P2 | 2026-11-16 | #1340 | HEIC (native, heic2any, then authed backend /api/heic/to-jpeg), center-crop, 2048px cap, 25MB input |
